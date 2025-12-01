@@ -28,18 +28,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     
     if (mounted) {
       if (isAuthenticated) {
-        // User is logged in, go to home
-        context.go('/');
-      } else {
-        // User is not logged in, check onboarding
+        // User is logged in, check if they completed profile onboarding
         final prefs = await SharedPreferences.getInstance();
-        final onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
+        final profileOnboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
         
-        if (onboardingCompleted) {
-          context.go('/login');
+        if (profileOnboardingCompleted) {
+          // Profile setup done, go to home
+          context.go('/');
         } else {
+          // Need to complete profile setup
           context.go('/onboarding');
         }
+      } else {
+        // User is not logged in, go to login
+        context.go('/login');
       }
     }
   }

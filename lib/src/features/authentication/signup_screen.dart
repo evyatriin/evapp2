@@ -44,7 +44,40 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           );
 
       if (mounted) {
-        context.go('/onboarding');
+        // Show email confirmation message
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: const Text('Check Your Email'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.email, size: 64, color: Colors.green),
+                const Gap(16),
+                Text(
+                  'We\'ve sent a confirmation email to ${_emailController.text.trim()}',
+                  textAlign: TextAlign.center,
+                ),
+                const Gap(8),
+                const Text(
+                  'Please check your email and click the confirmation link to activate your account.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.grey),
+                ),
+              ],
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  context.go('/login');
+                },
+                child: const Text('Go to Login'),
+              ),
+            ],
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {

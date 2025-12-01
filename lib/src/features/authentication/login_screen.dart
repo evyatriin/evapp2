@@ -42,10 +42,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
+        // Check if it's an email confirmation error
+        String errorMessage = e.toString();
+        if (errorMessage.contains('email_not_confirmed') || errorMessage.contains('Email not confirmed')) {
+          errorMessage = 'Please confirm your email before logging in. Check your inbox for the confirmation link.';
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Login failed: ${e.toString()}'),
+            content: Text('Login failed: $errorMessage'),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 5),
           ),
         );
       }

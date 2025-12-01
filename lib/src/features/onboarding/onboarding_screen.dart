@@ -24,22 +24,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _phoneController = TextEditingController();
   bool _isPhoneVerified = false;
 
-  // Step 2: Vehicle
-  String? _selectedBrand;
-  String? _selectedModel;
-  String? _selectedConnector;
-
-  // Step 3: Location
+  // Step 2: Location
   bool _locationGranted = false;
 
   @override
   void initState() {
     super.initState();
-    // Pre-fill name if available
-    final user = ref.read(userProvider);
-    if (user != null) {
-      _nameController.text = user.name;
-    }
+    // Pre-fill name if available - defer to after first build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(userProvider);
+      if (user != null && mounted) {
+        setState(() {
+          _nameController.text = user.name;
+        });
+      }
+    });
   }
 
   @override
@@ -145,14 +144,16 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Future<void> _completeOnboarding() async {
     setState(() => _isLoading = true);
     try {
+      // Verify user is logged in
+      final user = ref.read(userProvider);
+      if (user == null) {
+        throw Exception('Please log in again to complete setup');
+      }
+
       await ref.read(userProvider.notifier).completeOnboarding(
         phoneNumber: _phoneController.text,
         isPhoneVerified: _isPhoneVerified,
-        vehicleDetails: {
-          'brand': _selectedBrand,
-          'model': _selectedModel,
-          'connector': _selectedConnector,
-        },
+        vehicleDetails: {}, // Vehicle will be added via vehicle selection screen
       );
 
       final prefs = await SharedPreferences.getInstance();
@@ -164,7 +165,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -176,6 +177,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the provider to keep it alive
+    ref.watch(userProvider);
+    
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -191,7 +195,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 },
                 children: [
                   _buildProfileStep(),
-                  _buildVehicleStep(),
                   _buildLocationStep(),
                 ],
               ),
@@ -205,7 +208,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   // Indicators
                   Row(
                     children: List.generate(
-                      3,
+                      2,
                       (index) => Container(
                         margin: const EdgeInsets.only(right: 8),
                         height: 8,
@@ -220,7 +223,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     ),
                   ),
                   // Button
-                  if (_currentPage == 2)
+                  if (_currentPage == 1)
                     FilledButton(
                       onPressed: _isLoading ? null : _completeOnboarding,
                       child: _isLoading
@@ -234,27 +237,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   else
                     FilledButton.tonal(
                       onPressed: () {
-                        // Validation logic
-                        if (_currentPage == 0) {
-                          if (_nameController.text.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your name')));
-                            return;
-                          }
-                          if (_phoneController.text.isEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your phone number')));
-                            return;
-                          }
-                          if (!_isPhoneVerified) {
-                            // Allow proceeding but warn? Or just proceed.
-                            // User requested: "If the user skips the phone verification..."
-                            // So we just proceed.
-                          }
-                        } else if (_currentPage == 1) {
-                           if (_selectedBrand == null || _selectedModel == null) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select your vehicle')));
-                            return;
-                          }
+                        // Validation logic for profile step
+                        if (_nameController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your name')));
+                          return;
                         }
+                        if (_phoneController.text.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your phone number')));
+                          return;
+                        }
+                        // Navigate to vehicle selection screen
+                        context.push('/onboarding/vehicle-select');
                         _nextPage();
                       },
                       child: const Text('Next'),
@@ -338,85 +331,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
-  Widget _buildVehicleStep() {
-    // Mock Data
-    final brands = ['Tata', 'MG', 'Hyundai', 'Kia', 'Mahindra', 'BYD'];
-    final models = {
-      'Tata': ['Nexon EV', 'Tiago EV', 'Tigor EV', 'Punch EV'],
-      'MG': ['ZS EV', 'Comet EV'],
-      'Hyundai': ['Kona Electric', 'Ioniq 5'],
-      'Kia': ['EV6'],
-      'Mahindra': ['XUV400'],
-      'BYD': ['Atto 3', 'E6'],
-    };
-    final connectors = ['CCS2', 'Type 2', 'CHAdeMO', 'GB/T'];
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Gap(40),
-          Icon(PhosphorIcons.car(PhosphorIconsStyle.duotone), size: 64, color: Theme.of(context).colorScheme.primary),
-          const Gap(24),
-          Text(
-            'Your Electric Vehicle',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const Gap(8),
-          Text(
-            'Tell us about your car to help us plan better routes.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-          ),
-          const Gap(32),
-          DropdownButtonFormField<String>(
-            value: _selectedBrand,
-            decoration: const InputDecoration(
-              labelText: 'Brand',
-              border: OutlineInputBorder(),
-            ),
-            items: brands.map((b) => DropdownMenuItem(value: b, child: Text(b))).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedBrand = value;
-                _selectedModel = null; // Reset model
-              });
-            },
-          ),
-          const Gap(24),
-          DropdownButtonFormField<String>(
-            value: _selectedModel,
-            decoration: const InputDecoration(
-              labelText: 'Model',
-              border: OutlineInputBorder(),
-            ),
-            items: (_selectedBrand != null ? models[_selectedBrand] ?? [] : [])
-                .map((m) => DropdownMenuItem<String>(value: m, child: Text(m)))
-                .toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedModel = value;
-              });
-            },
-          ),
-          const Gap(24),
-          DropdownButtonFormField<String>(
-            value: _selectedConnector,
-            decoration: const InputDecoration(
-              labelText: 'Connector Type',
-              border: OutlineInputBorder(),
-            ),
-            items: connectors.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-            onChanged: (value) {
-              setState(() {
-                _selectedConnector = value;
-              });
-            },
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildLocationStep() {
     return Padding(
