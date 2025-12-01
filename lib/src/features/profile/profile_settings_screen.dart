@@ -37,7 +37,24 @@ class ProfileSettingsScreen extends ConsumerWidget {
                             child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U'),
                           ),
                           title: Text(user.name),
-                          subtitle: Text(user.email),
+                          subtitle: Row(
+                            children: [
+                              Text(user.email),
+                              const Gap(8),
+                              Icon(
+                                Icons.check_circle,
+                                size: 16,
+                                color: user.isPhoneVerified ? Colors.blue : Colors.grey,
+                              ),
+                              const Gap(4),
+                              Text(
+                                user.isPhoneVerified ? 'Verified' : 'Unverified',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: user.isPhoneVerified ? Colors.blue : Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
                           trailing: IconButton(
                             icon: const Icon(Icons.edit),
                             onPressed: () => context.push('/profile/edit'),

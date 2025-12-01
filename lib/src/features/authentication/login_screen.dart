@@ -58,6 +58,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the provider to keep it alive during async operations
+    ref.watch(userProvider);
     final theme = Theme.of(context);
 
     return Scaffold(

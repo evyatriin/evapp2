@@ -44,7 +44,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
           );
 
       if (mounted) {
-        context.go('/');
+        context.go('/onboarding');
       }
     } catch (e) {
       if (mounted) {
@@ -64,6 +64,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Watch the provider to keep it alive during async operations
+    ref.watch(userProvider);
     final theme = Theme.of(context);
 
     return Scaffold(

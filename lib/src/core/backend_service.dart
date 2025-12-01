@@ -4,12 +4,9 @@ import 'package:http/http.dart' as http;
 
 class BackendService {
   // Use 10.0.2.2 for Android Emulator, localhost for iOS Simulator
+
   static String get baseUrl {
-    if (Platform.isAndroid) {
-      return 'http://10.0.2.2:8000';
-    } else {
-      return 'http://127.0.0.1:8000';
-    }
+    return 'https://evyatribackend-bqc7hqdjgaezh6gd.southindia-01.azurewebsites.net';
   }
 
   static Future<dynamic> get(String endpoint, {Map<String, String>? queryParams}) async {
@@ -30,6 +27,23 @@ class BackendService {
     final uri = Uri.parse('$baseUrl$endpoint');
     try {
       final response = await http.post(
+        uri,
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(body),
+      );
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Backend Error: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network Error: $e');
+    }
+  }
+  static Future<dynamic> put(String endpoint, {required Map<String, dynamic> body}) async {
+    final uri = Uri.parse('$baseUrl$endpoint');
+    try {
+      final response = await http.put(
         uri,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(body),

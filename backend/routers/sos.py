@@ -2,15 +2,14 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-from supabase import create_client, Client
+from supabase import Client
+from supabase_client import supabase
 import os
 
 router = APIRouter()
 
 # Supabase Setup
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
+# Supabase Setup - using centralized client from supabase_client.py
 
 class SOSAlert(BaseModel):
     id: Optional[str] = None
@@ -34,6 +33,15 @@ class CreateAlertRequest(BaseModel):
 @router.post("/alert", response_model=SOSAlert)
 async def create_sos_alert(request: CreateAlertRequest):
     try:
+        # Check if user has verified phone number
+        profile = supabase.table("profiles").select("preferences").eq("id", request.user_id).execute()
+        if not profile.data:
+             raise HTTPException(status_code=404, detail="User profile not found")
+             
+        prefs = profile.data[0].get("preferences", {})
+        if not prefs.get("is_phone_verified", False):
+             raise HTTPException(status_code=403, detail="Phone number not verified. Please verify your phone number to send SOS alerts.")
+
         data = request.dict()
         response = supabase.table("sos_alerts").insert(data).execute()
         return response.data[0]

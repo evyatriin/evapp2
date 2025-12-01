@@ -44,11 +44,32 @@ class AuthService {
 
       if (response.user != null) {
         final userData = response.user!.userMetadata ?? {};
+        
+        // Fetch additional profile data
+        bool isVerified = false;
+        try {
+          final profileResponse = await _supabase
+              .from('profiles')
+              .select('preferences')
+              .eq('id', response.user!.id)
+              .maybeSingle();
+          
+          if (profileResponse != null) {
+             final prefs = profileResponse['preferences'];
+             if (prefs is Map) {
+               isVerified = prefs['is_phone_verified'] == true;
+             }
+          }
+        } catch (e) {
+          print('Error fetching profile preferences: $e');
+        }
+
         return UserProfile(
           id: response.user!.id,
           email: response.user!.email!,
           name: userData['name'] ?? '',
           profileImageUrl: userData['profile_image_url'],
+          isPhoneVerified: isVerified,
         );
       }
       return null;
@@ -74,11 +95,33 @@ class AuthService {
       final user = _supabase.auth.currentUser;
       if (user != null) {
         final userData = user.userMetadata ?? {};
+        
+        // Fetch additional profile data
+        bool isVerified = false;
+        try {
+          final profileResponse = await _supabase
+              .from('profiles')
+              .select('preferences')
+              .eq('id', user.id)
+              .maybeSingle();
+          
+          if (profileResponse != null) {
+             final prefs = profileResponse['preferences'];
+             // Handle both Map and JSON string cases if necessary, but usually Map
+             if (prefs is Map) {
+               isVerified = prefs['is_phone_verified'] == true;
+             }
+          }
+        } catch (e) {
+          print('Error fetching profile preferences: $e');
+        }
+
         return UserProfile(
           id: user.id,
           email: user.email!,
           name: userData['name'] ?? '',
           profileImageUrl: userData['profile_image_url'],
+          isPhoneVerified: isVerified,
         );
       }
       return null;

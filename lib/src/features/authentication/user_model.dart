@@ -3,12 +3,14 @@ class UserProfile {
   final String name;
   final String email;
   final String? profileImageUrl;
+  final bool isPhoneVerified;
 
   const UserProfile({
     required this.id,
     required this.name,
     required this.email,
     this.profileImageUrl,
+    this.isPhoneVerified = false,
   });
 
   UserProfile copyWith({
@@ -16,12 +18,14 @@ class UserProfile {
     String? name,
     String? email,
     String? profileImageUrl,
+    bool? isPhoneVerified,
   }) {
     return UserProfile(
       id: id ?? this.id,
       name: name ?? this.name,
       email: email ?? this.email,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
     );
   }
 
@@ -32,6 +36,7 @@ class UserProfile {
       name: json['name'] as String,
       email: json['email'] as String,
       profileImageUrl: json['profile_image_url'] as String?,
+      isPhoneVerified: json['is_phone_verified'] as bool? ?? false,
     );
   }
 
@@ -41,6 +46,7 @@ class UserProfile {
       'name': name,
       'email': email,
       'profile_image_url': profileImageUrl,
+      'is_phone_verified': isPhoneVerified,
     };
   }
 }

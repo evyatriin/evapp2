@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'user_model.dart';
 import 'auth_service.dart';
+import '../../core/backend_service.dart';
 
 part 'user_provider.g.dart';
 
@@ -60,6 +61,31 @@ class User extends _$User {
       state = null;
     } catch (e) {
       print('Sign out error in provider: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> completeOnboarding({
+    required String phoneNumber,
+    required bool isPhoneVerified,
+    required Map<String, dynamic> vehicleDetails,
+  }) async {
+    try {
+      if (state == null) throw Exception('User not logged in');
+      
+      await BackendService.put('/api/users/profile', body: {
+        'user_id': state!.id,
+        'phone_number': phoneNumber,
+        'is_phone_verified': isPhoneVerified,
+        'vehicle_details': vehicleDetails,
+      });
+      
+      // Update local state
+      if (state != null) {
+        state = state!.copyWith(isPhoneVerified: isPhoneVerified);
+      }
+    } catch (e) {
+      print('Onboarding error: $e');
       rethrow;
     }
   }
