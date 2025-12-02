@@ -202,11 +202,8 @@ class _VehicleSelectionScreenState extends ConsumerState<VehicleSelectionScreen>
       );
       
       // Check if we are in onboarding flow or normal app flow
-      if (GoRouter.of(context).routerDelegate.currentConfiguration.fullPath.contains('onboarding')) {
-        context.go('/'); // Go to home after onboarding
-      } else {
-        context.pop(); // Go back to profile
-      }
+      // If in onboarding, we pop to return to the OnboardingScreen which has moved to the Location step
+      context.pop();
     }
   }
 }
