@@ -314,8 +314,21 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 const Gap(8),
                 TextButton(
                   onPressed: () {
-                     // Just visual feedback or nothing, since "Next" button handles the flow
-                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone verification skipped')));
+                    // Validation logic for profile step
+                    if (_nameController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your name')));
+                      return;
+                    }
+                    if (_phoneController.text.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your phone number')));
+                      return;
+                    }
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone verification skipped')));
+                    
+                    // Navigate to vehicle selection screen
+                    context.push('/onboarding/vehicle-select');
+                    _nextPage();
                   },
                   child: const Text('Skip'),
                 ),
