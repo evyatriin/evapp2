@@ -1,15 +1,14 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
-from supabase import create_client, Client
+from supabase import Client
+from supabase_client import supabase
 import os
 
 router = APIRouter()
 
 # Supabase Setup
-url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
+# Supabase Setup - using centralized client
 
 class ModerationRequest(BaseModel):
     admin_id: str
