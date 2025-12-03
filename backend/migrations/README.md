@@ -30,6 +30,8 @@ psql -h your-db-host -U postgres -d postgres -f migrations/001_create_station_ch
 ## Migration Files
 
 - `001_create_station_checkins.sql` - Creates station_checkins table and adds points column to profiles
+- `002_create_saved_chargers.sql` - Creates saved_chargers table for user's favorite charging stations
+- `003_create_ev_news.sql` - Creates ev_news table for AI-curated EV news articles
 
 ## Rollback
 
@@ -38,4 +40,16 @@ To rollback the station_checkins migration:
 ```sql
 DROP TABLE IF EXISTS station_checkins CASCADE;
 ALTER TABLE profiles DROP COLUMN IF EXISTS points;
+```
+
+To rollback the saved_chargers migration:
+
+```sql
+DROP TABLE IF EXISTS saved_chargers CASCADE;
+```
+
+To rollback the ev_news migration:
+
+```sql
+DROP TABLE IF EXISTS ev_news CASCADE;
 ```
