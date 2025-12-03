@@ -57,4 +57,18 @@ class BackendService {
       throw Exception('Network Error: $e');
     }
   }
+
+  static Future<dynamic> delete(String endpoint) async {
+    final uri = Uri.parse('$baseUrl$endpoint');
+    try {
+      final response = await http.delete(uri);
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else {
+        throw Exception('Backend Error: ${response.statusCode} - ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network Error: $e');
+    }
+  }
 }

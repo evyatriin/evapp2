@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'src/core/router.dart';
 import 'src/core/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Initialize AdMob
+  await MobileAds.instance.initialize();
+
   // Initialize Supabase
   await Supabase.initialize(
     url: 'https://bqbiysdnqtcnckybzffk.supabase.co',

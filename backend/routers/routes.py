@@ -62,7 +62,13 @@ async def save_route(route: SavedRouteCreate):
             
         response = supabase.table("saved_routes").insert(data).execute()
         
-        if response.data:
+            # Award points for planning/saving a route
+            try:
+                from utils.gamification_utils import award_points_internal
+                await award_points_internal(route.user_id, 5, 'route')
+            except Exception as e:
+                print(f"Error awarding points for route: {e}")
+
             return response.data[0]
         else:
             raise HTTPException(status_code=500, detail="Failed to save route")

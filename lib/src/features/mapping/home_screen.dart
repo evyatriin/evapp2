@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../community/check_in_sheet.dart';
 import 'stations_repository.dart';
 import 'station_model.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geocoding/geocoding.dart';
+import 'saved_chargers_list.dart';
+import '../community/gamification_widgets.dart';
+import '../authentication/user_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -16,9 +19,53 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProviderStateMixin {
   GoogleMapController? _mapController;
   LatLng? _currentCameraPosition;
+  final TextEditingController _searchController = TextEditingController();
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _searchLocation(String query) async {
+    if (query.isEmpty) return;
+    try {
+      List<Location> locations = await locationFromAddress(query);
+      if (locations.isNotEmpty) {
+        final location = locations.first;
+        final target = LatLng(location.latitude, location.longitude);
+        _mapController?.animateCamera(CameraUpdate.newLatLngZoom(target, 14));
+        
+        // Update provider to fetch chargers
+        ref.read(mapCenterProvider.notifier).update(
+          ll.LatLng(location.latitude, location.longitude),
+        );
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location not found')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error finding location: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,105 +73,164 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final stations = stationsAsync.asData?.value ?? [];
     final theme = Theme.of(context);
 
-    return Scaffold(
-      body: Stack(
-        children: [
-          GoogleMap(
-            initialCameraPosition: const CameraPosition(
-              target: LatLng(17.3850, 78.4867), // Hyderabad
-              zoom: 12.0,
-            ),
-            markers: stations.map((station) {
-              return Marker(
-                markerId: MarkerId(station.id),
-                position: LatLng(station.location.latitude, station.location.longitude),
-                onTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    useSafeArea: true,
-                    builder: (context) => DraggableScrollableSheet(
-                      initialChildSize: 0.5,
-                      minChildSize: 0.3,
-                      maxChildSize: 0.9,
-                      expand: false,
-                      builder: (context, scrollController) => SingleChildScrollView(
-                        controller: scrollController,
-                        child: _StationDetailsSheet(station: station),
+    return Column(
+      children: [
+        Container(
+          color: theme.colorScheme.surface,
+          child: TabBar(
+            controller: _tabController,
+            tabs: const [
+              Tab(text: 'Find Chargers'),
+              Tab(text: 'Saved Chargers'),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              // Tab 1: Map with Search
+              Stack(
+                children: [
+                  GoogleMap(
+                    initialCameraPosition: const CameraPosition(
+                      target: LatLng(17.3850, 78.4867), // Hyderabad
+                      zoom: 12.0,
+                    ),
+                    markers: stations.map((station) {
+                      return Marker(
+                        markerId: MarkerId(station.id),
+                        position: LatLng(station.location.latitude, station.location.longitude),
+                        onTap: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            useSafeArea: true,
+                            builder: (context) => DraggableScrollableSheet(
+                              initialChildSize: 0.5,
+                              minChildSize: 0.3,
+                              maxChildSize: 0.9,
+                              expand: false,
+                              builder: (context, scrollController) => SingleChildScrollView(
+                                controller: scrollController,
+                                child: _StationDetailsSheet(station: station),
+                              ),
+                            ),
+                          );
+                        },
+                        icon: BitmapDescriptor.defaultMarkerWithHue(
+                          station.isPrivate
+                              ? BitmapDescriptor.hueViolet // Private
+                              : station.status == 'working'
+                                  ? BitmapDescriptor.hueGreen
+                                  : station.status == 'busy'
+                                      ? BitmapDescriptor.hueOrange
+                                      : BitmapDescriptor.hueRed,
+                        ),
+                      );
+                    }).toSet(),
+                    onMapCreated: (controller) {
+                      _mapController = controller;
+                    },
+                    onCameraMove: (position) {
+                      _currentCameraPosition = position.target;
+                    },
+                    onCameraIdle: () {
+                      if (_currentCameraPosition != null) {
+                        ref.read(mapCenterProvider.notifier).update(
+                          ll.LatLng(_currentCameraPosition!.latitude, _currentCameraPosition!.longitude),
+                        );
+                      }
+                    },
+                  ),
+                  
+                  // Streak Widget Overlay
+                  Positioned(
+                    top: 16,
+                    right: 16,
+                    child: Consumer(
+                      builder: (context, ref, child) {
+                        final user = ref.watch(userProvider);
+                        if (user == null || user.streak == 0) return const SizedBox.shrink();
+                        return StreakWidget(streak: user.streak);
+                      },
+                    ),
+                  ),
+                  
+                  // Search Bar
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    right: 16,
+                    child: Card(
+                      elevation: 4,
+                      child: TextField(
+                        controller: _searchController,
+                        decoration: InputDecoration(
+                          hintText: 'Search location...',
+                          prefixIcon: const Icon(Icons.search),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          suffixIcon: IconButton(
+                            icon: const Icon(Icons.arrow_forward),
+                            onPressed: () => _searchLocation(_searchController.text),
+                          ),
+                        ),
+                        onSubmitted: _searchLocation,
                       ),
                     ),
-                  );
-                },
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                  station.isPrivate
-                      ? BitmapDescriptor.hueViolet // Private
-                      : station.status == 'working'
-                          ? BitmapDescriptor.hueGreen
-                          : station.status == 'busy'
-                              ? BitmapDescriptor.hueOrange
-                              : BitmapDescriptor.hueRed,
-                ),
-              );
-            }).toSet(),
-            onMapCreated: (controller) {
-              _mapController = controller;
-            },
-            onCameraMove: (position) {
-              _currentCameraPosition = position.target;
-            },
-            onCameraIdle: () {
-              if (_currentCameraPosition != null) {
-                print('DEBUG: Camera Idle at ${_currentCameraPosition!.latitude}, ${_currentCameraPosition!.longitude}');
-                ref.read(mapCenterProvider.notifier).update(
-                  ll.LatLng(_currentCameraPosition!.latitude, _currentCameraPosition!.longitude),
-                );
-              }
-            },
-          ),
-          
-          // Loading Indicator Overlay
-          if (stationsAsync.isLoading)
-            Positioned(
-              top: 60,
-              left: 0,
-              right: 0,
-              child: Center(
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
-                        SizedBox(width: 8),
-                        Text('Searching area...'),
-                      ],
+                  ),
+
+                  // Loading Indicator Overlay
+                  if (stationsAsync.isLoading)
+                    Positioned(
+                      top: 80,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                                SizedBox(width: 8),
+                                Text('Searching area...'),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                    
+                  // Error Overlay
+                  if (stationsAsync.hasError)
+                     Positioned(
+                      bottom: 20,
+                      left: 20,
+                      right: 20,
+                      child: Card(
+                        color: theme.colorScheme.errorContainer,
+                        child: Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            'Error loading stations: ${stationsAsync.error}',
+                            style: TextStyle(color: theme.colorScheme.onErrorContainer),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ),
-            
-          // Error Overlay
-          if (stationsAsync.hasError)
-             Positioned(
-              bottom: 20,
-              left: 20,
-              right: 20,
-              child: Card(
-                color: theme.colorScheme.errorContainer,
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    'Error loading stations: ${stationsAsync.error}',
-                    style: TextStyle(color: theme.colorScheme.onErrorContainer),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+
+              // Tab 2: Saved Chargers
+              const SavedChargersList(),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

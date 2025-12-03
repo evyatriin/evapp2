@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
-import 'package:latlong2/latlong.dart' as ll; // Alias to avoid conflict
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:map_launcher/map_launcher.dart';
 import 'here_routing_service.dart';
 import 'route_model.dart';
 import '../mapping/places_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../vehicle_profile/vehicle_provider.dart';
+import 'saved_routes_screen.dart';
 
 class RoutePlannerScreen extends StatefulWidget {
   const RoutePlannerScreen({super.key});
@@ -17,7 +17,7 @@ class RoutePlannerScreen extends StatefulWidget {
   State<RoutePlannerScreen> createState() => _RoutePlannerScreenState();
 }
 
-class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
+class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTickerProviderStateMixin {
   final _startController = TextEditingController();
   final _destController = TextEditingController();
   final _hereService = HereRoutingService();
@@ -33,6 +33,19 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
   String? _destPlaceId;
   String? _selectedVehicleId;
   final _placesService = PlacesService();
+  late TabController _tabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
 
   Future<void> _planTrip() async {
     if (_startPlaceId == null || _destPlaceId == null) {
@@ -96,13 +109,33 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface, // Solid background
+      backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text('Plan Your Trip'),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'Plan Trip'),
+            Tab(text: 'Saved Plans'),
+          ],
+        ),
       ),
-      body: Stack(
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Tab 1: Plan Trip Form
+          _buildPlanTripForm(theme),
+          // Tab 2: Saved Plans
+          const SavedRoutesList(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlanTripForm(ThemeData theme) {
+    return Stack(
         children: [
           // No Background Map
 
@@ -327,8 +360,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> {
               ),
             ),
         ],
-      ),
-    );
+      );
   }
 
   Widget _buildSliderRow(BuildContext context, String label, String valueLabel, double value, double min, double max, ValueChanged<double> onChanged, {String? info}) {
@@ -486,11 +518,36 @@ class TripSummarySheet extends StatelessWidget {
                   const Gap(16),
                   Expanded(
                     child: FilledButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Navigation Started!')),
-                        );
+                      onPressed: () async {
+                        // Launch navigation in maps app
+                        try {
+                          final origin = route.stops.first.location;
+                          final destination = route.stops.last.location;
+                          
+                          final availableMaps = await MapLauncher.installedMaps;
+                          
+                          if (availableMaps.isEmpty) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('No map apps installed')),
+                              );
+                            }
+                            return;
+                          }
+                          
+                          // Use first available map (usually Google Maps on Android, Apple Maps on iOS)
+                          await availableMaps.first.showDirections(
+                            destination: Coords(destination.latitude, destination.longitude),
+                            origin: Coords(origin.latitude, origin.longitude),
+                            directionsMode: DirectionsMode.driving,
+                          );
+                        } catch (e) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Error launching navigation: $e')),
+                            );
+                          }
+                        }
                       },
                       icon: const Icon(Icons.navigation),
                       label: const Text('Navigate'),

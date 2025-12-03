@@ -66,3 +66,34 @@ async def update_profile(request: UpdateProfileRequest):
         return {"status": "success", "message": "Profile updated"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/profile/{user_id}")
+async def get_profile(user_id: str):
+    """Get full user profile including stats and badges"""
+    try:
+        # 1. Get basic profile
+        profile_response = supabase.table("profiles").select("*").eq("id", user_id).execute()
+        profile = profile_response.data[0] if profile_response.data else {}
+        
+        # 2. Get stats
+        stats_response = supabase.table("user_stats").select("*").eq("user_id", user_id).execute()
+        stats = stats_response.data[0] if stats_response.data else {
+            "total_points": 0,
+            "current_streak": 0,
+            "total_check_ins": 0,
+            "total_routes_planned": 0
+        }
+        
+        # 3. Get badges
+        badges_response = supabase.table("user_badges").select("*, badge:badges(*)").eq("user_id", user_id).execute()
+        badges = badges_response.data if badges_response.data else []
+        
+        return {
+            "profile": profile,
+            "stats": stats,
+            "badges": badges
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching profile: {str(e)}")

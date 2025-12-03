@@ -4,6 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import 'community_service.dart';
 import 'community_models.dart';
+import 'trending_tab.dart';
+import 'resources_tab.dart';
+import 'leaderboard_screen.dart';
 
 class CommunityScreen extends StatelessWidget {
   const CommunityScreen({super.key});
@@ -13,7 +16,7 @@ class CommunityScreen extends StatelessWidget {
     final theme = Theme.of(context);
 
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Community Hub'),
@@ -41,6 +44,7 @@ class CommunityScreen extends StatelessWidget {
               Tab(text: 'My Communities'),
               Tab(text: 'Trending'),
               Tab(text: 'Resources'),
+              Tab(text: 'Leaderboard'),
             ],
           ),
         ),
@@ -48,8 +52,9 @@ class CommunityScreen extends StatelessWidget {
           children: [
             _buildForYouTab(context),
             _buildPlaceholderTab(context, 'My Communities'),
-            _buildPlaceholderTab(context, 'Trending'),
-            _buildPlaceholderTab(context, 'Resources'),
+            const TrendingTab(),
+            const ResourcesTab(),
+            const LeaderboardScreen(),
           ],
         ),
         floatingActionButton: FloatingActionButton(

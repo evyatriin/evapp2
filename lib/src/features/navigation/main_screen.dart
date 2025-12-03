@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import '../community/check_in_sheet.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../mapping/app_drawer.dart';
+import '../../core/ad_banner_widget.dart';
 
-class MainScreen extends StatelessWidget {
+class MainScreen extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
   const MainScreen({
@@ -14,17 +16,12 @@ class MainScreen extends StatelessWidget {
   void _goBranch(int index) {
     navigationShell.goBranch(
       index,
-      // A common pattern when using bottom navigation bars is to support
-      // navigating to the initial location when tapping the item that is
-      // already active. This example demonstrates how to support this behavior,
-      // using the initialLocation parameter of goBranch.
       initialLocation: index == navigationShell.currentIndex,
     );
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('EV-Ranger'),
@@ -41,78 +38,19 @@ class MainScreen extends StatelessWidget {
           ),
           IconButton(
             icon: Icon(PhosphorIcons.userCircle(PhosphorIconsStyle.duotone)),
-            onPressed: () => context.push('/setup'),
+            onPressed: () => context.push('/profile'),
             tooltip: 'Profile',
           ),
           const SizedBox(width: 8),
         ],
       ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            UserAccountsDrawerHeader(
-              accountName: const Text('Ranger User'), // Placeholder
-              accountEmail: const Text('ranger@ev-ranger.com'), // Placeholder
-              currentAccountPicture: CircleAvatar(
-                backgroundColor: theme.colorScheme.primaryContainer,
-                child: Text(
-                  'R',
-                  style: TextStyle(fontSize: 24, color: theme.colorScheme.onPrimaryContainer),
-                ),
-              ),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary,
-              ),
-              onDetailsPressed: () {
-                context.pop(); // Close drawer
-                context.push('/setup');
-              },
-            ),
-            ListTile(
-              leading: Icon(PhosphorIcons.userCircle(PhosphorIconsStyle.duotone)),
-              title: const Text('Profile'),
-              onTap: () {
-                context.pop(); // Close drawer
-                context.push('/setup');
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: Icon(PhosphorIcons.camera(PhosphorIconsStyle.duotone)),
-              title: const Text('Check-In'),
-              onTap: () {
-                context.pop(); // Close drawer
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (context) => const CheckInSheet(),
-                );
-              },
-            ),
-            ListTile(
-              leading: Icon(PhosphorIcons.warning(PhosphorIconsStyle.duotone), color: theme.colorScheme.error),
-              title: Text('SOS', style: TextStyle(color: theme.colorScheme.error)),
-              onTap: () {
-                context.pop(); // Close drawer
-                context.push('/sos');
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: Icon(PhosphorIcons.gear(PhosphorIconsStyle.duotone)),
-              title: const Text('Settings'),
-              onTap: () {
-                context.pop(); // Close drawer
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Settings coming soon!')),
-                );
-              },
-            ),
-          ],
-        ),
+      drawer: const AppDrawer(),
+      body: Column(
+        children: [
+          Expanded(child: navigationShell),
+          const AdBannerWidget(),
+        ],
       ),
-      body: navigationShell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: _goBranch,

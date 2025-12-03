@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../authentication/user_provider.dart';
 
 class ProfileSettingsScreen extends ConsumerWidget {
@@ -23,6 +22,9 @@ class ProfileSettingsScreen extends ConsumerWidget {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+import '../community/gamification_widgets.dart';
+import '../community/gamification_service.dart';
+
                 // Profile Section
                 Card(
                   child: Padding(
@@ -30,34 +32,108 @@ class ProfileSettingsScreen extends ConsumerWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Profile', style: theme.textTheme.titleLarge),
+                        Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 30,
+                              child: Text(
+                                user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U',
+                                style: const TextStyle(fontSize: 24),
+                              ),
+                            ),
+                            const Gap(16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(user.name, style: theme.textTheme.titleLarge),
+                                  Text(user.email, style: theme.textTheme.bodyMedium),
+                                  const Gap(4),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        size: 16,
+                                        color: user.isPhoneVerified ? Colors.blue : Colors.grey,
+                                      ),
+                                      const Gap(4),
+                                      Text(
+                                        user.isPhoneVerified ? 'Verified' : 'Unverified',
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          color: user.isPhoneVerified ? Colors.blue : Colors.grey,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => context.push('/profile/edit'),
+                            ),
+                          ],
+                        ),
+                        const Gap(24),
+                        
+                        // Stats Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            Column(
+                              children: [
+                                PointsBadge(points: user.points),
+                                const Gap(4),
+                                Text('Total Points', style: theme.textTheme.bodySmall),
+                              ],
+                            ),
+                            Column(
+                              children: [
+                                StreakWidget(streak: user.streak),
+                                const Gap(4),
+                                Text('Current Streak', style: theme.textTheme.bodySmall),
+                              ],
+                            ),
+                          ],
+                        ),
+                        
+                        const Gap(24),
+                        const Divider(),
                         const Gap(16),
-                        ListTile(
-                          leading: CircleAvatar(
-                            child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U'),
-                          ),
-                          title: Text(user.name),
-                          subtitle: Row(
-                            children: [
-                              Text(user.email),
-                              const Gap(8),
-                              Icon(
-                                Icons.check_circle,
-                                size: 16,
-                                color: user.isPhoneVerified ? Colors.blue : Colors.grey,
-                              ),
-                              const Gap(4),
-                              Text(
-                                user.isPhoneVerified ? 'Verified' : 'Unverified',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: user.isPhoneVerified ? Colors.blue : Colors.grey,
-                                ),
-                              ),
-                            ],
-                          ),
-                          trailing: IconButton(
-                            icon: const Icon(Icons.edit),
-                            onPressed: () => context.push('/profile/edit'),
+                        
+                        // Badges Section
+                        Text('Badges', style: theme.textTheme.titleMedium),
+                        const Gap(16),
+                        SizedBox(
+                          height: 100,
+                          child: FutureBuilder<List<Badge>>(
+                            future: GamificationService().getBadges(),
+                            builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
+                              }
+                              
+                              final allBadges = snapshot.data ?? [];
+                              final userBadgeIds = user.badges;
+                              
+                              if (allBadges.isEmpty) {
+                                return const Center(child: Text('No badges available'));
+                              }
+
+                              return ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: allBadges.length,
+                                separatorBuilder: (context, index) => const Gap(16),
+                                itemBuilder: (context, index) {
+                                  final badge = allBadges[index];
+                                  final isUnlocked = userBadgeIds.contains(badge.id);
+                                  return BadgeWidget(
+                                    badge: badge,
+                                    isLocked: !isUnlocked,
+                                  );
+                                },
+                              );
+                            },
                           ),
                         ),
                       ],

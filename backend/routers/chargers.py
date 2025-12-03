@@ -187,15 +187,10 @@ async def create_checkin(checkin: CreateCheckInRequest):
         # Insert checkin
         response = supabase.table("station_checkins").insert(data).execute()
         
-        # Reward points logic (simplified)
-        # Assuming we have a 'profiles' table with 'points' column
+        # Reward points logic
         try:
-            # Fetch current points
-            profile = supabase.table("profiles").select("points").eq("id", checkin.user_id).execute()
-            current_points = profile.data[0]['points'] if profile.data else 0
-            
-            # Update points (+10)
-            supabase.table("profiles").update({"points": current_points + 10}).eq("id", checkin.user_id).execute()
+            from utils.gamification_utils import award_points_internal
+            await award_points_internal(checkin.user_id, 10, 'check_in')
         except Exception as e:
             print(f"Error updating points: {e}")
 
@@ -233,5 +228,61 @@ async def upload_checkin_image(file: UploadFile = File(...)):
         return {"image_url": public_url}
     except Exception as e:
         print(f"Error uploading image: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Error uploading image: {str(e)}")
 
+# --- Saved Chargers Endpoints ---
+
+class SaveChargerRequest(BaseModel):
+    user_id: str
+    station_id: str
+
+@router.post("/save")
+def save_charger(request: SaveChargerRequest):
+    """Save/favorite a charging station"""
+    try:
+        result = supabase.table("saved_chargers").insert({
+            "user_id": request.user_id,
+            "station_id": request.station_id
+        }).execute()
+        return {"message": "Charger saved successfully", "data": result.data}
+    except Exception as e:
+        # Handle duplicate entries gracefully
+        if "duplicate" in str(e).lower() or "unique" in str(e).lower():
+            return {"message": "Charger already saved"}
+        print(f"Error saving charger: {e}")
+        raise HTTPException(status_code=500, detail=f"Error saving charger: {str(e)}")
+
+@router.delete("/save/{user_id}/{station_id}")
+def unsave_charger(user_id: str, station_id: str):
+    """Unsave/unfavorite a charging station"""
+    try:
+        result = supabase.table("saved_chargers").delete().eq("user_id", user_id).eq("station_id", station_id).execute()
+        return {"message": "Charger unsaved successfully"}
+    except Exception as e:
+        print(f"Error unsaving charger: {e}")
+        raise HTTPException(status_code=500, detail=f"Error unsaving charger: {str(e)}")
+
+@router.get("/saved/{user_id}")
+def get_saved_chargers(user_id: str):
+    """Get all saved chargers for a user with station details"""
+    try:
+        # Get saved charger IDs
+        saved_result = supabase.table("saved_chargers").select("station_id, created_at").eq("user_id", user_id).execute()
+        
+        if not saved_result.data:
+            return []
+        
+        station_ids = [item['station_id'] for item in saved_result.data]
+        
+        # Get station details
+        stations_result = supabase.table("charging_stations").select("*").in_("id", station_ids).execute()
+        
+        # Merge saved_at timestamp with station data
+        saved_map = {item['station_id']: item['created_at'] for item in saved_result.data}
+        for station in stations_result.data:
+            station['saved_at'] = saved_map.get(station['id'])
+        
+        return stations_result.data
+    except Exception as e:
+        print(f"Error fetching saved chargers: {e}")
+        raise HTTPException(status_code=500, detail=f"Error fetching saved chargers: {str(e)}")

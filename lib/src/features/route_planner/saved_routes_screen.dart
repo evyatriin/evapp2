@@ -8,14 +8,29 @@ import 'package:intl/intl.dart';
 import 'saved_route_model.dart';
 import 'route_service.dart';
 
-class SavedRoutesScreen extends StatefulWidget {
+class SavedRoutesScreen extends StatelessWidget {
   const SavedRoutesScreen({super.key});
 
   @override
-  State<SavedRoutesScreen> createState() => _SavedRoutesScreenState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Saved Routes'),
+        centerTitle: true,
+      ),
+      body: const SavedRoutesList(),
+    );
+  }
 }
 
-class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
+class SavedRoutesList extends StatefulWidget {
+  const SavedRoutesList({super.key});
+
+  @override
+  State<SavedRoutesList> createState() => _SavedRoutesListState();
+}
+
+class _SavedRoutesListState extends State<SavedRoutesList> {
   final _routeService = RouteService();
   List<SavedRoute> _routes = [];
   bool _isLoading = true;
@@ -119,28 +134,30 @@ class _SavedRoutesScreenState extends State<SavedRoutesScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Saved Routes'),
-        centerTitle: true,
-      ),
-      body: _isLoading
+    return RefreshIndicator(
+      onRefresh: _loadRoutes,
+      child: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _routes.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(PhosphorIcons.path(PhosphorIconsStyle.duotone), size: 64, color: Colors.grey),
-                      const Gap(16),
-                      Text('No saved routes yet', style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey)),
-                      const Gap(8),
-                      FilledButton.tonal(
-                        onPressed: () => context.go('/planner'),
-                        child: const Text('Plan a Trip'),
+              ? ListView(
+                  children: [
+                    SizedBox(
+                      height: 400,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(PhosphorIcons.path(PhosphorIconsStyle.duotone), size: 64, color: Colors.grey),
+                          const Gap(16),
+                          Text('No saved routes yet', style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey)),
+                          const Gap(8),
+                          FilledButton.tonal(
+                            onPressed: () => context.go('/planner'),
+                            child: const Text('Plan a Trip'),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 )
               : ListView.builder(
                   padding: const EdgeInsets.all(16),

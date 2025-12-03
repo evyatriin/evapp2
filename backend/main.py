@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import places, routing, chargers, community, vehicles, auth, routes, chat, sos, users, admin
+from routers import places, routing, chargers, community, vehicles, auth, routes, chat, sos, users, admin, gamification
 # from routers import news  # Uncomment to enable EV news API
 
 app = FastAPI(title="EV Router Backend")
@@ -25,6 +25,7 @@ app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 app.include_router(sos.router, prefix="/api/sos", tags=["SOS"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(gamification.router, prefix="/api/gamification", tags=["Gamification"])
 # app.include_router(news.router, prefix="/api/news", tags=["News"])  # Uncomment to enable EV news API
 
 @app.get("/")

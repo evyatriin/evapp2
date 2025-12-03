@@ -46,8 +46,14 @@ class AuthService {
         final userData = response.user!.userMetadata ?? {};
         
         // Fetch additional profile data
+        // Fetch additional profile data
         bool isVerified = false;
+        int points = 0;
+        int streak = 0;
+        List<String> badges = [];
+
         try {
+          // Fetch profile preferences
           final profileResponse = await _supabase
               .from('profiles')
               .select('preferences')
@@ -60,8 +66,31 @@ class AuthService {
                isVerified = prefs['is_phone_verified'] == true;
              }
           }
+
+          // Fetch user stats
+          final statsResponse = await _supabase
+              .from('user_stats')
+              .select('total_points, current_streak')
+              .eq('user_id', response.user!.id)
+              .maybeSingle();
+          
+          if (statsResponse != null) {
+            points = statsResponse['total_points'] ?? 0;
+            streak = statsResponse['current_streak'] ?? 0;
+          }
+
+          // Fetch badges
+          final badgesResponse = await _supabase
+              .from('user_badges')
+              .select('badge_id')
+              .eq('user_id', response.user!.id);
+          
+          if (badgesResponse != null) {
+            badges = (badgesResponse as List).map((e) => e['badge_id'] as String).toList();
+          }
+
         } catch (e) {
-          print('Error fetching profile preferences: $e');
+          print('Error fetching user data: $e');
         }
 
         return UserProfile(
@@ -70,6 +99,9 @@ class AuthService {
           name: userData['name'] ?? '',
           profileImageUrl: userData['profile_image_url'],
           isPhoneVerified: isVerified,
+          points: points,
+          streak: streak,
+          badges: badges,
         );
       }
       return null;
@@ -98,7 +130,12 @@ class AuthService {
         
         // Fetch additional profile data
         bool isVerified = false;
+        int points = 0;
+        int streak = 0;
+        List<String> badges = [];
+
         try {
+          // Fetch profile preferences
           final profileResponse = await _supabase
               .from('profiles')
               .select('preferences')
@@ -107,13 +144,35 @@ class AuthService {
           
           if (profileResponse != null) {
              final prefs = profileResponse['preferences'];
-             // Handle both Map and JSON string cases if necessary, but usually Map
              if (prefs is Map) {
                isVerified = prefs['is_phone_verified'] == true;
              }
           }
+
+          // Fetch user stats
+          final statsResponse = await _supabase
+              .from('user_stats')
+              .select('total_points, current_streak')
+              .eq('user_id', user.id)
+              .maybeSingle();
+          
+          if (statsResponse != null) {
+            points = statsResponse['total_points'] ?? 0;
+            streak = statsResponse['current_streak'] ?? 0;
+          }
+
+          // Fetch badges
+          final badgesResponse = await _supabase
+              .from('user_badges')
+              .select('badge_id')
+              .eq('user_id', user.id);
+          
+          if (badgesResponse != null) {
+            badges = (badgesResponse as List).map((e) => e['badge_id'] as String).toList();
+          }
+
         } catch (e) {
-          print('Error fetching profile preferences: $e');
+          print('Error fetching user data: $e');
         }
 
         return UserProfile(
@@ -122,6 +181,9 @@ class AuthService {
           name: userData['name'] ?? '',
           profileImageUrl: userData['profile_image_url'],
           isPhoneVerified: isVerified,
+          points: points,
+          streak: streak,
+          badges: badges,
         );
       }
       return null;

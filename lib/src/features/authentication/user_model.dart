@@ -3,7 +3,9 @@ class UserProfile {
   final String name;
   final String email;
   final String? profileImageUrl;
-  final bool isPhoneVerified;
+  final int points;
+  final int streak;
+  final List<String> badges;
 
   const UserProfile({
     required this.id,
@@ -11,6 +13,9 @@ class UserProfile {
     required this.email,
     this.profileImageUrl,
     this.isPhoneVerified = false,
+    this.points = 0,
+    this.streak = 0,
+    this.badges = const [],
   });
 
   UserProfile copyWith({
@@ -19,6 +24,9 @@ class UserProfile {
     String? email,
     String? profileImageUrl,
     bool? isPhoneVerified,
+    int? points,
+    int? streak,
+    List<String>? badges,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -26,6 +34,9 @@ class UserProfile {
       email: email ?? this.email,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
+      points: points ?? this.points,
+      streak: streak ?? this.streak,
+      badges: badges ?? this.badges,
     );
   }
 
@@ -37,6 +48,9 @@ class UserProfile {
       email: json['email'] as String,
       profileImageUrl: json['profile_image_url'] as String?,
       isPhoneVerified: json['is_phone_verified'] as bool? ?? false,
+      points: json['points'] as int? ?? 0,
+      streak: json['streak'] as int? ?? 0,
+      badges: (json['badges'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
     );
   }
 
@@ -47,6 +61,9 @@ class UserProfile {
       'email': email,
       'profile_image_url': profileImageUrl,
       'is_phone_verified': isPhoneVerified,
+      'points': points,
+      'streak': streak,
+      'badges': badges,
     };
   }
 }

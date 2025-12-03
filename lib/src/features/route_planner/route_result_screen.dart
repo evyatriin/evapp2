@@ -52,6 +52,14 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
       return;
     }
 
+    // Safety check: Ensure route has stops
+    if (_selectedRoute.stops.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error: Route has no stops. Please try planning the route again.')),
+      );
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
@@ -74,8 +82,25 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
       await _routeService.saveRoute(savedRoute);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Route saved successfully!')),
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Route Saved!'),
+            content: const Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.map, size: 48, color: Colors.blue),
+                Gap(16),
+                Text('You earned +5 Points!'),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
         );
       }
     } catch (e) {

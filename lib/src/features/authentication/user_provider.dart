@@ -18,7 +18,10 @@ class User extends _$User {
 
   Future<void> _loadCurrentUser() async {
     final user = await _authService.getCurrentUser();
-    state = user;
+    // Check if provider is still mounted before updating state
+    if (ref.mounted) {
+      state = user;
+    }
   }
 
   Future<void> signUp({
