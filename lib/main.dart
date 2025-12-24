@@ -13,8 +13,8 @@ Future<void> main() async {
 
   // Initialize Supabase
   await Supabase.initialize(
-    url: 'https://bqbiysdnqtcnckybzffk.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJxYml5c2RucXRjbmNreWJ6ZmZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwMDU2MzUsImV4cCI6MjA3NDU4MTYzNX0.taSp-VdJC3MCRTL1FAXeanQbRHNAz9uy3qhc9FaBa7o',
+    url: 'https://mzxwbfpxmyjmbfhosgkk.supabase.co',
+    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16eHdiZnB4bXlqbWJmaG9zZ2trIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1NTY0NjIsImV4cCI6MjA4MDEzMjQ2Mn0.dX-ZkKDOgXfOeyYrkyA77NLZmM-sWyf2zjXfVp7zFWg',
   );
   
   runApp(const ProviderScope(child: MyApp()));

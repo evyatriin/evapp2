@@ -62,6 +62,7 @@ async def save_route(route: SavedRouteCreate):
             
         response = supabase.table("saved_routes").insert(data).execute()
         
+        if response.data:
             # Award points for planning/saving a route
             try:
                 from utils.gamification_utils import award_points_internal
