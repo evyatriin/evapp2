@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import '../../common_widgets/app_text_field.dart';
+import '../../common_widgets/app_button.dart';
 import 'user_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -103,16 +105,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const Gap(48),
-                  TextFormField(
+                  AppTextField(
                     controller: _emailController,
+                    label: 'Email',
+                    prefixIcon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your email';
@@ -124,21 +121,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     },
                   ),
                   const Gap(16),
-                  TextFormField(
+                  AppTextField(
                     controller: _passwordController,
+                    label: 'Password',
+                    prefixIcon: Icons.lock_outline,
                     obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                        ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -148,21 +140,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     },
                   ),
                   const Gap(24),
-                  FilledButton(
-                    onPressed: _isLoading ? null : _handleLogin,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text('Login', style: TextStyle(fontSize: 16)),
+                  AppButton(
+                    label: 'Login',
+                    onPressed: _handleLogin,
+                    isLoading: _isLoading,
+                    isFullWidth: true,
                   ),
                   const Gap(16),
                   TextButton(

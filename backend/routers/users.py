@@ -97,3 +97,55 @@ async def get_profile(user_id: str):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching profile: {str(e)}")
+
+@router.get("/{user_id}/statistics")
+async def get_user_statistics(user_id: str):
+    """Get user trip statistics with CO2 savings calculations"""
+    try:
+        # 1. Get check-ins count
+        checkins_response = supabase.table("station_checkins").select("id", count="exact").eq("user_id", user_id).execute()
+        total_check_ins = checkins_response.count or 0
+        
+        # 2. Get trip logs for distance
+        trips_response = supabase.table("trip_logs").select("distance_km").eq("user_id", user_id).execute()
+        trips = trips_response.data or []
+        total_km = sum(t.get("distance_km", 0) or 0 for t in trips)
+        total_trips = len(trips)
+        
+        # 3. Get charging sessions for kWh
+        sessions_response = supabase.table("charging_sessions").select("kwh_charged").eq("user_id", user_id).execute()
+        sessions = sessions_response.data or []
+        total_kwh = sum(s.get("kwh_charged", 0) or 0 for s in sessions)
+        
+        # 4. Calculate CO2 saved vs petrol car
+        # Average petrol car: 120g CO2/km
+        # Average EV in India: ~50g CO2/km (including power generation)
+        # Savings: 70g/km = 0.07 kg/km
+        co2_saved_kg = total_km * 0.07
+        
+        # 5. Calculate money saved
+        # Petrol cost: ~₹8/km for average car
+        # EV cost: ~₹1.5/km
+        # Savings: ₹6.5/km
+        money_saved = total_km * 6.5
+        
+        return {
+            "total_km": total_km,
+            "total_kwh_charged": total_kwh,
+            "co2_saved_kg": co2_saved_kg,
+            "money_saved": money_saved,
+            "total_check_ins": total_check_ins,
+            "total_trips": total_trips
+        }
+    except Exception as e:
+        # Return zeros on error rather than failing
+        print(f"Error fetching statistics: {e}")
+        return {
+            "total_km": 0,
+            "total_kwh_charged": 0,
+            "co2_saved_kg": 0,
+            "money_saved": 0,
+            "total_check_ins": 0,
+            "total_trips": 0
+        }
+

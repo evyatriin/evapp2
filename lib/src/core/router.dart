@@ -19,6 +19,7 @@ import '../features/authentication/forgot_password_screen.dart';
 import '../features/profile/profile_settings_screen.dart';
 import '../features/profile/edit_profile_screen.dart';
 import '../features/profile/change_password_screen.dart';
+import '../features/profile/statistics_screen.dart';
 import '../features/route_planner/saved_routes_screen.dart';
 import '../features/vehicle_profile/vehicle_selection_screen.dart';
 
@@ -54,6 +55,10 @@ final router = GoRouter(
     GoRoute(
       path: '/saved-routes',
       builder: (context, state) => const SavedRoutesScreen(),
+    ),
+    GoRoute(
+      path: '/statistics',
+      builder: (context, state) => const StatisticsScreen(),
     ),
     GoRoute(
       path: '/profile',

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../community/check_in_sheet.dart';
+import '../charge/cost_calculator_sheet.dart';
 import 'stations_repository.dart';
 import 'station_model.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -79,10 +80,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
           color: theme.colorScheme.surface,
           child: TabBar(
             controller: _tabController,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+            indicatorWeight: 2,
             tabs: const [
-              Tab(text: 'Find Chargers'),
-              Tab(text: 'Saved Chargers'),
+              Tab(text: 'Find Chargers', height: 36),
+              Tab(text: 'Saved Chargers', height: 36),
             ],
+          ),
+        ),
+        // Connector Filter Chips
+        Container(
+          color: theme.colorScheme.surface,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Consumer(
+              builder: (context, ref, child) {
+                final selectedFilters = ref.watch(connectorFilterProvider);
+                const connectors = ['CCS2', 'Type 2', 'CHAdeMO', 'GB/T'];
+                return Row(
+                  children: [
+                    FilterChip(
+                      label: const Text('All'),
+                      selected: selectedFilters.isEmpty,
+                      onSelected: (_) => ref.read(connectorFilterProvider.notifier).clear(),
+                    ),
+                    const SizedBox(width: 8),
+                    ...connectors.map((connector) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: Text(connector),
+                        selected: selectedFilters.contains(connector),
+                        onSelected: (_) => ref.read(connectorFilterProvider.notifier).toggle(connector),
+                      ),
+                    )),
+                  ],
+                );
+              },
+            ),
           ),
         ),
         Expanded(
@@ -359,6 +394,27 @@ class _StationDetailsSheet extends StatelessWidget {
           ),
           
           const SizedBox(height: 24),
+
+          // Cost Calculator Button
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  builder: (context) => CostCalculatorSheet(
+                    stationCost: station.cost ?? '₹18 / kWh',
+                    stationName: station.name,
+                  ),
+                );
+              },
+              icon: Icon(PhosphorIcons.calculator(PhosphorIconsStyle.duotone)),
+              label: const Text('Calculate Charging Cost'),
+            ),
+          ),
+
+          const SizedBox(height: 12),
 
           // Actions
           Row(

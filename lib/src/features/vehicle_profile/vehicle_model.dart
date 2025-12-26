@@ -8,6 +8,7 @@ class VehicleProfile {
   final String? imageUrl;
   final String? photoUrl; // Supabase Storage URL
   final List<String> preferredChargingNetworks;
+  final bool isPrimary;
 
   const VehicleProfile({
     required this.id,
@@ -19,6 +20,7 @@ class VehicleProfile {
     this.imageUrl,
     this.photoUrl,
     this.preferredChargingNetworks = const [],
+    this.isPrimary = false,
   });
 
   VehicleProfile copyWith({
@@ -31,6 +33,7 @@ class VehicleProfile {
     String? imageUrl,
     String? photoUrl,
     List<String>? preferredChargingNetworks,
+    bool? isPrimary,
   }) {
     return VehicleProfile(
       id: id ?? this.id,
@@ -42,6 +45,7 @@ class VehicleProfile {
       imageUrl: imageUrl ?? this.imageUrl,
       photoUrl: photoUrl ?? this.photoUrl,
       preferredChargingNetworks: preferredChargingNetworks ?? this.preferredChargingNetworks,
+      isPrimary: isPrimary ?? this.isPrimary,
     );
   }
   
@@ -66,6 +70,7 @@ class VehicleProfile {
               ?.map((e) => e as String)
               .toList() ??
           [],
+      isPrimary: json['is_primary'] as bool? ?? false,
     );
   }
 
@@ -80,6 +85,7 @@ class VehicleProfile {
       'image_url': imageUrl,
       'photo_url': photoUrl,
       'preferred_charging_networks': preferredChargingNetworks,
+      'is_primary': isPrimary,
     };
   }
 }

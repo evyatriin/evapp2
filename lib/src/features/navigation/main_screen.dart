@@ -52,6 +52,8 @@ class MainScreen extends ConsumerWidget {
         ],
       ),
       bottomNavigationBar: NavigationBar(
+        height: 60, // Reduced from default 80
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: _goBranch,
         destinations: [

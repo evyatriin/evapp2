@@ -64,7 +64,7 @@ class LeaderboardEntry {
 }
 
 class GamificationService {
-  static const String _baseUrl = '${BackendService.baseUrl}/api/gamification';
+  static final String _baseUrl = '${BackendService.baseUrl}/api/gamification';
 
   Future<List<LeaderboardEntry>> getLeaderboard() async {
     try {

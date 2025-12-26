@@ -9,6 +9,8 @@ import 'vehicle_model.dart';
 import 'vehicle_provider.dart';
 import 'vehicle_photo_service.dart';
 import '../authentication/user_provider.dart';
+import '../../common_widgets/app_button.dart';
+import '../../common_widgets/app_card.dart';
 
 class VehicleFormScreen extends ConsumerStatefulWidget {
   final VehicleProfile? vehicleToEdit;
@@ -108,12 +110,8 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
             style: theme.textTheme.titleMedium,
           ),
           const Gap(8),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(16),
-            ),
+          AppCard(
+            color: theme.colorScheme.surfaceContainerHighest,
             child: Column(
               children: [
                 Row(
@@ -156,13 +154,11 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
             ),
           ),
           const Gap(40),
-          FilledButton.icon(
+          AppButton(
+            label: 'Save Vehicle',
+            icon: Icons.save,
             onPressed: _saveVehicle,
-            icon: const Icon(Icons.save),
-            label: const Text('Save Vehicle'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
+            isFullWidth: true,
           ),
         ],
       ),

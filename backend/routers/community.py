@@ -54,12 +54,15 @@ async def get_micro_communities():
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/feed", response_model=List[CommunityPost])
-async def get_feed(community_id: Optional[str] = None):
+async def get_feed(community_id: Optional[str] = None, limit: int = 10, offset: int = 0):
     try:
         query = supabase.table("community_posts").select("*, profiles(full_name, avatar_url)").eq("is_hidden", False).order("created_at", desc=True)
         
         if community_id:
             query = query.eq("community_id", community_id)
+            
+        # Add pagination
+        query = query.range(offset, offset + limit - 1)
             
         response = query.execute()
         

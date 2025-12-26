@@ -2,17 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
-import 'community_service.dart';
-import 'community_models.dart';
 import 'trending_tab.dart';
 import 'resources_tab.dart';
 import 'leaderboard_screen.dart';
 
-class CommunityScreen extends StatelessWidget {
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'community_providers.dart';
+
+class CommunityScreen extends ConsumerWidget {
   const CommunityScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
 
     return DefaultTabController(
@@ -21,36 +22,41 @@ class CommunityScreen extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Community Hub'),
           centerTitle: false,
+          toolbarHeight: 48,
           actions: [
             Padding(
-              padding: const EdgeInsets.only(right: 16),
+              padding: const EdgeInsets.only(right: 8),
               child: FilledButton.icon(
                 onPressed: () => context.push('/sos'),
-                icon: const Icon(Icons.sos, size: 18),
+                icon: const Icon(Icons.sos, size: 16),
                 label: const Text('SOS'),
                 style: FilledButton.styleFrom(
                   backgroundColor: theme.colorScheme.error,
                   foregroundColor: theme.colorScheme.onError,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 ),
               ),
             ),
           ],
-          bottom: TabBar(
-            isScrollable: true,
-            tabAlignment: TabAlignment.start,
-            tabs: const [
-              Tab(text: 'For You'),
-              Tab(text: 'My Communities'),
-              Tab(text: 'Trending'),
-              Tab(text: 'Resources'),
-              Tab(text: 'Leaderboard'),
-            ],
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(36),
+            child: TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+              tabs: const [
+                Tab(text: 'For You', height: 36),
+                Tab(text: 'My Communities', height: 36),
+                Tab(text: 'Trending', height: 36),
+                Tab(text: 'Resources', height: 36),
+                Tab(text: 'Leaderboard', height: 36),
+              ],
+            ),
           ),
         ),
         body: TabBarView(
           children: [
-            _buildForYouTab(context),
+            const _ForYouTab(),
             _buildPlaceholderTab(context, 'My Communities'),
             const TrendingTab(),
             const ResourcesTab(),
@@ -65,97 +71,6 @@ class CommunityScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildForYouTab(BuildContext context) {
-    final communityService = CommunityService();
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        // In a real app, this would trigger a provider refresh
-        // For now, setState to rebuild FutureBuilder would be needed if we weren't creating service in build
-        // Since we are creating service here, we might need a stateful widget for proper refresh
-        // But for MVP this is okay to just trigger UI update
-        (context as Element).markNeedsBuild(); 
-      },
-      child: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        children: [
-          // Micro-Communities Section
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Micro-Communities', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                TextButton(onPressed: () {}, child: const Text('See All')),
-              ],
-            ),
-          ),
-          SizedBox(
-            height: 140,
-            child: FutureBuilder<List<MicroCommunity>>(
-              future: communityService.getMicroCommunities(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return const Center(child: Text('No communities found'));
-                }
-                return ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  itemCount: snapshot.data!.length,
-                  itemBuilder: (context, index) {
-                    final community = snapshot.data![index];
-                    return _MicroCommunityCard(
-                      name: community.name,
-                      members: community.members,
-                      image: community.imageUrl,
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-          const Divider(height: 32),
-          
-          // Feed Section
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text('Latest Discussions', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          ),
-          const Gap(8),
-          FutureBuilder<List<FeedPost>>(
-            future: communityService.getFeed(),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()));
-              }
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Center(child: Text('No posts yet'));
-              }
-              return Column(
-                children: snapshot.data!.map((post) => _FeedPostCard(
-                  avatarUrl: post.avatarUrl,
-                  userName: post.userName,
-                  timeAgo: post.timeAgo,
-                  title: post.title,
-                  content: post.content,
-                  likes: post.likes,
-                  comments: post.comments,
-                  isAlert: post.isAlert,
-                  isOfficial: post.isOfficial,
-                  hasImage: post.hasImage,
-                  imageUrl: post.imageUrl,
-                )).toList(),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildPlaceholderTab(BuildContext context, String title) {
     return Center(
       child: Column(
@@ -164,6 +79,137 @@ class CommunityScreen extends StatelessWidget {
           Icon(PhosphorIcons.wrench(PhosphorIconsStyle.duotone), size: 48, color: Colors.grey),
           const Gap(16),
           Text('$title Coming Soon', style: Theme.of(context).textTheme.titleMedium),
+        ],
+      ),
+    );
+  }
+}
+
+class _ForYouTab extends ConsumerStatefulWidget {
+  const _ForYouTab();
+
+  @override
+  ConsumerState<_ForYouTab> createState() => _ForYouTabState();
+}
+
+class _ForYouTabState extends ConsumerState<_ForYouTab> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+      ref.read(feedProvider.notifier).loadMore();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final microCommunitiesAsync = ref.watch(microCommunitiesProvider);
+    final feedAsync = ref.watch(feedProvider);
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.refresh(microCommunitiesProvider);
+        await ref.read(feedProvider.notifier).refresh();
+      },
+      child: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // Micro-Communities Section
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Micro-Communities', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                      TextButton(onPressed: () {}, child: const Text('See All')),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  height: 140,
+                  child: microCommunitiesAsync.when(
+                    data: (communities) {
+                      if (communities.isEmpty) return const Center(child: Text('No communities found'));
+                      return ListView.builder(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        itemCount: communities.length,
+                        itemBuilder: (context, index) {
+                          final community = communities[index];
+                          return _MicroCommunityCard(
+                            name: community.name,
+                            members: community.members,
+                            image: community.imageUrl,
+                          );
+                        },
+                      );
+                    },
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (e, s) => Center(child: Text('Error: $e')),
+                  ),
+                ),
+                const Divider(height: 16),
+                
+                // Feed Section Header
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('Latest Discussions', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                ),
+                const Gap(8),
+              ]),
+            ),
+          ),
+          
+          // Feed List
+          feedAsync.when(
+            data: (posts) {
+              if (posts.isEmpty) {
+                return const SliverToBoxAdapter(child: Center(child: Text('No posts yet')));
+              }
+              return SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final post = posts[index];
+                    return _FeedPostCard(
+                      avatarUrl: post.avatarUrl,
+                      userName: post.userName,
+                      timeAgo: post.timeAgo,
+                      title: post.title,
+                      content: post.content,
+                      likes: post.likes,
+                      comments: post.comments,
+                      isAlert: post.isAlert,
+                      isOfficial: post.isOfficial,
+                      hasImage: post.hasImage,
+                      imageUrl: post.imageUrl,
+                    );
+                  },
+                  childCount: posts.length,
+                ),
+              );
+            },
+            loading: () => const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))),
+            error: (e, s) => SliverToBoxAdapter(child: Center(child: Text('Error loading feed: $e'))),
+          ),
+          
+          // Bottom padding
+          const SliverPadding(padding: EdgeInsets.only(bottom: 20)),
         ],
       ),
     );
@@ -192,6 +238,7 @@ class _MicroCommunityCard extends StatelessWidget {
                 image,
                 width: double.infinity,
                 fit: BoxFit.cover,
+                cacheWidth: 280, // 140 * 2 for high density
                 errorBuilder: (c, e, s) => Container(color: Colors.grey[300]),
               ),
             ),
@@ -244,11 +291,11 @@ class _FeedPostCard extends StatelessWidget {
     final theme = Theme.of(context);
     
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -307,12 +354,18 @@ class _FeedPostCard extends StatelessWidget {
               const Gap(12),
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: Image.network(imageUrl!, width: double.infinity, height: 180, fit: BoxFit.cover),
+                child: Image.network(
+                  imageUrl!, 
+                  width: double.infinity, 
+                  height: 180, 
+                  fit: BoxFit.cover,
+                  cacheWidth: 800, // Reasonable max width
+                ),
               ),
             ],
             
-            const Gap(16),
-            const Divider(),
+            const Gap(12),
+            const Divider(height: 1),
             
             // Actions
             Row(

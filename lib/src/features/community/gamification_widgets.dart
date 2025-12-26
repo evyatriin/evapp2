@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Badge;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:gap/gap.dart';
 import 'gamification_service.dart';

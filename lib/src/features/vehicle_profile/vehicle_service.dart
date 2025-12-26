@@ -63,10 +63,21 @@ class VehicleService {
   /// Delete a vehicle from the backend
   Future<bool> deleteVehicle(String vehicleId) async {
     try {
-      await BackendService.get('/api/vehicles/$vehicleId');
+      await BackendService.delete('/api/vehicles/$vehicleId');
       return true;
     } catch (e) {
       print('Error deleting vehicle: $e');
+      return false;
+    }
+  }
+
+  /// Set a vehicle as the primary vehicle
+  Future<bool> setPrimaryVehicle(String vehicleId) async {
+    try {
+      await BackendService.put('/api/vehicles/$vehicleId/primary', body: {});
+      return true;
+    } catch (e) {
+      print('Error setting primary vehicle: $e');
       return false;
     }
   }

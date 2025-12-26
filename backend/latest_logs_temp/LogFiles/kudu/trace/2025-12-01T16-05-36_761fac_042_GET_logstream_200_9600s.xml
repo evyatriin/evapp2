@@ -1,8 +1,0 @@
-<step title="Incoming Request" date="2025-12-01T16:05:36.111" instance="761fac" url="/logstream" method="GET" type="request" pid="768,1,32" Host="evyatribackend-bqc7hqdjgaezh6gd.scm.southindia-01.azurewebsites.net" User-Agent="AZURECLI/2.80.0 (HOMEBREW)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="90c3643e-cecf-11f0-91f1-4ef58866546f" X-ARR-LOG-ID="90c3643e-cecf-11f0-91f1-4ef58866546f" CLIENT-IP="49.37.135.35:57594" X-SITE-DEPLOYMENT-ID="evyatribackend" WAS-DEFAULT-HOSTNAME="evyatribackend-bqc7hqdjgaezh6gd.scm.southindia-01.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/logstream" X-Client-IP="49.37.135.35" X-Client-Port="57594" >
-  <step title="Cleanup Xml Logs" date="2025-12-01T16:05:36.114" /><!-- duration: 7ms -->
-  <step title="LogStreamHandlerMiddleware.Invoke" date="2025-12-01T16:05:36.130" /><!-- duration: 39ms -->
-  <step title="Error occurred" date="2025-12-01T18:05:36.170" type="error" text="LogStreamManager: Inside TerminateClient" /><!-- duration: 7ms -->
-  <step title="Error occurred" date="2025-12-01T18:05:36.184" type="error" text="LogStreamManager: Inside Reset" /><!-- duration: 3ms -->
-  <step title="Error occurred" date="2025-12-01T18:45:36.423" type="error" text="LogStreamManager: ProcessRequest end due to timeout" /><!-- duration: 6ms -->
-  <step title="Outgoing response" date="2025-12-01T18:45:36.437" type="response" statusCode="200" statusText="OK" /><!-- duration: 2ms -->
-</step><!-- duration: 9600330ms -->

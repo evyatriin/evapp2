@@ -13,9 +13,9 @@ class CommunityService {
     }
   }
 
-  Future<List<FeedPost>> getFeed() async {
+  Future<List<FeedPost>> getFeed({int limit = 10, int offset = 0}) async {
     try {
-      final response = await BackendService.get('/api/community/feed');
+      final response = await BackendService.get('/api/community/feed?limit=$limit&offset=$offset');
       final List<dynamic> data = response as List<dynamic>;
       return data.map((json) => FeedPost.fromJson(json)).toList();
     } catch (e) {

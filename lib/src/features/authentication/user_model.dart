@@ -3,6 +3,7 @@ class UserProfile {
   final String name;
   final String email;
   final String? profileImageUrl;
+  final bool isPhoneVerified;
   final int points;
   final int streak;
   final List<String> badges;

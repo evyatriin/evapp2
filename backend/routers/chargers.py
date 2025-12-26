@@ -89,46 +89,61 @@ class CreateCheckInRequest(BaseModel):
 
 @router.get("/", response_model=List[ChargingStation])
 async def get_stations(lat: Optional[float] = None, lng: Optional[float] = None, radius: float = 5.0):
-    # ... (existing code)
+    """
+    Get charging stations.
+    If lat/lng are provided, returns stations within 'radius' km.
+    Otherwise returns all verified public stations (limited to 100).
+    """
     try:
-        # Fetch verified public stations
-        query = supabase.table("charging_stations").select("*").eq("verification_status", "verified").eq("is_private", False)
-        response = query.execute()
-        stations = response.data
-        
-        # If lat/lng provided, perform distance filtering
         if lat is not None and lng is not None:
-            from math import radians, cos, sin, asin, sqrt
+            # Use database-level geospatial filtering via RPC
+            # Note: This requires the 'nearby_stations' function to be created in Supabase
+            try:
+                response = supabase.rpc("nearby_stations", {
+                    "lat": lat, 
+                    "long": lng, 
+                    "radius_km": radius
+                }).execute()
+                return response.data
+            except Exception as rpc_error:
+                print(f"RPC Error (falling back to python filtering): {rpc_error}")
+                # Fallback to fetching all and filtering (legacy behavior) if RPC fails
+                query = supabase.table("charging_stations").select("*").eq("verification_status", "verified").eq("is_private", False)
+                response = query.execute()
+                stations = response.data
+                
+                # ... (Keep existing fallback logic if needed, or just return empty/error)
+                # For now, let's keep the fallback logic but optimized
+                return _filter_stations_python(stations, lat, lng, radius)
 
-            def haversine(lon1, lat1, lon2, lat2):
-                # convert decimal degrees to radians 
-                lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
-                # haversine formula 
-                dlon = lon2 - lon1 
-                dlat = lat2 - lat1 
-                a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-                c = 2 * asin(sqrt(a)) 
-                r = 6371 # Radius of earth in kilometers. Use 3956 for miles
-                return c * r
-
-            # Calculate distances
-            for station in stations:
-                station['distance'] = haversine(lng, lat, station['longitude'], station['latitude'])
-            
-            # Filter by radius
-            nearby_stations = [s for s in stations if s.get('distance', float('inf')) <= radius]
-            
-            # If no stations within radius, get nearest 5
-            if not nearby_stations:
-                stations.sort(key=lambda x: x.get('distance', float('inf')))
-                return stations[:5]
-            
-            return nearby_stations
-
-        return stations
+        # Default fetch if no location provided
+        query = supabase.table("charging_stations").select("*").eq("verification_status", "verified").eq("is_private", False).limit(50)
+        response = query.execute()
+        return response.data
+        
     except Exception as e:
         print(f"Error fetching stations: {e}")
         return []
+
+def _filter_stations_python(stations, lat, lng, radius):
+    from math import radians, cos, sin, asin, sqrt
+    
+    filtered = []
+    for station in stations:
+        # Haversine formula
+        lon1, lat1, lon2, lat2 = map(radians, [lng, lat, station['longitude'], station['latitude']])
+        dlon = lon2 - lon1 
+        dlat = lat2 - lat1 
+        a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+        c = 2 * asin(sqrt(a)) 
+        r = 6371 
+        dist = c * r
+        
+        if dist <= radius:
+            station['distance'] = dist
+            filtered.append(station)
+            
+    return filtered
 
 @router.get("/my-stations/{user_id}", response_model=List[ChargingStation])
 async def get_my_stations(user_id: str):

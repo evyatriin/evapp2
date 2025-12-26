@@ -40,7 +40,7 @@ final class UserProvider extends $NotifierProvider<User, UserProfile?> {
   }
 }
 
-String _$userHash() => r'e45ff51843a8287a7e90c3ac2e3edabf9185ffca';
+String _$userHash() => r'1a9bab7ba68912a302d1754489cf18c2b628ad3b';
 
 abstract class _$User extends $Notifier<UserProfile?> {
   UserProfile? build();

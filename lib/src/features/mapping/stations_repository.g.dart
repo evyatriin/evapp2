@@ -109,6 +109,59 @@ abstract class _$MapCenter extends $Notifier<LatLng> {
   }
 }
 
+@ProviderFor(ConnectorFilter)
+const connectorFilterProvider = ConnectorFilterProvider._();
+
+final class ConnectorFilterProvider
+    extends $NotifierProvider<ConnectorFilter, Set<String>> {
+  const ConnectorFilterProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'connectorFilterProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$connectorFilterHash();
+
+  @$internal
+  @override
+  ConnectorFilter create() => ConnectorFilter();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<String>>(value),
+    );
+  }
+}
+
+String _$connectorFilterHash() => r'89b9b9d98468821d5324e5bbc69d90c86d3b2afa';
+
+abstract class _$ConnectorFilter extends $Notifier<Set<String>> {
+  Set<String> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<Set<String>, Set<String>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Set<String>, Set<String>>,
+              Set<String>,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
 @ProviderFor(stations)
 const stationsProvider = StationsProvider._();
 
@@ -148,4 +201,4 @@ final class StationsProvider
   }
 }
 
-String _$stationsHash() => r'd625556549f020d783ea589b00a82327c865eebc';
+String _$stationsHash() => r'dedb3ca9f534046e65df62c591456a31a7529a51';

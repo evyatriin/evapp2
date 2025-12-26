@@ -109,6 +109,16 @@ def _parse_here_response(data, request):
         total_dist = 0
         total_dur = 0
         
+        # Add origin stop
+        stops.append({
+            "name": "Start",
+            "location": {"latitude": request.origin.latitude, "longitude": request.origin.longitude},
+            "type": "origin",
+            "arrivalTime": datetime.now().isoformat(),
+            "arrivalSoc": request.current_soc,
+            "departureSoc": request.current_soc
+        })
+        
         for section in sections:
             # Decode polyline
             if "polyline" in section:
@@ -152,6 +162,16 @@ def _parse_here_response(data, request):
                             "cost": 200 # Placeholder
                         })
 
+        # Add destination stop
+        stops.append({
+            "name": "Destination",
+            "location": {"latitude": request.destination.latitude, "longitude": request.destination.longitude},
+            "type": "destination",
+            "arrivalTime": (datetime.now() + timedelta(minutes=int(total_dur))).isoformat(),
+            "arrivalSoc": request.target_soc,
+            "departureSoc": request.target_soc
+        })
+
         routes.append({
             "id": f"here_route_{i}",
             "name": f"Route {i+1}",
@@ -159,7 +179,7 @@ def _parse_here_response(data, request):
             "totalDistanceKm": total_dist,
             "totalDurationMin": total_dur,
             "stops": stops,
-            "estimatedCost": len(stops) * 200
+            "estimatedCost": len([s for s in stops if s["type"] == "charging"]) * 200
         })
         
     if not routes:

@@ -77,8 +77,6 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
                 ),
               ),
             ),
-import '../community/gamification_widgets.dart';
-
             accountName: Row(
               children: [
                 Text(
@@ -101,6 +99,17 @@ import '../community/gamification_widgets.dart';
             onTap: () {
               Navigator.pop(context);
               context.push('/profile');
+            },
+          ),
+
+          // Statistics
+          ListTile(
+            leading: Icon(PhosphorIcons.chartBar(PhosphorIconsStyle.duotone)),
+            title: const Text('My Statistics'),
+            subtitle: const Text('km, CO₂ saved, & more'),
+            onTap: () {
+              Navigator.pop(context);
+              context.push('/statistics');
             },
           ),
 

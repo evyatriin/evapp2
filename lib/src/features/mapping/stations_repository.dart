@@ -64,10 +64,41 @@ class MapCenter extends _$MapCenter {
   }
 }
 
+// Connector filter provider
+@riverpod
+class ConnectorFilter extends _$ConnectorFilter {
+  @override
+  Set<String> build() => {}; // Empty = show all
+
+  void toggle(String connector) {
+    if (state.contains(connector)) {
+      state = {...state}..remove(connector);
+    } else {
+      state = {...state, connector};
+    }
+  }
+
+  void clear() {
+    state = {};
+  }
+}
+
 @riverpod
 Future<List<StationModel>> stations(Ref ref) async {
   final repository = ref.watch(stationsRepositoryProvider);
   final center = ref.watch(mapCenterProvider);
+  final filters = ref.watch(connectorFilterProvider);
   print('DEBUG: Fetching stations for center: ${center.latitude}, ${center.longitude}');
-  return repository.getStationsNear(center);
+  
+  final allStations = await repository.getStationsNear(center);
+  
+  // Apply connector filter
+  if (filters.isEmpty) {
+    return allStations;
+  }
+  
+  return allStations.where((station) {
+    return station.connectors.any((c) => filters.contains(c));
+  }).toList();
 }
+

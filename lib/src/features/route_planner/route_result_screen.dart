@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart' as ll;
+import 'package:gap/gap.dart';
 
 import 'route_model.dart';
 import 'saved_route_model.dart';
@@ -194,8 +195,8 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
 
           // Plan Selection Dropdown (Floating Top)
           Positioned(
-            top: MediaQuery.of(context).padding.top + 10,
-            left: 16,
+            top: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
+            left: 56,
             right: 16,
             child: Card(
               elevation: 4,

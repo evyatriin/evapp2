@@ -71,12 +71,17 @@ class _ChargeScreenState extends ConsumerState<ChargeScreen> with SingleTickerPr
     return Scaffold(
       appBar: AppBar(
         title: const Text('Charging History'),
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Charged Successfully'),
-            Tab(text: 'Issue with Charger'),
-          ],
+        toolbarHeight: 48,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(36),
+          child: TabBar(
+            controller: _tabController,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+            tabs: const [
+              Tab(text: 'Charged Successfully', height: 36),
+              Tab(text: 'Issue with Charger', height: 36),
+            ],
+          ),
         ),
       ),
       body: _isLoading

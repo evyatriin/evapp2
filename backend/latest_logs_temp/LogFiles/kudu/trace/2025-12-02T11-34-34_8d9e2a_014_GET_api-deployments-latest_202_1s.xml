@@ -1,9 +1,0 @@
-<step title="Incoming Request" date="2025-12-02T11:34:34.744" instance="8d9e2a" url="/api/deployments/latest?deployer=OneDeploy&amp;time=2025-12-02_11-33-26Z" method="GET" type="request" pid="768,1,20" Host="evyatribackend-bqc7hqdjgaezh6gd.scm.southindia-01.azurewebsites.net" User-Agent="GITHUBACTIONS_DeployWebAppToAzure_d9290a2b740c0fabf7ba9abd472c8746feb317fa5ae365012beadc752bc2600d" Authorization="Bea..." Content-Type="application/json; charset=utf-8" Cookie="ARRAffinity=8d9e2a936c95dd849e4c0dae43b408c0ae869fcd34aeaf84a36fa1ee3cdf62cf;Path=/;HttpOnly;Secure;Domain=evyatribackend-bqc7hqdjgaezh6gd.scm.southindia-01.azurewebsites.net; ARRAffinitySameSite=8d9e2a936c95dd849e4c0dae43b408c0ae869fcd34aeaf84a36fa1ee3cdf62cf;Path=/;HttpOnly;SameSite=None;Secure;Domain=evyatribackend-bqc7hqdjgaezh6gd.scm.southindia-01.azurewebsites.net" Content-Length="0" X-ARR-LOG-ID="5277b57d-99e0-4ae9-afc3-df39fefde35f" CLIENT-IP="172.183.131.194:29768" X-SITE-DEPLOYMENT-ID="evyatribackend" WAS-DEFAULT-HOSTNAME="evyatribackend-bqc7hqdjgaezh6gd.scm.southindia-01.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/api/deployments/latest?deployer=OneDeploy&amp;time=2025-12-02_11-33-26Z" X-Client-IP="172.183.131.194" X-Client-Port="29768" >
-  <step title="Cleanup Xml Logs" date="2025-12-02T11:34:34.747" /><!-- duration: 10ms -->
-  <step title="DeploymentService.GetResult" date="2025-12-02T11:34:34.774" >
-    <step title="DeploymentService.GetLatestDeployment" date="2025-12-02T11:34:34.779" >
-      <step title="DeploymentManager.GetResults" date="2025-12-02T11:34:34.788" /><!-- duration: 453ms -->
-    </step><!-- duration: 466ms -->
-  </step><!-- duration: 473ms -->
-  <step title="Outgoing response" date="2025-12-02T11:34:35.251" type="response" statusCode="202" statusText="Accepted" /><!-- duration: 28ms -->
-</step><!-- duration: 540ms -->

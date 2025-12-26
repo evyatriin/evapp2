@@ -131,7 +131,11 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           CircleAvatar(
             radius: 20,
             backgroundImage: entry.profileImageUrl != null
-                ? NetworkImage(entry.profileImageUrl!)
+                ? ResizeImage(
+                    NetworkImage(entry.profileImageUrl!),
+                    width: 40, // 20 * 2
+                    height: 40,
+                  )
                 : null,
             child: entry.profileImageUrl == null
                 ? Text(entry.name.isNotEmpty ? entry.name[0].toUpperCase() : '?')

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import '../../common_widgets/app_text_field.dart';
+import '../../common_widgets/app_button.dart';
 import 'user_provider.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
@@ -135,15 +137,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     textAlign: TextAlign.center,
                   ),
                   const Gap(48),
-                  TextFormField(
+                  AppTextField(
                     controller: _nameController,
-                    decoration: InputDecoration(
-                      labelText: 'Name',
-                      prefixIcon: const Icon(Icons.person_outline),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
+                    label: 'Name',
+                    prefixIcon: Icons.person_outline,
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your name';
@@ -152,16 +149,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     },
                   ),
                   const Gap(16),
-                  TextFormField(
+                  AppTextField(
                     controller: _emailController,
+                    label: 'Email',
+                    prefixIcon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
-                    decoration: InputDecoration(
-                      labelText: 'Email',
-                      prefixIcon: const Icon(Icons.email_outlined),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter your email';
@@ -173,21 +165,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     },
                   ),
                   const Gap(16),
-                  TextFormField(
+                  AppTextField(
                     controller: _passwordController,
+                    label: 'Password',
+                    prefixIcon: Icons.lock_outline,
                     obscureText: _obscurePassword,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                        ),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -200,21 +187,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     },
                   ),
                   const Gap(16),
-                  TextFormField(
+                  AppTextField(
                     controller: _confirmPasswordController,
+                    label: 'Confirm Password',
+                    prefixIcon: Icons.lock_outline,
                     obscureText: _obscureConfirmPassword,
-                    decoration: InputDecoration(
-                      labelText: 'Confirm Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                        ),
-                        onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                       ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -227,21 +209,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     },
                   ),
                   const Gap(24),
-                  FilledButton(
-                    onPressed: _isLoading ? null : _handleSignup,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text('Sign Up', style: TextStyle(fontSize: 16)),
+                  AppButton(
+                    label: 'Sign Up',
+                    onPressed: _handleSignup,
+                    isLoading: _isLoading,
+                    isFullWidth: true,
                   ),
                   const Gap(16),
                   Row(

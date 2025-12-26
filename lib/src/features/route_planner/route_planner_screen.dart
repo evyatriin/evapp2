@@ -113,13 +113,18 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
       appBar: AppBar(
         title: const Text('Plan Your Trip'),
         backgroundColor: theme.colorScheme.surface,
+        toolbarHeight: 48,
         elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Plan Trip'),
-            Tab(text: 'Saved Plans'),
-          ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(36),
+          child: TabBar(
+            controller: _tabController,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+            tabs: const [
+              Tab(text: 'Plan Trip', height: 36),
+              Tab(text: 'Saved Plans', height: 36),
+            ],
+          ),
         ),
       ),
       body: TabBarView(
@@ -151,9 +156,9 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
                           margin: EdgeInsets.zero,
                           elevation: 4,
                           shadowColor: Colors.black26,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -198,72 +203,180 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
                                 
                                 // Options
                                 if (_showOptions) ...[
-                                  const Gap(8),
-                                  const Gap(8),
+                                  const Gap(4),
                                   // Vehicle Selection Dropdown
                                   Consumer(
                                     builder: (context, ref, child) {
                                       final vehicles = ref.watch(vehicleProvider);
+                                      final vehicleNotifier = ref.read(vehicleProvider.notifier);
                                       
-                                      // Initialize selected vehicle if not set
+                                      // Initialize selected vehicle with primary vehicle if not set
                                       if (_selectedVehicleId == null && vehicles.isNotEmpty) {
                                         WidgetsBinding.instance.addPostFrameCallback((_) {
                                           if (mounted) {
                                             setState(() {
-                                              _selectedVehicleId = vehicles.first.id;
+                                              final primary = vehicleNotifier.primaryVehicle;
+                                              _selectedVehicleId = primary?.id ?? vehicles.first.id;
                                             });
                                           }
                                         });
                                       }
                                       
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                        decoration: BoxDecoration(
-                                          border: Border.all(color: theme.colorScheme.outlineVariant),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: DropdownButtonHideUnderline(
-                                          child: DropdownButton<String>(
-                                            isExpanded: true,
-                                            value: _selectedVehicleId,
-                                            hint: const Text('Select Vehicle'),
-                                            items: vehicles.map((v) {
-                                              return DropdownMenuItem(
-                                                value: v.id,
-                                          child: Row(
-                                            children: [
-                                              if (v.photoUrl != null)
-                                                Padding(
-                                                  padding: const EdgeInsets.only(right: 8.0),
-                                                  child: CircleAvatar(
-                                                    backgroundImage: NetworkImage(v.photoUrl!),
-                                                    radius: 12,
-                                                  ),
-                                                ),
-                                              Expanded(
-                                                child: Text(
-                                                  '${v.brand} ${v.model} ${v.variant}',
-                                                  style: theme.textTheme.bodyMedium,
-                                                  overflow: TextOverflow.ellipsis,
-                                                ),
+                                      // Get selected vehicle for specs display
+                                      final selectedVehicle = vehicles.where((v) => v.id == _selectedVehicleId).toList();
+                                      final currentVehicle = selectedVehicle.isNotEmpty ? selectedVehicle.first : null;
+                                      
+                                      return Column(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              border: Border.all(color: theme.colorScheme.outlineVariant),
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            child: DropdownButtonHideUnderline(
+                                              child: DropdownButton<String>(
+                                                isExpanded: true,
+                                                value: _selectedVehicleId,
+                                                hint: const Text('Select Vehicle'),
+                                                items: vehicles.map((v) {
+                                                  return DropdownMenuItem(
+                                                    value: v.id,
+                                                    child: Row(
+                                                      children: [
+                                                        // Vehicle image/icon
+                                                        Container(
+                                                          width: 32,
+                                                          height: 32,
+                                                          margin: const EdgeInsets.only(right: 10),
+                                                          decoration: BoxDecoration(
+                                                            borderRadius: BorderRadius.circular(6),
+                                                            color: theme.colorScheme.surfaceContainerHighest,
+                                                          ),
+                                                          clipBehavior: Clip.antiAlias,
+                                                          child: (v.photoUrl != null || v.imageUrl != null)
+                                                              ? Image.network(
+                                                                  v.photoUrl ?? v.imageUrl!,
+                                                                  fit: BoxFit.cover,
+                                                                  errorBuilder: (c, e, s) => Icon(
+                                                                    Icons.directions_car,
+                                                                    size: 18,
+                                                                    color: theme.colorScheme.primary,
+                                                                  ),
+                                                                )
+                                                              : Icon(
+                                                                  Icons.directions_car,
+                                                                  size: 18,
+                                                                  color: theme.colorScheme.primary,
+                                                                ),
+                                                        ),
+                                                        // Vehicle details
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            mainAxisSize: MainAxisSize.min,
+                                                            children: [
+                                                              Row(
+                                                                children: [
+                                                                  Flexible(
+                                                                    child: Text(
+                                                                      '${v.brand} ${v.model}',
+                                                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                                                        fontWeight: FontWeight.w600,
+                                                                      ),
+                                                                      overflow: TextOverflow.ellipsis,
+                                                                    ),
+                                                                  ),
+                                                                  if (v.isPrimary) ...[
+                                                                    const Gap(4),
+                                                                    Icon(
+                                                                      Icons.star,
+                                                                      size: 14,
+                                                                      color: theme.colorScheme.primary,
+                                                                    ),
+                                                                  ],
+                                                                ],
+                                                              ),
+                                                              Text(
+                                                                '${v.variant} • ${v.estimatedRange.toInt()} km',
+                                                                style: theme.textTheme.bodySmall?.copyWith(
+                                                                  color: theme.colorScheme.onSurfaceVariant,
+                                                                ),
+                                                                overflow: TextOverflow.ellipsis,
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  );
+                                                }).toList(),
+                                                onChanged: (id) {
+                                                  setState(() {
+                                                    _selectedVehicleId = id;
+                                                  });
+                                                },
                                               ),
-                                            ],
+                                            ),
                                           ),
-                                              );
-                                            }).toList(),
-                                            onChanged: (id) {
-                                              setState(() {
-                                                _selectedVehicleId = id;
-                                              });
-                                            },
-                                          ),
-                                        ),
+                                          // Vehicle Specs Card
+                                          if (currentVehicle != null) ...[
+                                            const Gap(8),
+                                            Container(
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: _buildSpecItem(
+                                                      context,
+                                                      icon: Icons.speed,
+                                                      label: 'Efficiency',
+                                                      value: '${(currentVehicle.rangeEfficiency * 100).toInt()}%',
+                                                    ),
+                                                  ),
+                                                  Container(
+                                                    width: 1,
+                                                    height: 30,
+                                                    color: theme.colorScheme.outlineVariant,
+                                                  ),
+                                                  Expanded(
+                                                    child: _buildSpecItem(
+                                                      context,
+                                                      icon: Icons.battery_charging_full,
+                                                      label: 'Range',
+                                                      value: '${currentVehicle.estimatedRange.toInt()} km',
+                                                    ),
+                                                  ),
+                                                  if (currentVehicle.preferredChargingNetworks.isNotEmpty) ...[
+                                                    Container(
+                                                      width: 1,
+                                                      height: 30,
+                                                      color: theme.colorScheme.outlineVariant,
+                                                    ),
+                                                    Expanded(
+                                                      child: _buildSpecItem(
+                                                        context,
+                                                        icon: Icons.ev_station,
+                                                        label: 'Networks',
+                                                        value: '${currentVehicle.preferredChargingNetworks.length}',
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       );
                                     },
                                   ),
-                                  const Gap(16),
-                                  const Divider(),
                                   const Gap(8),
+                                  const Divider(height: 1),
+                                  const Gap(4),
                                   _buildSliderRow(
                                     context, 
                                     'Current SOC', 
@@ -338,10 +451,10 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
                   
                   // Floating Action Button for Planning
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: SizedBox(
                       width: double.infinity,
-                      height: 56,
+                      height: 48,
                       child: FilledButton.icon(
                         onPressed: _isLoading ? null : _planTrip,
                         style: FilledButton.styleFrom(
@@ -409,6 +522,25 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
             max: max,
             onChanged: onChanged,
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSpecItem(BuildContext context, {required IconData icon, required String label, required String value}) {
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 16, color: theme.colorScheme.primary),
+        const Gap(2),
+        Text(
+          value,
+          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+        ),
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
       ],
     );

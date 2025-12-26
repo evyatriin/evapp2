@@ -160,12 +160,12 @@ class _SavedRoutesListState extends State<SavedRoutesList> {
                   ],
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   itemCount: _routes.length,
                   itemBuilder: (context, index) {
                     final route = _routes[index];
                     return Card(
-                      margin: const EdgeInsets.only(bottom: 16),
+                      margin: const EdgeInsets.only(bottom: 10),
                       child: InkWell(
                         onTap: () {
                           // Navigate to result screen with this route
@@ -176,9 +176,9 @@ class _SavedRoutesListState extends State<SavedRoutesList> {
                             'endAddress': route.endAddress,
                           });
                         },
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         child: Padding(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(12),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [

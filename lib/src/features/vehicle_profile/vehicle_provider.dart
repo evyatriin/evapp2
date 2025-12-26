@@ -27,6 +27,13 @@ class Vehicle extends Notifier<List<VehicleProfile>> {
     }
   }
 
+  /// Get the primary vehicle (or first vehicle if none is primary)
+  VehicleProfile? get primaryVehicle {
+    if (state.isEmpty) return null;
+    final primary = state.where((v) => v.isPrimary).toList();
+    return primary.isNotEmpty ? primary.first : state.first;
+  }
+
   Future<void> addVehicle(VehicleProfile vehicle) async {
     final addedVehicle = await _service.addVehicle(vehicle);
     if (addedVehicle != null) {
@@ -48,6 +55,17 @@ class Vehicle extends Notifier<List<VehicleProfile>> {
     final success = await _service.deleteVehicle(id);
     if (success) {
       state = state.where((v) => v.id != id).toList();
+    }
+  }
+
+  /// Set a vehicle as the primary vehicle
+  Future<void> setPrimaryVehicle(String vehicleId) async {
+    final success = await _service.setPrimaryVehicle(vehicleId);
+    if (success) {
+      state = [
+        for (final vehicle in state)
+          vehicle.copyWith(isPrimary: vehicle.id == vehicleId),
+      ];
     }
   }
 
