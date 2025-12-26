@@ -234,13 +234,22 @@ class _MicroCommunityCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: Image.network(
-                image,
-                width: double.infinity,
-                fit: BoxFit.cover,
-                cacheWidth: 280, // 140 * 2 for high density
-                errorBuilder: (c, e, s) => Container(color: Colors.grey[300]),
-              ),
+              child: image.isNotEmpty
+                  ? Image.network(
+                      image,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      cacheWidth: 280,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Container(
+                          color: Colors.grey[200],
+                          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                        );
+                      },
+                      errorBuilder: (c, e, s) => Container(color: Colors.grey[300]),
+                    )
+                  : Container(color: Colors.grey[300]),
             ),
             Padding(
               padding: const EdgeInsets.all(8.0),
@@ -304,7 +313,7 @@ class _FeedPostCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundImage: NetworkImage(avatarUrl),
+                  backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
                   onBackgroundImageError: (e, s) {},
                   child: const Icon(Icons.person, size: 16),
                 ),
@@ -350,7 +359,7 @@ class _FeedPostCard extends StatelessWidget {
             const Gap(4),
             Text(content, style: theme.textTheme.bodyMedium),
             
-            if (hasImage && imageUrl != null) ...[
+            if (hasImage && imageUrl != null && imageUrl!.isNotEmpty) ...[
               const Gap(12),
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
@@ -359,7 +368,20 @@ class _FeedPostCard extends StatelessWidget {
                   width: double.infinity, 
                   height: 180, 
                   fit: BoxFit.cover,
-                  cacheWidth: 800, // Reasonable max width
+                  cacheWidth: 800,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      height: 180,
+                      color: Colors.grey[200],
+                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) => Container(
+                    height: 180,
+                    color: Colors.grey[300],
+                    child: const Center(child: Icon(Icons.broken_image, size: 48, color: Colors.grey)),
+                  ),
                 ),
               ),
             ],

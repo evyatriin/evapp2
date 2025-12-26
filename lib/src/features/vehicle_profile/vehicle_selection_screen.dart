@@ -115,6 +115,11 @@ class _VehicleSelectionScreenState extends ConsumerState<VehicleSelectionScreen>
                                 child: Image.network(
                                   template.imageUrl,
                                   fit: BoxFit.contain,
+                                  cacheWidth: 400,
+                                  loadingBuilder: (context, child, loadingProgress) {
+                                    if (loadingProgress == null) return child;
+                                    return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                                  },
                                   errorBuilder: (context, error, stackTrace) =>
                                       const Icon(Icons.directions_car, size: 48, color: Colors.grey),
                                 ),
