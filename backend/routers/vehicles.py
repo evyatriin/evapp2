@@ -111,12 +111,18 @@ async def get_vehicle_templates():
 @router.get("/", response_model=List[VehicleProfile])
 async def get_vehicles(user_id: str):
     """Get all vehicles for a user"""
+    print(f"[DEBUG] get_vehicles called with user_id: {user_id}")
+    print(f"[DEBUG] Current mock store keys: {list(_mock_vehicles_store.keys())}")
+    
     if not supabase:
         # Return mock data if Supabase is not configured
-        return _get_mock_vehicles(user_id)
+        vehicles = _get_mock_vehicles(user_id)
+        print(f"[DEBUG] Returning {len(vehicles)} mock vehicles for user {user_id}")
+        return vehicles
     
     try:
         response = supabase.table("vehicles").select("*").eq("user_id", user_id).execute()
+        print(f"[DEBUG] Supabase returned {len(response.data)} vehicles")
         return response.data
     except Exception as e:
         print(f"Supabase error: {e}")
@@ -125,9 +131,15 @@ async def get_vehicles(user_id: str):
 @router.post("/", response_model=VehicleProfile)
 async def create_vehicle(vehicle: VehicleCreateRequest):
     """Create a new vehicle"""
+    print(f"[DEBUG] create_vehicle called with user_id: {vehicle.user_id}")
+    print(f"[DEBUG] Vehicle data: brand={vehicle.brand}, model={vehicle.model}")
+    
     if not supabase:
         # Return mock response if Supabase is not configured
-        return _create_mock_vehicle(vehicle)
+        result = _create_mock_vehicle(vehicle)
+        print(f"[DEBUG] Mock vehicle created with id: {result['id']}")
+        print(f"[DEBUG] Mock store now has keys: {list(_mock_vehicles_store.keys())}")
+        return result
     
     try:
         response = supabase.table("vehicles").insert({
