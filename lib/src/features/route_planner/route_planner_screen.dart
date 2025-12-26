@@ -651,6 +651,16 @@ class TripSummarySheet extends StatelessWidget {
                   Expanded(
                     child: FilledButton.icon(
                       onPressed: () async {
+                        // Safety check: ensure route has stops
+                        if (route.stops.isEmpty) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('No route stops available for navigation')),
+                            );
+                          }
+                          return;
+                        }
+                        
                         // Launch navigation in maps app
                         try {
                           final origin = route.stops.first.location;
