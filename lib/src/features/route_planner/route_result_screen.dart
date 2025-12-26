@@ -121,17 +121,6 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundColor: theme.colorScheme.surface,
-            child: BackButton(color: theme.colorScheme.onSurface),
-          ),
-        ),
-      ),
       body: Stack(
         children: [
           // Map
@@ -146,7 +135,7 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
                 points: _selectedRoute.polyline
                     .map((p) => LatLng(p.latitude, p.longitude))
                     .toList(),
-                color: Colors.blue,
+                color: theme.colorScheme.primary,
                 width: 5,
               ),
             },
@@ -193,39 +182,128 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
             },
           ),
 
-          // Plan Selection Dropdown (Floating Top)
+          // Floating Header with Back Button + Route Selector
           Positioned(
-            top: MediaQuery.of(context).padding.top + kToolbarHeight + 8,
-            left: 56,
-            right: 16,
-            child: Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<RouteModel>(
-                    value: _selectedRoute,
-                    isExpanded: true,
-                    icon: const Icon(Icons.keyboard_arrow_down),
-                    items: _routes.map((route) {
-                      return DropdownMenuItem(
-                        value: route,
-                        child: Text(
-                          route.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (RouteModel? newValue) {
-                      if (newValue != null) {
-                        setState(() {
-                          _selectedRoute = newValue;
-                        });
-                      }
-                    },
+            top: MediaQuery.of(context).padding.top + 8,
+            left: 12,
+            right: 12,
+            child: Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
                   ),
-                ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  // Back Button
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => Navigator.of(context).pop(),
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(16),
+                        bottomLeft: Radius.circular(16),
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        child: Icon(
+                          Icons.arrow_back_rounded,
+                          color: theme.colorScheme.onSurface,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Divider
+                  Container(
+                    width: 1,
+                    height: 32,
+                    color: theme.colorScheme.outlineVariant,
+                  ),
+                  
+                  // Route Selector
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<RouteModel>(
+                          value: _selectedRoute,
+                          isExpanded: true,
+                          icon: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              color: theme.colorScheme.primary,
+                              size: 20,
+                            ),
+                          ),
+                          items: _routes.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final route = entry.value;
+                            final isSelected = route.id == _selectedRoute.id;
+                            return DropdownMenuItem(
+                              value: route,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 24,
+                                    height: 24,
+                                    decoration: BoxDecoration(
+                                      color: isSelected 
+                                          ? theme.colorScheme.primary 
+                                          : theme.colorScheme.surfaceContainerHighest,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '${index + 1}',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                          color: isSelected 
+                                              ? theme.colorScheme.onPrimary 
+                                              : theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const Gap(10),
+                                  Expanded(
+                                    child: Text(
+                                      route.name,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        color: theme.colorScheme.onSurface,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (RouteModel? newValue) {
+                            if (newValue != null) {
+                              setState(() {
+                                _selectedRoute = newValue;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
