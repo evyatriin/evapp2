@@ -13,10 +13,10 @@ class StationsRepository {
 
   StationsRepository(this._placesService, this._remoteService);
 
-  Future<List<StationModel>> getStationsNear(LatLng center) async {
+  Future<List<StationModel>> getStationsNear(LatLng center, {double radiusKm = 10.0}) async {
     // Fetch from both sources in parallel
     final results = await Future.wait([
-      _placesService.fetchChargingStations(center, 5.0),
+      _placesService.fetchChargingStations(center, radiusKm),
       _remoteService.fetchRemoteStations(center),
     ]);
 
@@ -64,6 +64,17 @@ class MapCenter extends _$MapCenter {
   }
 }
 
+// Map zoom level provider
+@riverpod
+class MapZoom extends _$MapZoom {
+  @override
+  double build() => 12.0; // Default zoom level
+
+  void update(double newZoom) {
+    state = newZoom;
+  }
+}
+
 // Connector filter provider
 @riverpod
 class ConnectorFilter extends _$ConnectorFilter {
@@ -83,14 +94,28 @@ class ConnectorFilter extends _$ConnectorFilter {
   }
 }
 
+/// Calculate search radius in km from zoom level
+/// Google Maps zoom levels: 1 (world) to 20 (buildings)
+/// Approx: Zoom 12 = ~5km visible, Zoom 10 = ~20km, Zoom 8 = ~80km
+double _calculateRadiusFromZoom(double zoom) {
+  // Formula: radius = 40000 / (2^zoom) km (rough approximation)
+  // We'll cap at a reasonable max to avoid too many API calls
+  final calculatedRadius = 40000 / (1 << zoom.round());
+  // Clamp between 5km and 50km
+  return calculatedRadius.clamp(5.0, 50.0);
+}
+
 @riverpod
 Future<List<StationModel>> stations(Ref ref) async {
   final repository = ref.watch(stationsRepositoryProvider);
   final center = ref.watch(mapCenterProvider);
+  final zoom = ref.watch(mapZoomProvider);
   final filters = ref.watch(connectorFilterProvider);
-  print('DEBUG: Fetching stations for center: ${center.latitude}, ${center.longitude}');
   
-  final allStations = await repository.getStationsNear(center);
+  final radiusKm = _calculateRadiusFromZoom(zoom);
+  print('DEBUG: Fetching stations for center: ${center.latitude}, ${center.longitude}, zoom: $zoom, radius: ${radiusKm}km');
+  
+  final allStations = await repository.getStationsNear(center, radiusKm: radiusKm);
   
   // Apply connector filter
   if (filters.isEmpty) {

@@ -17,10 +17,10 @@ class CommunityScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return DefaultTabController(
-      length: 5,
+      length: 3, // Reduced from 5 - For You and My Communities commented out
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Community Hub'),
+          title: const Text('Resource Hub'),
           centerTitle: false,
           toolbarHeight: 48,
           actions: [
@@ -45,8 +45,9 @@ class CommunityScreen extends ConsumerWidget {
               tabAlignment: TabAlignment.start,
               labelPadding: const EdgeInsets.symmetric(horizontal: 12),
               tabs: const [
-                Tab(text: 'For You', height: 36),
-                Tab(text: 'My Communities', height: 36),
+                // TODO: Enable these tabs when features are ready
+                // Tab(text: 'For You', height: 36),
+                // Tab(text: 'My Communities', height: 36),
                 Tab(text: 'Trending', height: 36),
                 Tab(text: 'Resources', height: 36),
                 Tab(text: 'Leaderboard', height: 36),
@@ -56,8 +57,9 @@ class CommunityScreen extends ConsumerWidget {
         ),
         body: TabBarView(
           children: [
-            const _ForYouTab(),
-            _buildPlaceholderTab(context, 'My Communities'),
+            // TODO: Enable these tabs when features are ready
+            // const _ForYouTab(),
+            // _buildPlaceholderTab(context, 'My Communities'),
             const TrendingTab(),
             const ResourcesTab(),
             const LeaderboardScreen(),

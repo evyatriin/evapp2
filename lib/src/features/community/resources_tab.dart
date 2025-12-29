@@ -126,31 +126,30 @@ class ResourcesTab extends StatelessWidget {
           ],
         ),
 
-        const Gap(16),
-
-        // Useful Links
-        _ResourceSection(
-          icon: PhosphorIcons.link(PhosphorIconsStyle.duotone),
-          title: 'Useful Links',
-          color: Colors.purple,
-          items: const [
-            _ResourceItem(
-              title: 'EV Yatra',
-              subtitle: 'Comprehensive EV information portal',
-              url: 'https://evyatra.com',
-            ),
-            _ResourceItem(
-              title: 'Charging Station Finder',
-              subtitle: 'Find chargers across India',
-              url: 'https://evyatra.com/charging-stations',
-            ),
-            _ResourceItem(
-              title: 'EV Forums India',
-              subtitle: 'Connect with EV community',
-              url: 'https://evyatra.com/forums',
-            ),
-          ],
-        ),
+        // TODO: Enable Useful Links when ready
+        // const Gap(16),
+        // _ResourceSection(
+        //   icon: PhosphorIcons.link(PhosphorIconsStyle.duotone),
+        //   title: 'Useful Links',
+        //   color: Colors.purple,
+        //   items: const [
+        //     _ResourceItem(
+        //       title: 'EV Yatra',
+        //       subtitle: 'Comprehensive EV information portal',
+        //       url: 'https://evyatra.com',
+        //     ),
+        //     _ResourceItem(
+        //       title: 'Charging Station Finder',
+        //       subtitle: 'Find chargers across India',
+        //       url: 'https://evyatra.com/charging-stations',
+        //     ),
+        //     _ResourceItem(
+        //       title: 'EV Forums India',
+        //       subtitle: 'Connect with EV community',
+        //       url: 'https://evyatra.com/forums',
+        //     ),
+        //   ],
+        // ),
       ],
     );
   }

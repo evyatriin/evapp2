@@ -84,6 +84,13 @@ class CreateCheckInRequest(BaseModel):
     rating: Optional[int]
     comment: Optional[str]
     image_url: Optional[str]
+    # New charging detail fields
+    battery_start_percent: Optional[int] = None
+    battery_end_percent: Optional[int] = None
+    time_taken_minutes: Optional[int] = None
+    cost_paid: Optional[float] = None
+    charging_slip_url: Optional[str] = None
+    points_earned: Optional[int] = 10  # Default to 10 for backward compatibility
 
 # --- Endpoints ---
 
@@ -193,6 +200,18 @@ async def get_my_checkins(user_id: str):
         print(f"Error fetching checkins: {e}")
         return []
 
+@router.get("/checkin/station/{station_id}/latest")
+async def get_latest_station_checkin(station_id: str):
+    """Get the latest check-in for a specific station"""
+    try:
+        response = supabase.table("station_checkins").select("*").eq("station_id", station_id).order("created_at", desc=True).limit(1).execute()
+        if response.data and len(response.data) > 0:
+            return response.data[0]
+        return None
+    except Exception as e:
+        print(f"Error fetching latest checkin: {e}")
+        return None
+
 @router.post("/checkin", response_model=CheckIn)
 async def create_checkin(checkin: CreateCheckInRequest):
     try:
@@ -202,10 +221,11 @@ async def create_checkin(checkin: CreateCheckInRequest):
         # Insert checkin
         response = supabase.table("station_checkins").insert(data).execute()
         
-        # Reward points logic
+        # Reward points logic - use points from request (default 10)
+        points_to_award = checkin.points_earned or 10
         try:
             from utils.gamification_utils import award_points_internal
-            await award_points_internal(checkin.user_id, 10, 'check_in')
+            await award_points_internal(checkin.user_id, points_to_award, 'check_in')
         except Exception as e:
             print(f"Error updating points: {e}")
 

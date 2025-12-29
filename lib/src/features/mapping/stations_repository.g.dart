@@ -109,6 +109,58 @@ abstract class _$MapCenter extends $Notifier<LatLng> {
   }
 }
 
+@ProviderFor(MapZoom)
+const mapZoomProvider = MapZoomProvider._();
+
+final class MapZoomProvider extends $NotifierProvider<MapZoom, double> {
+  const MapZoomProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'mapZoomProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$mapZoomHash();
+
+  @$internal
+  @override
+  MapZoom create() => MapZoom();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(double value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<double>(value),
+    );
+  }
+}
+
+String _$mapZoomHash() => r'57b724ce074f21226df37b5742d0b9c0ab7ad752';
+
+abstract class _$MapZoom extends $Notifier<double> {
+  double build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<double, double>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<double, double>,
+              double,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
 @ProviderFor(ConnectorFilter)
 const connectorFilterProvider = ConnectorFilterProvider._();
 
@@ -201,4 +253,4 @@ final class StationsProvider
   }
 }
 
-String _$stationsHash() => r'dedb3ca9f534046e65df62c591456a31a7529a51';
+String _$stationsHash() => r'048d1e03bbfb8d12502adc6a1a28aa581baf58bb';

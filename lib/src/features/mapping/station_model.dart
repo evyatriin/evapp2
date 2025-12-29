@@ -73,7 +73,7 @@ class StationModel {
     if (evOptions != null && evOptions['connectorAggregation'] != null) {
       for (var agg in evOptions['connectorAggregation']) {
         if (agg['type'] != null) {
-          connectors.add(agg['type']);
+          connectors.add(_formatConnectorType(agg['type']));
         }
         // Simple logic: if any connector is available, station is working
         if (agg['availability'] == 'OUT_OF_SERVICE') {
@@ -102,4 +102,41 @@ class StationModel {
       availabilityStatus: 'Unknown',
     );
   }
+
+  /// Formats raw API connector types into user-friendly display names
+  static String _formatConnectorType(String rawType) {
+    // Remove common prefixes
+    String formatted = rawType
+        .replaceAll('EV_CONNECTOR_TYPE_', '')
+        .replaceAll('EV_CONNECTOR_', '')
+        .replaceAll('_', ' ');
+
+    // Map known types to friendly names
+    final typeMap = {
+      'CCS COMBO 1': 'CCS1',
+      'CCS COMBO 2': 'CCS2',
+      'CHADEMO': 'CHAdeMO',
+      'J1772': 'Type 1 (J1772)',
+      'TYPE 2': 'Type 2',
+      'TYPE 1': 'Type 1',
+      'TESLA': 'Tesla',
+      'GB T': 'GB/T',
+      'GBT': 'GB/T',
+      'UNSPECIFIED': 'Standard',
+      'OTHER': 'Other',
+    };
+
+    // Check if we have a mapping
+    final upperFormatted = formatted.toUpperCase().trim();
+    if (typeMap.containsKey(upperFormatted)) {
+      return typeMap[upperFormatted]!;
+    }
+
+    // Title case the result if no mapping found
+    return formatted.split(' ').map((word) {
+      if (word.isEmpty) return word;
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ').trim();
+  }
 }
+

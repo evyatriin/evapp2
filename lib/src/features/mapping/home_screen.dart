@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart' as ll;
@@ -8,10 +10,12 @@ import '../charge/cost_calculator_sheet.dart';
 import 'stations_repository.dart';
 import 'station_model.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:geocoding/geocoding.dart';
 import 'saved_chargers_list.dart';
 import '../community/gamification_widgets.dart';
 import '../authentication/user_provider.dart';
+import '../../common_widgets/location_autocomplete.dart';
+import 'places_service.dart';
+import '../charge/charging_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -23,6 +27,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProviderStateMixin {
   GoogleMapController? _mapController;
   LatLng? _currentCameraPosition;
+  double _currentZoom = 12.0;
   final TextEditingController _searchController = TextEditingController();
   late TabController _tabController;
 
@@ -39,12 +44,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
     super.dispose();
   }
 
-  Future<void> _searchLocation(String query) async {
-    if (query.isEmpty) return;
+  String? _selectedPlaceId;
+  final _placesService = PlacesService();
+
+  Future<void> _searchLocation(String placeId) async {
+    if (placeId.isEmpty) return;
     try {
-      List<Location> locations = await locationFromAddress(query);
-      if (locations.isNotEmpty) {
-        final location = locations.first;
+      final location = await _placesService.getPlaceDetails(placeId);
+      if (location != null) {
         final target = LatLng(location.latitude, location.longitude);
         _mapController?.animateCamera(CameraUpdate.newLatLngZoom(target, 14));
         
@@ -132,6 +139,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                       target: LatLng(17.3850, 78.4867), // Hyderabad
                       zoom: 12.0,
                     ),
+                    gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                      Factory<OneSequenceGestureRecognizer>(
+                        () => EagerGestureRecognizer(),
+                      ),
+                    },
                     markers: stations.map((station) {
                       return Marker(
                         markerId: MarkerId(station.id),
@@ -169,12 +181,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     },
                     onCameraMove: (position) {
                       _currentCameraPosition = position.target;
+                      _currentZoom = position.zoom;
                     },
                     onCameraIdle: () {
                       if (_currentCameraPosition != null) {
                         ref.read(mapCenterProvider.notifier).update(
                           ll.LatLng(_currentCameraPosition!.latitude, _currentCameraPosition!.longitude),
                         );
+                        ref.read(mapZoomProvider.notifier).update(_currentZoom);
                       }
                     },
                   ),
@@ -199,19 +213,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
                     right: 16,
                     child: Card(
                       elevation: 4,
-                      child: TextField(
+                      child: LocationAutocomplete(
                         controller: _searchController,
-                        decoration: InputDecoration(
-                          hintText: 'Search location...',
-                          prefixIcon: const Icon(Icons.search),
-                          border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          suffixIcon: IconButton(
-                            icon: const Icon(Icons.arrow_forward),
-                            onPressed: () => _searchLocation(_searchController.text),
-                          ),
-                        ),
-                        onSubmitted: _searchLocation,
+                        hintText: 'Search location...',
+                        onSelected: (selection) {
+                          _selectedPlaceId = selection['place_id'];
+                          if (_selectedPlaceId != null) {
+                            _searchLocation(_selectedPlaceId!);
+                          }
+                        },
                       ),
                     ),
                   ),
@@ -272,14 +282,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen> with SingleTickerProvid
 
 
 
-class _StationDetailsSheet extends StatelessWidget {
+class _StationDetailsSheet extends StatefulWidget {
   final StationModel station;
 
   const _StationDetailsSheet({required this.station});
 
+  @override
+  State<_StationDetailsSheet> createState() => _StationDetailsSheetState();
+}
+
+class _StationDetailsSheetState extends State<_StationDetailsSheet> {
+  Map<String, dynamic>? _lastCheckIn;
+  bool _isLoadingCheckIn = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastCheckIn();
+  }
+
+  Future<void> _loadLastCheckIn() async {
+    if (widget.station.id != null) {
+      final checkIn = await ChargingService().getLatestStationCheckIn(widget.station.id!);
+      if (mounted) {
+        setState(() {
+          _lastCheckIn = checkIn;
+          _isLoadingCheckIn = false;
+        });
+      }
+    } else {
+      setState(() => _isLoadingCheckIn = false);
+    }
+  }
+
+  String _formatLastCharged() {
+    if (_lastCheckIn == null) return 'No data yet';
+    try {
+      final createdAt = DateTime.parse(_lastCheckIn!['created_at']);
+      final now = DateTime.now();
+      final diff = now.difference(createdAt);
+      
+      if (diff.inMinutes < 60) {
+        return '${diff.inMinutes} min ago';
+      } else if (diff.inHours < 24) {
+        return '${diff.inHours} hrs ago';
+      } else if (diff.inDays < 7) {
+        return '${diff.inDays} days ago';
+      } else {
+        return '${(diff.inDays / 7).floor()} weeks ago';
+      }
+    } catch (e) {
+      return 'Unknown';
+    }
+  }
+
   Future<void> _launchMaps() async {
     final url = Uri.parse(
-        'https://www.google.com/maps/dir/?api=1&destination=${station.location.latitude},${station.location.longitude}');
+        'https://www.google.com/maps/dir/?api=1&destination=${widget.station.location.latitude},${widget.station.location.longitude}');
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       throw Exception('Could not launch $url');
     }
@@ -288,6 +347,7 @@ class _StationDetailsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final station = widget.station;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -368,6 +428,28 @@ class _StationDetailsSheet extends StatelessWidget {
             const SizedBox(height: 16),
           ],
 
+          // Last Charged Info
+          Row(
+            children: [
+              Icon(PhosphorIcons.clockCounterClockwise(PhosphorIconsStyle.fill), size: 16, color: theme.colorScheme.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Last Charged: ',
+                style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.secondary),
+              ),
+              _isLoadingCheckIn
+                ? const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(
+                    _formatLastCharged(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
           const Divider(),
           const SizedBox(height: 16),
 
@@ -395,27 +477,6 @@ class _StationDetailsSheet extends StatelessWidget {
           
           const SizedBox(height: 24),
 
-          // Cost Calculator Button
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  builder: (context) => CostCalculatorSheet(
-                    stationCost: station.cost ?? '₹18 / kWh',
-                    stationName: station.name,
-                  ),
-                );
-              },
-              icon: Icon(PhosphorIcons.calculator(PhosphorIconsStyle.duotone)),
-              label: const Text('Calculate Charging Cost'),
-            ),
-          ),
-
-          const SizedBox(height: 12),
-
           // Actions
           Row(
             children: [
@@ -426,7 +487,8 @@ class _StationDetailsSheet extends StatelessWidget {
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
-                      builder: (context) => const CheckInSheet(),
+                      useSafeArea: true,
+                      builder: (context) => CheckInSheet(station: station),
                     );
                   },
                   icon: Icon(PhosphorIcons.camera(PhosphorIconsStyle.duotone)),

@@ -210,6 +210,50 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
                                       final vehicles = ref.watch(vehicleProvider);
                                       final vehicleNotifier = ref.read(vehicleProvider.notifier);
                                       
+                                      // Show prompt if no vehicles
+                                      if (vehicles.isEmpty) {
+                                        return Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                                            borderRadius: BorderRadius.circular(12),
+                                            border: Border.all(
+                                              color: theme.colorScheme.primary.withValues(alpha: 0.3),
+                                            ),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              Icon(
+                                                Icons.directions_car_outlined,
+                                                size: 40,
+                                                color: theme.colorScheme.primary,
+                                              ),
+                                              const Gap(8),
+                                              Text(
+                                                'No Vehicle Added',
+                                                style: theme.textTheme.titleMedium?.copyWith(
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                              const Gap(4),
+                                              Text(
+                                                'Add your EV to get personalized route planning based on your car\'s range',
+                                                textAlign: TextAlign.center,
+                                                style: theme.textTheme.bodySmall?.copyWith(
+                                                  color: theme.colorScheme.onSurfaceVariant,
+                                                ),
+                                              ),
+                                              const Gap(12),
+                                              FilledButton.icon(
+                                                onPressed: () => context.push('/setup/vehicle/add'),
+                                                icon: const Icon(Icons.add, size: 18),
+                                                label: const Text('Add Your Vehicle'),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }
+                                      
                                       // Initialize selected vehicle with primary vehicle if not set
                                       if (_selectedVehicleId == null && vehicles.isNotEmpty) {
                                         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -325,7 +369,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
                                             Container(
                                               padding: const EdgeInsets.all(10),
                                               decoration: BoxDecoration(
-                                                color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                                                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                                                 borderRadius: BorderRadius.circular(8),
                                               ),
                                               child: Row(

@@ -27,15 +27,16 @@ class MainScreen extends ConsumerWidget {
         title: const Text('EV-Ranger'),
         centerTitle: false,
         actions: [
-          IconButton(
-            icon: Icon(PhosphorIcons.wallet(PhosphorIconsStyle.duotone)),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Wallet feature coming soon!')),
-              );
-            },
-            tooltip: 'Wallet',
-          ),
+          // TODO: Enable wallet feature when ready
+          // IconButton(
+          //   icon: Icon(PhosphorIcons.wallet(PhosphorIconsStyle.duotone)),
+          //   onPressed: () {
+          //     ScaffoldMessenger.of(context).showSnackBar(
+          //       const SnackBar(content: Text('Wallet feature coming soon!')),
+          //     );
+          //   },
+          //   tooltip: 'Wallet',
+          // ),
           IconButton(
             icon: Icon(PhosphorIcons.userCircle(PhosphorIconsStyle.duotone)),
             onPressed: () => context.push('/profile'),
@@ -75,7 +76,7 @@ class MainScreen extends ConsumerWidget {
           NavigationDestination(
             icon: Icon(PhosphorIcons.usersThree(PhosphorIconsStyle.duotone)),
             selectedIcon: Icon(PhosphorIcons.usersThree(PhosphorIconsStyle.fill)),
-            label: 'Community',
+            label: 'Resources',
           ),
         ],
       ),

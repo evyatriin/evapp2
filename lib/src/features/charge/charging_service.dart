@@ -42,6 +42,19 @@ class ChargingService {
     }
   }
 
+  Future<Map<String, dynamic>?> getLatestStationCheckIn(String stationId) async {
+    try {
+      final response = await BackendService.get('/api/chargers/checkin/station/$stationId/latest');
+      if (response != null) {
+        return response as Map<String, dynamic>;
+      }
+      return null;
+    } catch (e) {
+      print('Error fetching latest station checkin: $e');
+      return null;
+    }
+  }
+
   Future<void> submitCheckIn({
     required String userId,
     required String status,
@@ -49,6 +62,12 @@ class ChargingService {
     int? rating,
     String? comment,
     String? imageUrl,
+    int? batteryStartPercent,
+    int? batteryEndPercent,
+    int? timeTakenMinutes,
+    double? costPaid,
+    String? chargingSlipUrl,
+    int? pointsEarned,
   }) async {
     try {
       await BackendService.post('/api/chargers/checkin', body: {
@@ -58,6 +77,12 @@ class ChargingService {
         'rating': rating,
         'comment': comment,
         'image_url': imageUrl,
+        'battery_start_percent': batteryStartPercent,
+        'battery_end_percent': batteryEndPercent,
+        'time_taken_minutes': timeTakenMinutes,
+        'cost_paid': costPaid,
+        'charging_slip_url': chargingSlipUrl,
+        'points_earned': pointsEarned,
       });
     } catch (e) {
       print('Error submitting checkin: $e');
