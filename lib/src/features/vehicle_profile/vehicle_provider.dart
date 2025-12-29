@@ -10,19 +10,25 @@ class Vehicle extends Notifier<List<VehicleProfile>> {
   
   @override
   List<VehicleProfile> build() {
-    // Load vehicles from backend
-    _loadVehicles();
+    // Load cached vehicles immediately, then validate
+    _loadWithCache();
     
-    // Return empty list initially, will be populated by _loadVehicles
+    // Return empty list initially, will be populated by _loadWithCache
     return [];
   }
 
-  Future<void> _loadVehicles() async {
-    // Get actual user ID from auth service
+  Future<void> _loadWithCache() async {
     final userId = _service.getCurrentUserId();
     
     if (userId != null) {
-      final vehicles = await _service.fetchVehicles(userId);
+      // First, try to load cached data immediately for instant UI
+      final cached = await _service.getCachedVehicles();
+      if (cached.isNotEmpty) {
+        state = cached;
+      }
+      
+      // Then fetch with cache validation (will update if stale)
+      final vehicles = await _service.fetchVehiclesWithCache(userId);
       state = vehicles;
     }
   }
@@ -70,7 +76,7 @@ class Vehicle extends Notifier<List<VehicleProfile>> {
   }
 
   Future<void> refresh() async {
-    await _loadVehicles();
+    await _loadWithCache();
   }
 }
 

@@ -4,6 +4,8 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../mapping/app_drawer.dart';
 import '../../core/ad_banner_widget.dart';
+import '../authentication/user_provider.dart';
+import '../community/gamification_widgets.dart';
 
 class MainScreen extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
@@ -22,11 +24,19 @@ class MainScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(userProvider);
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('EV-Ranger'),
         centerTitle: false,
         actions: [
+          // Points Badge - shows user's current points
+          if (user != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: PointsBadge(points: user.points, compact: true),
+            ),
           // TODO: Enable wallet feature when ready
           // IconButton(
           //   icon: Icon(PhosphorIcons.wallet(PhosphorIconsStyle.duotone)),

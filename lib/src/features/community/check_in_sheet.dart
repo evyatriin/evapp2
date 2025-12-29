@@ -616,6 +616,7 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
         costPaid: double.tryParse(_costPaidController.text),
         chargingSlipUrl: slipUrl,
         pointsEarned: pointsEarned,
+        userName: user.name,
       );
 
       if (mounted) {

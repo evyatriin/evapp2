@@ -75,6 +75,9 @@ class CheckIn(BaseModel):
     rating: Optional[int]
     comment: Optional[str]
     image_url: Optional[str]
+    upvotes: int = 0
+    downvotes: int = 0
+    user_name: Optional[str] = None  # Will be anonymized when returned
     created_at: datetime = datetime.now()
 
 class CreateCheckInRequest(BaseModel):
@@ -91,6 +94,12 @@ class CreateCheckInRequest(BaseModel):
     cost_paid: Optional[float] = None
     charging_slip_url: Optional[str] = None
     points_earned: Optional[int] = 10  # Default to 10 for backward compatibility
+    user_name: Optional[str] = None  # User's name for display (will be anonymized)
+
+class VoteRequest(BaseModel):
+    user_id: str
+    checkin_id: str
+    vote_type: str  # "upvote" or "downvote"
 
 # --- Endpoints ---
 
@@ -232,6 +241,64 @@ async def create_checkin(checkin: CreateCheckInRequest):
         return response.data[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+def anonymize_name(name: str) -> str:
+    """Anonymize name: show first and last char, star the rest"""
+    if not name or len(name) < 2:
+        return "A***r"
+    parts = name.split()
+    if len(parts) == 1:
+        word = parts[0]
+        if len(word) <= 2:
+            return word
+        return word[0] + '*' * (len(word) - 2) + word[-1]
+    else:
+        # For multi-word names, show first char of first word and last char of last word
+        first_word = parts[0]
+        last_word = parts[-1]
+        return first_word[0] + '***' + last_word[-1]
+
+@router.get("/checkins/public", response_model=List[CheckIn])
+async def get_public_checkins(limit: int = 50):
+    """Get recent public check-ins with anonymized user names"""
+    try:
+        response = supabase.table("station_checkins").select("*").order("created_at", desc=True).limit(limit).execute()
+        checkins = response.data
+        
+        # Anonymize user names
+        for checkin in checkins:
+            if 'user_name' in checkin and checkin['user_name']:
+                checkin['user_name'] = anonymize_name(checkin['user_name'])
+            else:
+                checkin['user_name'] = "A***r"  # Default anonymized name
+        
+        return checkins
+    except Exception as e:
+        print(f"Error fetching public checkins: {e}")
+        return []
+
+@router.post("/checkin/vote")
+async def vote_checkin(vote: VoteRequest):
+    """Upvote or downvote a check-in"""
+    try:
+        # Get current checkin
+        checkin_response = supabase.table("station_checkins").select("upvotes, downvotes").eq("id", vote.checkin_id).single().execute()
+        
+        if not checkin_response.data:
+            raise HTTPException(status_code=404, detail="Check-in not found")
+        
+        current = checkin_response.data
+        
+        if vote.vote_type == "upvote":
+            new_upvotes = (current.get('upvotes') or 0) + 1
+            supabase.table("station_checkins").update({"upvotes": new_upvotes}).eq("id", vote.checkin_id).execute()
+            return {"upvotes": new_upvotes, "downvotes": current.get('downvotes') or 0}
+        elif vote.vote_type == "downvote":
+            new_downvotes = (current.get('downvotes') or 0) + 1
+            supabase.table("station_checkins").update({"downvotes": new_downvotes}).eq("id", vote.checkin_id).execute()
+            return {"upvotes": current.get('upvotes') or 0, "downvotes": new_downvotes}
+        else:
+            raise HTTPException(status_code=400, detail="Invalid vote type. Use 'upvote' or 'downvote'")
 
 @router.post("/upload-checkin-image")
 async def upload_checkin_image(file: UploadFile = File(...)):

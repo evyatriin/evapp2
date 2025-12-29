@@ -16,6 +16,7 @@ class ChargeScreen extends ConsumerStatefulWidget {
 class _ChargeScreenState extends ConsumerState<ChargeScreen> with SingleTickerProviderStateMixin {
   final _chargingService = ChargingService();
   List<dynamic> _checkIns = [];
+  List<dynamic> _publicCheckIns = [];
   bool _isLoading = true;
   String? _error;
   late TabController _tabController;
@@ -23,8 +24,9 @@ class _ChargeScreenState extends ConsumerState<ChargeScreen> with SingleTickerPr
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadHistory();
+    _loadPublicCheckIns();
   }
 
   @override
@@ -61,6 +63,42 @@ class _ChargeScreenState extends ConsumerState<ChargeScreen> with SingleTickerPr
     }
   }
 
+  Future<void> _loadPublicCheckIns() async {
+    final checkIns = await _chargingService.getPublicCheckIns(limit: 50);
+    if (mounted) {
+      setState(() {
+        _publicCheckIns = checkIns;
+      });
+    }
+  }
+
+  Future<void> _vote(String checkinId, String voteType) async {
+    final user = ref.read(userProvider);
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please log in to vote')),
+      );
+      return;
+    }
+
+    final result = await _chargingService.voteCheckIn(
+      userId: user.id,
+      checkinId: checkinId,
+      voteType: voteType,
+    );
+
+    if (result != null) {
+      // Update local state
+      setState(() {
+        final index = _publicCheckIns.indexWhere((c) => c['id'] == checkinId);
+        if (index != -1) {
+          _publicCheckIns[index]['upvotes'] = result['upvotes'];
+          _publicCheckIns[index]['downvotes'] = result['downvotes'];
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -70,16 +108,19 @@ class _ChargeScreenState extends ConsumerState<ChargeScreen> with SingleTickerPr
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Charging History'),
+        title: const Text('Charging Hub'),
         toolbarHeight: 48,
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(36),
           child: TabBar(
             controller: _tabController,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
             labelPadding: const EdgeInsets.symmetric(horizontal: 12),
             tabs: const [
-              Tab(text: 'Charged Successfully', height: 36),
-              Tab(text: 'Issue with Charger', height: 36),
+              Tab(text: 'My Charges', height: 36),
+              Tab(text: 'Community Reviews', height: 36),
+              Tab(text: 'Issues', height: 36),
             ],
           ),
         ),
@@ -96,6 +137,10 @@ class _ChargeScreenState extends ConsumerState<ChargeScreen> with SingleTickerPr
                       child: _buildList(workingCheckIns, theme, true),
                     ),
                     RefreshIndicator(
+                      onRefresh: _loadPublicCheckIns,
+                      child: _buildPublicReviewsList(theme),
+                    ),
+                    RefreshIndicator(
                       onRefresh: _loadHistory,
                       child: _buildList(issueCheckIns, theme, false),
                     ),
@@ -108,11 +153,148 @@ class _ChargeScreenState extends ConsumerState<ChargeScreen> with SingleTickerPr
             isScrollControlled: true,
             useSafeArea: true,
             builder: (context) => const CheckInSheet(),
-          ).then((_) => _loadHistory()); // Refresh after check-in
+          ).then((_) {
+            _loadHistory();
+            _loadPublicCheckIns();
+          });
         },
         icon: Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.duotone)),
         label: const Text('Check-In'),
       ),
+    );
+  }
+
+  Widget _buildPublicReviewsList(ThemeData theme) {
+    if (_publicCheckIns.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              PhosphorIcons.usersThree(PhosphorIconsStyle.duotone),
+              size: 64,
+              color: theme.colorScheme.primary.withOpacity(0.5),
+            ),
+            const SizedBox(height: 16),
+            Text('No community reviews yet', style: theme.textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text('Be the first to check-in!', style: theme.textTheme.bodySmall),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.all(16),
+      itemCount: _publicCheckIns.length,
+      itemBuilder: (context, index) {
+        final item = _publicCheckIns[index];
+        final createdAt = DateTime.parse(item['created_at']);
+        final status = item['status'] ?? 'Unknown';
+        final rating = item['rating'];
+        final comment = item['comment'];
+        final userName = item['user_name'] ?? 'A***r';
+        final upvotes = item['upvotes'] ?? 0;
+        final downvotes = item['downvotes'] ?? 0;
+        final checkinId = item['id'];
+
+        return Card(
+          margin: const EdgeInsets.only(bottom: 12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header: User + Time
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: theme.colorScheme.primaryContainer,
+                      child: Text(
+                        userName.isNotEmpty ? userName[0].toUpperCase() : 'A',
+                        style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(userName, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(DateFormat.yMMMd().add_jm().format(createdAt), style: theme.textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: status == 'Working' ? Colors.green.withOpacity(0.1) : Colors.red.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        status,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: status == 'Working' ? Colors.green : Colors.red,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                // Comment
+                if (comment != null && comment.toString().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text('"$comment"', style: theme.textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic)),
+                ],
+                
+                const SizedBox(height: 12),
+                
+                // Rating + Votes
+                Row(
+                  children: [
+                    if (rating != null) ...[
+                      Row(
+                        children: [
+                          Text(rating.toString(), style: const TextStyle(fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 4),
+                          const Icon(Icons.star, size: 16, color: Colors.amber),
+                        ],
+                      ),
+                      const SizedBox(width: 16),
+                    ],
+                    const Spacer(),
+                    // Upvote button
+                    InkWell(
+                      onTap: () => _vote(checkinId, 'upvote'),
+                      child: Row(
+                        children: [
+                          Icon(PhosphorIcons.thumbsUp(PhosphorIconsStyle.duotone), size: 20, color: Colors.green),
+                          const SizedBox(width: 4),
+                          Text('$upvotes', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Downvote button
+                    InkWell(
+                      onTap: () => _vote(checkinId, 'downvote'),
+                      child: Row(
+                        children: [
+                          Icon(PhosphorIcons.thumbsDown(PhosphorIconsStyle.duotone), size: 20, color: Colors.red),
+                          const SizedBox(width: 4),
+                          Text('$downvotes', style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

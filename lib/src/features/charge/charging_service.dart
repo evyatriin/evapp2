@@ -55,6 +55,34 @@ class ChargingService {
     }
   }
 
+  Future<List<dynamic>> getPublicCheckIns({int limit = 50}) async {
+    try {
+      final response = await BackendService.get('/api/chargers/checkins/public?limit=$limit');
+      return response as List<dynamic>;
+    } catch (e) {
+      print('Error fetching public checkins: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>?> voteCheckIn({
+    required String userId,
+    required String checkinId,
+    required String voteType, // "upvote" or "downvote"
+  }) async {
+    try {
+      final response = await BackendService.post('/api/chargers/checkin/vote', body: {
+        'user_id': userId,
+        'checkin_id': checkinId,
+        'vote_type': voteType,
+      });
+      return response as Map<String, dynamic>;
+    } catch (e) {
+      print('Error voting on checkin: $e');
+      return null;
+    }
+  }
+
   Future<void> submitCheckIn({
     required String userId,
     required String status,
@@ -68,6 +96,7 @@ class ChargingService {
     double? costPaid,
     String? chargingSlipUrl,
     int? pointsEarned,
+    String? userName,
   }) async {
     try {
       await BackendService.post('/api/chargers/checkin', body: {
@@ -83,6 +112,7 @@ class ChargingService {
         'cost_paid': costPaid,
         'charging_slip_url': chargingSlipUrl,
         'points_earned': pointsEarned,
+        'user_name': userName,
       });
     } catch (e) {
       print('Error submitting checkin: $e');

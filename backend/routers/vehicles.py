@@ -128,6 +128,42 @@ async def get_vehicles(user_id: str):
         print(f"Supabase error: {e}")
         return _get_mock_vehicles(user_id)
 
+@router.get("/hash/{user_id}")
+async def get_vehicles_hash(user_id: str):
+    """Get a hash of user's vehicles for cache validation.
+    
+    Returns a hash based on:
+    - Vehicle count
+    - Vehicle IDs
+    - Updated timestamps (if available)
+    
+    Client can compare this hash to determine if cached data is stale.
+    """
+    import hashlib
+    import json
+    
+    try:
+        if not supabase:
+            vehicles = _get_mock_vehicles(user_id)
+        else:
+            response = supabase.table("vehicles").select("id, updated_at").eq("user_id", user_id).order("id").execute()
+            vehicles = response.data
+        
+        # Create a deterministic hash of vehicle data
+        hash_data = {
+            "count": len(vehicles),
+            "ids": sorted([v.get("id", "") for v in vehicles]),
+            "updated": [v.get("updated_at", "") for v in sorted(vehicles, key=lambda x: x.get("id", ""))]
+        }
+        
+        hash_string = json.dumps(hash_data, sort_keys=True)
+        data_hash = hashlib.md5(hash_string.encode()).hexdigest()
+        
+        return {"hash": data_hash, "count": len(vehicles)}
+    except Exception as e:
+        print(f"Error generating vehicle hash: {e}")
+        return {"hash": None, "count": 0}
+
 @router.post("/", response_model=VehicleProfile)
 async def create_vehicle(vehicle: VehicleCreateRequest):
     """Create a new vehicle"""
