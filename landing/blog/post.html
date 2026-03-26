@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Loading… – EVraahein Blog</title>
+  <meta name="description" content="EVraahein Blog" />
+  <link rel="icon" type="image/png" href="../app_icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <!-- marked.js for markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --cyan: #00e5ff; --green: #00e676; --dark: #060d1b; --border: rgba(0,229,255,0.12); }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--dark); color: #d0e8f4; min-height: 100vh; }
+    .glow { position: fixed; top: -20%; left: 50%; transform: translateX(-50%); width: 900px; height: 500px; background: radial-gradient(ellipse, rgba(0,229,255,0.06) 0%, transparent 70%); pointer-events: none; z-index: 0; }
+    .wrapper { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 0 24px 80px; }
+
+    /* Nav */
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 24px 0; border-bottom: 1px solid var(--border); margin-bottom: 48px; }
+    .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .logo img { width: 36px; height: 36px; border-radius: 10px; box-shadow: 0 0 16px rgba(0,229,255,0.35); object-fit: cover; }
+    .logo-text { font-family: 'Outfit', sans-serif; font-size: 1.3rem; font-weight: 900; background: linear-gradient(90deg, var(--cyan), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .back-link { font-size: 0.82rem; color: rgba(255,255,255,0.4); text-decoration: none; transition: color 0.2s; }
+    .back-link:hover { color: var(--cyan); }
+
+    /* Post meta */
+    .post-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .post-category { font-size: 0.65rem; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; padding: 3px 10px; border-radius: 100px; }
+    .cat-product { color: var(--cyan); background: rgba(0,229,255,0.1); border: 1px solid rgba(0,229,255,0.18); }
+    .cat-industry { color: #a78bfa; background: rgba(167,139,250,0.1); border: 1px solid rgba(167,139,250,0.18); }
+    .cat-technology { color: var(--green); background: rgba(0,230,118,0.1); border: 1px solid rgba(0,230,118,0.18); }
+    .post-date { font-size: 0.78rem; color: rgba(255,255,255,0.3); }
+    .post-readtime { font-size: 0.78rem; color: rgba(255,255,255,0.3); }
+    .post-readtime::before { content: '·'; margin-right: 8px; }
+
+    /* Markdown body */
+    .post-body { line-height: 1.8; }
+    .post-body h1 { font-family: 'Outfit', sans-serif; font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 800; color: #fff; letter-spacing: -0.8px; margin-bottom: 24px; line-height: 1.15; }
+    .post-body h2 { font-family: 'Outfit', sans-serif; font-size: 1.25rem; font-weight: 700; color: #fff; margin: 40px 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+    .post-body h3 { font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: rgba(255,255,255,0.85); margin: 28px 0 10px; }
+    .post-body p { font-size: 0.97rem; color: rgba(208,232,244,0.72); margin-bottom: 18px; }
+    .post-body ul, .post-body ol { padding-left: 22px; margin-bottom: 18px; display: flex; flex-direction: column; gap: 7px; }
+    .post-body li { font-size: 0.95rem; color: rgba(208,232,244,0.68); }
+    .post-body strong { color: rgba(255,255,255,0.85); font-weight: 600; }
+    .post-body em { color: rgba(208,232,244,0.65); font-style: italic; }
+    .post-body a { color: var(--cyan); text-decoration: none; }
+    .post-body a:hover { text-decoration: underline; }
+    .post-body hr { border: none; border-top: 1px solid var(--border); margin: 36px 0; }
+    .post-body blockquote { border-left: 3px solid var(--cyan); padding-left: 18px; color: rgba(208,232,244,0.5); font-style: italic; margin: 24px 0; }
+    .post-body code { background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.15); border-radius: 5px; padding: 2px 7px; font-size: 0.85rem; color: var(--cyan); font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+    .post-body pre { background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: 12px; padding: 20px; overflow-x: auto; margin-bottom: 18px; }
+    .post-body pre code { background: none; border: none; padding: 0; }
+
+    /* Table */
+    .post-body table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 0.88rem; }
+    .post-body th { text-align: left; padding: 8px 14px 8px 0; border-bottom: 1px solid var(--border); color: rgba(255,255,255,0.5); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.3px; }
+    .post-body td { padding: 10px 14px 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); color: rgba(208,232,244,0.65); vertical-align: top; }
+
+    /* State */
+    .state-msg { text-align: center; padding: 80px 20px; color: rgba(255,255,255,0.3); font-size: 0.9rem; }
+
+    /* Back to blog */
+    .back-to-blog { display: inline-flex; align-items: center; gap: 7px; margin-bottom: 36px; font-size: 0.83rem; color: rgba(255,255,255,0.35); text-decoration: none; transition: color 0.2s; }
+    .back-to-blog:hover { color: var(--cyan); }
+
+    footer { margin-top: 64px; padding-top: 24px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .footer-brand { font-family: 'Outfit', sans-serif; font-size: 0.9rem; font-weight: 800; background: linear-gradient(90deg, var(--cyan), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .footer-note { font-size: 0.73rem; color: rgba(255,255,255,0.22); }
+
+    @media (max-width: 560px) { .post-body h1 { font-size: 1.6rem; } }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="wrapper">
+
+    <nav>
+      <a href="../index.html" class="logo">
+        <img src="../app_icon.png" alt="EVraahein" onerror="this.style.display='none';" />
+        <span class="logo-text">EVraahein</span>
+      </a>
+      <a href="index.html" class="back-link">← All posts</a>
+    </nav>
+
+    <div id="content">
+      <div class="state-msg">Loading post…</div>
+    </div>
+
+    <footer>
+      <div>
+        <span class="footer-brand">EVraahein</span>
+        <span class="footer-note" style="display:block;margin-top:2px;">TaruniLakshmi Ventures · Hyderabad</span>
+      </div>
+      <a href="mailto:hey@evraahein.app" style="font-size:0.73rem;color:var(--cyan);text-decoration:none;">hey@evraahein.app</a>
+    </footer>
+
+  </div>
+
+  <script>
+    const CATEGORY_CLASS = { Product: 'cat-product', Industry: 'cat-industry', Technology: 'cat-technology' };
+
+    function formatDate(iso) {
+      return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function stripFrontmatter(md) {
+      // Remove YAML frontmatter (--- ... ---)
+      return md.replace(/^---[\s\S]*?---\n?/, '').trim();
+    }
+
+    async function loadPost() {
+      const content = document.getElementById('content');
+      const params  = new URLSearchParams(window.location.search);
+      const slug    = params.get('slug');
+
+      if (!slug) {
+        content.innerHTML = '<div class="state-msg">No post specified. <a href="index.html" style="color:var(--cyan)">Back to blog →</a></div>';
+        return;
+      }
+
+      try {
+        // Load manifest for metadata
+        const manifestRes = await fetch('manifest.json');
+        const manifest    = await manifestRes.json();
+        const meta        = manifest.find(p => p.slug === slug);
+
+        // Load markdown file
+        const mdRes = await fetch(`posts/${slug}.md`);
+        if (!mdRes.ok) throw new Error('Post not found');
+        const rawMd = await mdRes.text();
+        const mdBody = stripFrontmatter(rawMd);
+
+        // Update page title
+        document.title = (meta ? meta.title : slug) + ' – EVraahein Blog';
+
+        const catClass = meta ? (CATEGORY_CLASS[meta.category] || 'cat-product') : 'cat-product';
+
+        content.innerHTML = `
+          <a href="index.html" class="back-to-blog">← Back to blog</a>
+          <div class="post-meta">
+            ${meta ? `<span class="post-category ${catClass}">${meta.category}</span>` : ''}
+            ${meta ? `<span class="post-date">${formatDate(meta.date)}</span>` : ''}
+            ${meta ? `<span class="post-readtime">${meta.readTime}</span>` : ''}
+          </div>
+          <article class="post-body">${marked.parse(mdBody)}</article>
+        `;
+      } catch (err) {
+        content.innerHTML = `
+          <div class="state-msg">
+            Post not found or failed to load.<br />
+            <a href="index.html" style="color:var(--cyan);margin-top:10px;display:inline-block">← Back to blog</a>
+          </div>
+        `;
+      }
+    }
+
+    loadPost();
+  </script>
+</body>
+</html>

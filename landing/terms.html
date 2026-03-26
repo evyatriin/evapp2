@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms & Conditions – EVraahein</title>
+  <meta name="description" content="Terms and Conditions for EVraahein – Smart EV Routing App by TaruniLakshmi Ventures." />
+  <link rel="icon" type="image/png" href="app_icon.png" />
+  <link rel="apple-touch-icon" href="app_icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --cyan: #00e5ff; --green: #00e676; --dark: #060d1b; --border: rgba(0,229,255,0.12); }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--dark); color: #d0e8f4; min-height: 100vh; line-height: 1.7; }
+
+    /* Glow */
+    .glow { position: fixed; top: -20%; left: 50%; transform: translateX(-50%); width: 800px; height: 400px; background: radial-gradient(ellipse, rgba(0,229,255,0.08) 0%, transparent 70%); pointer-events: none; z-index: 0; }
+
+    .wrapper { position: relative; z-index: 1; max-width: 780px; margin: 0 auto; padding: 0 24px 80px; }
+
+    /* Nav */
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 24px 0; border-bottom: 1px solid var(--border); margin-bottom: 56px; }
+    .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .logo img { width: 36px; height: 36px; border-radius: 10px; box-shadow: 0 0 16px rgba(0,229,255,0.35); object-fit: cover; }
+    .logo-text { font-family: 'Outfit', sans-serif; font-size: 1.3rem; font-weight: 900; background: linear-gradient(90deg, var(--cyan), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .back-link { font-size: 0.82rem; color: rgba(255,255,255,0.4); text-decoration: none; transition: color 0.2s; }
+    .back-link:hover { color: var(--cyan); }
+
+    /* Hero */
+    .page-hero { margin-bottom: 48px; }
+    .page-tag { display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--cyan); background: rgba(0,229,255,0.08); border: 1px solid rgba(0,229,255,0.18); padding: 4px 14px; border-radius: 100px; margin-bottom: 16px; }
+    h1 { font-family: 'Outfit', sans-serif; font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; color: #fff; letter-spacing: -0.8px; margin-bottom: 12px; }
+    .effective { font-size: 0.82rem; color: rgba(255,255,255,0.3); }
+
+    /* Content */
+    .doc-body { display: flex; flex-direction: column; gap: 36px; }
+    .section { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 16px; padding: 28px 32px; }
+    h2 { font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+    h2 .num { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, rgba(0,229,255,0.18), rgba(0,230,118,0.12)); border: 1px solid rgba(0,229,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: var(--cyan); flex-shrink: 0; }
+    p { font-size: 0.92rem; color: rgba(208,232,244,0.72); margin-bottom: 10px; }
+    p:last-child { margin-bottom: 0; }
+    ul { padding-left: 20px; margin: 10px 0; display: flex; flex-direction: column; gap: 6px; }
+    li { font-size: 0.92rem; color: rgba(208,232,244,0.68); }
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: rgba(255,255,255,0.85); font-weight: 500; }
+
+    /* Contact box */
+    .contact-box { background: linear-gradient(135deg, rgba(0,229,255,0.07), rgba(0,230,118,0.05)); border: 1px solid rgba(0,229,255,0.2); border-radius: 16px; padding: 24px 32px; text-align: center; }
+    .contact-box p { margin-bottom: 6px; font-size: 0.9rem; }
+    .contact-email { font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--cyan); }
+
+    /* Footer */
+    footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .footer-brand { font-family: 'Outfit', sans-serif; font-size: 0.9rem; font-weight: 800; background: linear-gradient(90deg, var(--cyan), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .footer-note { font-size: 0.74rem; color: rgba(255,255,255,0.22); }
+
+    @media (max-width: 560px) {
+      .section { padding: 20px; }
+      nav { flex-direction: column; align-items: flex-start; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="wrapper">
+
+    <nav>
+      <a href="index.html" class="logo">
+        <img src="app_icon.png" alt="EVraahein" onerror="this.style.display='none';" />
+        <span class="logo-text">EVraahein</span>
+      </a>
+      <a href="index.html" class="back-link">← Back to home</a>
+    </nav>
+
+    <div class="page-hero">
+      <span class="page-tag">Legal</span>
+      <h1>Terms &amp; Conditions</h1>
+      <p class="effective">Effective date: 26 March 2026 &nbsp;·&nbsp; TaruniLakshmi Ventures, Hyderabad, India</p>
+    </div>
+
+    <div class="doc-body">
+
+      <div class="section">
+        <h2><span class="num">1</span> Acceptance of Terms</h2>
+        <p>By accessing or using the EVraahein application, website, or any related services (collectively, the <strong>"Service"</strong>), you agree to be bound by these Terms &amp; Conditions. If you do not agree to any part of these terms, please do not use the Service.</p>
+        <p>These Terms constitute a legally binding agreement between you and <strong>TaruniLakshmi Ventures</strong> ("we", "us", or "our"), a company based in Hyderabad, Telangana, India.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">2</span> Description of Service</h2>
+        <p>EVraahein is an electric vehicle (EV) routing and journey-planning application. The Service includes, but is not limited to:</p>
+        <ul>
+          <li>Smart EV route planning with real-time traffic data</li>
+          <li>Charging station discovery and availability information</li>
+          <li>Battery consumption estimation and range prediction</li>
+          <li>Trip analytics, cost tracking, and carbon footprint reporting</li>
+          <li>Community features for EV drivers</li>
+          <li>Charging station alerts and notifications</li>
+        </ul>
+        <p>The Service is currently in pre-launch. Features and availability may change without prior notice.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">3</span> Eligibility</h2>
+        <p>You must be at least <strong>18 years of age</strong> to use EVraahein. By using the Service, you represent and warrant that you meet this requirement and have the legal capacity to enter into these Terms.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">4</span> User Accounts</h2>
+        <p>Certain features of EVraahein may require you to create an account. You agree to:</p>
+        <ul>
+          <li>Provide accurate, current, and complete information during registration</li>
+          <li>Maintain the security of your account credentials</li>
+          <li>Notify us immediately at <a href="mailto:hey@evraahein.app">hey@evraahein.app</a> if you suspect unauthorised access to your account</li>
+          <li>Be responsible for all activities that occur under your account</li>
+        </ul>
+        <p>We reserve the right to suspend or terminate accounts that violate these Terms.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">5</span> Acceptable Use</h2>
+        <p>You agree not to use the Service to:</p>
+        <ul>
+          <li>Violate any applicable law or regulation</li>
+          <li>Transmit any harmful, offensive, or misleading content</li>
+          <li>Attempt to gain unauthorised access to our systems or data</li>
+          <li>Reverse engineer, decompile, or disassemble any part of the Service</li>
+          <li>Use automated means to scrape or extract data from the Service</li>
+          <li>Impersonate another person or organisation</li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">6</span> Navigation &amp; Safety Disclaimer</h2>
+        <p>EVraahein provides routing suggestions and charging information to assist your journey. <strong>You must always exercise independent judgment while driving.</strong> We are not responsible for:</p>
+        <ul>
+          <li>Inaccuracies in route suggestions, charging station status, or availability</li>
+          <li>Accidents, damages, or losses arising from reliance on the Service</li>
+          <li>Navigation errors caused by GPS signal loss or data connectivity issues</li>
+          <li>Charging station closures or equipment failures beyond our control</li>
+        </ul>
+        <p>Always verify charging station availability before commencing a long journey.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">7</span> Intellectual Property</h2>
+        <p>All content, trademarks, logos, software, and materials within EVraahein are the intellectual property of TaruniLakshmi Ventures or our licensors. You may not reproduce, distribute, or create derivative works without our express written permission.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">8</span> Third-Party Services</h2>
+        <p>EVraahein integrates with third-party mapping, traffic, and charging network providers. These services are governed by their own terms and privacy policies. We are not responsible for the practices or content of third-party providers.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">9</span> Limitation of Liability</h2>
+        <p>To the maximum extent permitted by applicable law, TaruniLakshmi Ventures shall not be liable for any indirect, incidental, special, consequential, or punitive damages — including loss of profits, data, goodwill, or vehicle damage — arising from your use of or inability to use the Service.</p>
+        <p>Our total liability to you for any claim arising from these Terms shall not exceed the amount you paid us in the twelve months preceding the claim, or ₹1,000 (Indian Rupees One Thousand), whichever is greater.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">10</span> Governing Law &amp; Disputes</h2>
+        <p>These Terms are governed by the laws of <strong>India</strong>, without regard to conflict of law principles. Any disputes shall be subject to the exclusive jurisdiction of the courts in <strong>Hyderabad, Telangana, India</strong>.</p>
+        <p>We encourage you to contact us first at <a href="mailto:hey@evraahein.app">hey@evraahein.app</a> to resolve any concerns amicably before initiating formal proceedings.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">11</span> Changes to These Terms</h2>
+        <p>We may update these Terms from time to time. We will notify registered users via email or in-app notification of material changes. Continued use of the Service after changes constitutes your acceptance of the revised Terms.</p>
+      </div>
+
+      <div class="contact-box">
+        <p>Questions about these Terms?</p>
+        <p>Reach us at</p>
+        <a class="contact-email" href="mailto:hey@evraahein.app">hey@evraahein.app</a>
+      </div>
+
+    </div><!-- /doc-body -->
+
+    <footer>
+      <div>
+        <span class="footer-brand">EVraahein</span>
+        <span class="footer-note" style="display:block;margin-top:2px;">TaruniLakshmi Ventures · Hyderabad, India</span>
+      </div>
+      <span class="footer-note">© 2026 All rights reserved</span>
+    </footer>
+
+  </div>
+</body>
+</html>

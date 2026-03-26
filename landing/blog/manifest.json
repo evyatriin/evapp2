@@ -1,0 +1,26 @@
+[
+  {
+    "slug": "why-ev-routing-needs-a-rethink",
+    "title": "Why EV Route Planning Needs a Rethink",
+    "date": "2026-03-20",
+    "category": "Product",
+    "excerpt": "Most navigation apps were built for petrol cars. Here is why that is a problem for EV drivers — and what truly intelligent routing looks like.",
+    "readTime": "5 min read"
+  },
+  {
+    "slug": "ev-charging-india-2026",
+    "title": "India's EV Charging Network in 2026: Where We Are and What's Next",
+    "date": "2026-03-18",
+    "category": "Industry",
+    "excerpt": "India reached 25,000 public charging stations in 2025. But raw numbers don't tell the full story. Here is what the data actually means for everyday EV drivers.",
+    "readTime": "6 min read"
+  },
+  {
+    "slug": "battery-aware-navigation-explained",
+    "title": "Drive Smarter: How Battery-Aware Navigation Actually Works",
+    "date": "2026-03-15",
+    "category": "Technology",
+    "excerpt": "Range anxiety is not about the battery — it is about uncertainty. Battery-aware navigation replaces guesswork with physics. Here is how it works under the hood.",
+    "readTime": "7 min read"
+  }
+]

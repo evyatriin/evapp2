@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy – EVraahein</title>
+  <meta name="description" content="Privacy Policy for EVraahein – how we collect, use, and protect your data." />
+  <link rel="icon" type="image/png" href="app_icon.png" />
+  <link rel="apple-touch-icon" href="app_icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --cyan: #00e5ff; --green: #00e676; --dark: #060d1b; --border: rgba(0,229,255,0.12); }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--dark); color: #d0e8f4; min-height: 100vh; line-height: 1.7; }
+    .glow { position: fixed; top: -20%; left: 50%; transform: translateX(-50%); width: 800px; height: 400px; background: radial-gradient(ellipse, rgba(0,230,118,0.07) 0%, transparent 70%); pointer-events: none; z-index: 0; }
+    .wrapper { position: relative; z-index: 1; max-width: 780px; margin: 0 auto; padding: 0 24px 80px; }
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 24px 0; border-bottom: 1px solid var(--border); margin-bottom: 56px; }
+    .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .logo img { width: 36px; height: 36px; border-radius: 10px; box-shadow: 0 0 16px rgba(0,229,255,0.35); object-fit: cover; }
+    .logo-text { font-family: 'Outfit', sans-serif; font-size: 1.3rem; font-weight: 900; background: linear-gradient(90deg, var(--cyan), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .back-link { font-size: 0.82rem; color: rgba(255,255,255,0.4); text-decoration: none; transition: color 0.2s; }
+    .back-link:hover { color: var(--cyan); }
+    .page-hero { margin-bottom: 48px; }
+    .page-tag { display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--green); background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.18); padding: 4px 14px; border-radius: 100px; margin-bottom: 16px; }
+    h1 { font-family: 'Outfit', sans-serif; font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; color: #fff; letter-spacing: -0.8px; margin-bottom: 12px; }
+    .effective { font-size: 0.82rem; color: rgba(255,255,255,0.3); }
+    .doc-body { display: flex; flex-direction: column; gap: 36px; }
+    .section { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 16px; padding: 28px 32px; }
+    h2 { font-family: 'Outfit', sans-serif; font-size: 1.05rem; font-weight: 700; color: #fff; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+    h2 .num { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, rgba(0,230,118,0.15), rgba(0,229,255,0.1)); border: 1px solid rgba(0,230,118,0.2); display: flex; align-items: center; justify-content: center; font-size: 0.72rem; font-weight: 700; color: var(--green); flex-shrink: 0; }
+    p { font-size: 0.92rem; color: rgba(208,232,244,0.72); margin-bottom: 10px; }
+    p:last-child { margin-bottom: 0; }
+    ul { padding-left: 20px; margin: 10px 0; display: flex; flex-direction: column; gap: 6px; }
+    li { font-size: 0.92rem; color: rgba(208,232,244,0.68); }
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    strong { color: rgba(255,255,255,0.85); font-weight: 500; }
+
+    /* Data table */
+    .data-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 0.88rem; }
+    .data-table th { text-align: left; font-family: 'Outfit', sans-serif; font-weight: 600; font-size: 0.78rem; letter-spacing: 0.5px; color: rgba(255,255,255,0.5); text-transform: uppercase; padding: 0 12px 10px 0; border-bottom: 1px solid var(--border); }
+    .data-table td { padding: 10px 12px 10px 0; border-bottom: 1px solid rgba(255,255,255,0.04); color: rgba(208,232,244,0.68); vertical-align: top; }
+    .data-table tr:last-child td { border-bottom: none; }
+    .data-table td:first-child { color: rgba(255,255,255,0.75); font-weight: 500; white-space: nowrap; }
+
+    /* Rights grid */
+    .rights-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .right-item { background: rgba(0,230,118,0.04); border: 1px solid rgba(0,230,118,0.12); border-radius: 10px; padding: 12px 16px; }
+    .right-item strong { display: block; font-size: 0.85rem; color: var(--green); margin-bottom: 4px; }
+    .right-item span { font-size: 0.8rem; color: rgba(208,232,244,0.55); }
+
+    .contact-box { background: linear-gradient(135deg, rgba(0,229,255,0.07), rgba(0,230,118,0.05)); border: 1px solid rgba(0,229,255,0.2); border-radius: 16px; padding: 24px 32px; text-align: center; }
+    .contact-box p { margin-bottom: 6px; font-size: 0.9rem; }
+    .contact-email { font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; color: var(--cyan); }
+
+    footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .footer-brand { font-family: 'Outfit', sans-serif; font-size: 0.9rem; font-weight: 800; background: linear-gradient(90deg, var(--cyan), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .footer-note { font-size: 0.74rem; color: rgba(255,255,255,0.22); }
+
+    @media (max-width: 560px) {
+      .section { padding: 20px; }
+      .rights-grid { grid-template-columns: 1fr; }
+      nav { flex-direction: column; align-items: flex-start; gap: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="wrapper">
+
+    <nav>
+      <a href="index.html" class="logo">
+        <img src="app_icon.png" alt="EVraahein" onerror="this.style.display='none';" />
+        <span class="logo-text">EVraahein</span>
+      </a>
+      <a href="index.html" class="back-link">← Back to home</a>
+    </nav>
+
+    <div class="page-hero">
+      <span class="page-tag">Privacy</span>
+      <h1>Privacy Policy</h1>
+      <p class="effective">Effective date: 26 March 2026 &nbsp;·&nbsp; TaruniLakshmi Ventures, Hyderabad, India</p>
+    </div>
+
+    <div class="doc-body">
+
+      <div class="section">
+        <h2><span class="num">1</span> Overview</h2>
+        <p>At EVraahein, we take your privacy seriously. This Privacy Policy explains how <strong>TaruniLakshmi Ventures</strong> collects, uses, shares, and protects your personal data when you use the EVraahein app or website.</p>
+        <p>We comply with the <strong>Information Technology Act, 2000</strong> and the <strong>Digital Personal Data Protection Act, 2023 (DPDPA)</strong> of India. By using EVraahein, you consent to the practices described in this policy.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">2</span> Data We Collect</h2>
+        <p>We collect only what is necessary to provide and improve the Service:</p>
+        <table class="data-table">
+          <thead>
+            <tr><th>Category</th><th>Examples</th><th>Purpose</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Account data</td><td>Name, email address, password (hashed)</td><td>Authentication &amp; account management</td></tr>
+            <tr><td>Vehicle data</td><td>EV make/model, battery capacity, range</td><td>Personalised route &amp; charge planning</td></tr>
+            <tr><td>Location data</td><td>GPS coordinates (while using the app)</td><td>Navigation, route calculation, nearby chargers</td></tr>
+            <tr><td>Usage data</td><td>Routes taken, features used, app interactions</td><td>Service improvement &amp; analytics</td></tr>
+            <tr><td>Device data</td><td>Device type, OS version, app version</td><td>Bug fixing &amp; compatibility</td></tr>
+            <tr><td>Waitlist email</td><td>Email address submitted on our website</td><td>Launch notification only</td></tr>
+          </tbody>
+        </table>
+        <p style="margin-top:14px;">We do <strong>not</strong> collect payment card numbers. Payments, if applicable, are processed by certified third-party payment processors.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">3</span> How We Use Your Data</h2>
+        <p>We use your data to:</p>
+        <ul>
+          <li>Provide, operate, and improve the EVraahein Service</li>
+          <li>Calculate personalised EV routes and identify optimal charging stops</li>
+          <li>Send important service notifications (e.g., charging alerts, account activity)</li>
+          <li>Respond to support requests and queries</li>
+          <li>Analyse aggregate usage trends to improve the app</li>
+          <li>Send launch and product update emails (only if you signed up for early access)</li>
+          <li>Comply with legal obligations</li>
+        </ul>
+        <p>We will <strong>never</strong> sell your personal data to third parties.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">4</span> Location Data</h2>
+        <p>EVraahein is a navigation service — precise location access is essential for route planning and charger discovery. Here is how we handle it:</p>
+        <ul>
+          <li><strong>Foreground only:</strong> We access location only while the app is open and in use</li>
+          <li><strong>No background tracking:</strong> We do not track your location when the app is closed</li>
+          <li><strong>Not sold:</strong> Your location data is never sold or shared with advertisers</li>
+          <li><strong>Deletable:</strong> You can delete all stored trip history from your account settings</li>
+        </ul>
+        <p>You may deny location permission, but core navigation features will not function without it.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">5</span> Data Sharing</h2>
+        <p>We share your data only in the following limited circumstances:</p>
+        <ul>
+          <li><strong>Service providers:</strong> Trusted vendors who help us operate the app (cloud hosting, mapping APIs, analytics) — bound by strict data processing agreements</li>
+          <li><strong>Legal compliance:</strong> When required by law, court order, or governmental authority in India</li>
+          <li><strong>Business transfer:</strong> In the event of a merger or acquisition, your data may transfer to the new entity under equivalent privacy protections</li>
+          <li><strong>With your consent:</strong> Any other sharing requires your explicit permission</li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">6</span> Data Retention</h2>
+        <p>We retain your personal data only as long as necessary:</p>
+        <ul>
+          <li><strong>Account data:</strong> Retained while your account is active; deleted within 30 days of account closure</li>
+          <li><strong>Trip history:</strong> Retained for 12 months; you can delete it sooner from settings</li>
+          <li><strong>Waitlist emails:</strong> Retained until the app launches or until you unsubscribe</li>
+          <li><strong>Legal records:</strong> Some data may be retained longer where required by Indian law</li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">7</span> Your Rights</h2>
+        <p>Under the Digital Personal Data Protection Act, 2023, you have the following rights:</p>
+        <div class="rights-grid">
+          <div class="right-item"><strong>Access</strong><span>Request a copy of your personal data we hold</span></div>
+          <div class="right-item"><strong>Correction</strong><span>Correct inaccurate or incomplete personal data</span></div>
+          <div class="right-item"><strong>Erasure</strong><span>Request deletion of your personal data</span></div>
+          <div class="right-item"><strong>Withdraw Consent</strong><span>Opt out of data processing at any time</span></div>
+          <div class="right-item"><strong>Grievance</strong><span>Lodge a complaint with our Data Protection Officer</span></div>
+          <div class="right-item"><strong>Nomination</strong><span>Nominate someone to exercise rights on your behalf</span></div>
+        </div>
+        <p style="margin-top:14px;">To exercise any right, email us at <a href="mailto:hey@evraahein.app">hey@evraahein.app</a>. We will respond within <strong>30 days</strong>.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">8</span> Data Security</h2>
+        <p>We implement industry-standard safeguards to protect your data:</p>
+        <ul>
+          <li>All data transmitted between your device and our servers is encrypted using <strong>TLS 1.3</strong></li>
+          <li>Passwords are hashed using bcrypt — we never store plaintext passwords</li>
+          <li>Access to production systems is restricted to authorised personnel only</li>
+          <li>We conduct regular security reviews of our infrastructure</li>
+        </ul>
+        <p>No system is 100% secure. In the unlikely event of a data breach affecting your rights, we will notify you within <strong>72 hours</strong> of becoming aware, as required by law.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">9</span> Children's Privacy</h2>
+        <p>EVraahein is not directed at children under the age of 18. We do not knowingly collect personal data from minors. If you believe we have inadvertently collected data from a minor, please contact us immediately at <a href="mailto:hey@evraahein.app">hey@evraahein.app</a> and we will delete it promptly.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">10</span> Cookies &amp; Tracking</h2>
+        <p>Our website uses minimal cookies for:</p>
+        <ul>
+          <li><strong>Essential functionality:</strong> Keeping you logged into the web portal</li>
+          <li><strong>Analytics:</strong> Anonymised, aggregate traffic statistics (no cross-site tracking)</li>
+        </ul>
+        <p>We do not use advertising cookies or third-party tracking pixels. You can disable cookies in your browser settings; this may affect some website features.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">11</span> Changes to This Policy</h2>
+        <p>We may update this Privacy Policy as our Service evolves or as regulations change. When we make material changes, we will notify you via email or an in-app notice at least <strong>7 days</strong> before the changes take effect. The "Effective date" at the top of this page always reflects the latest version.</p>
+      </div>
+
+      <div class="section">
+        <h2><span class="num">12</span> Data Protection Officer</h2>
+        <p>Our Data Protection Officer can be reached at:</p>
+        <p><strong>TaruniLakshmi Ventures</strong><br />
+        Hyderabad, Telangana, India<br />
+        Email: <a href="mailto:hey@evraahein.app">hey@evraahein.app</a></p>
+      </div>
+
+      <div class="contact-box">
+        <p>Questions or privacy requests?</p>
+        <p>We typically respond within 2 business days.</p>
+        <a class="contact-email" href="mailto:hey@evraahein.app">hey@evraahein.app</a>
+      </div>
+
+    </div><!-- /doc-body -->
+
+    <footer>
+      <div>
+        <span class="footer-brand">EVraahein</span>
+        <span class="footer-note" style="display:block;margin-top:2px;">TaruniLakshmi Ventures · Hyderabad, India</span>
+      </div>
+      <span class="footer-note">© 2026 All rights reserved</span>
+    </footer>
+
+  </div>
+</body>
+</html>
