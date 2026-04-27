@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Ev Router App2</string>
+	<string>EVraahein</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,7 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>ev_router_app2</string>
+	<string>EVraahein</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -45,6 +45,18 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>EVraahein uses Bluetooth to connect with your OBD-II adapter and read vehicle telemetry.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>EVraahein uses Bluetooth to connect with your OBD-II adapter and surface battery insights.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>EVraahein uses your location to find charging stations, route you, and pair with nearby adapters on older Android/iOS Bluetooth stacks.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>EVraahein uses the camera so you can capture charger photos and upload charging slips during check-ins.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>EVraahein uses your photo library so you can attach existing charger photos, charging slips, and vehicle images.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>EVraahein may save processed images back to your library when you choose to export or share them.</string>
 	<!-- AdMob App ID - Test ID, replace with real one in production -->
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-3940256099942544~1458002511</string>
