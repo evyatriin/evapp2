@@ -3,11 +3,12 @@ import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:map_launcher/map_launcher.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'here_routing_service.dart';
 import 'route_model.dart';
 import '../mapping/places_service.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../vehicle_profile/vehicle_provider.dart';
+import '../vehicle_profile/vehicle_model.dart';
 import 'saved_routes_screen.dart';
 
 class RoutePlannerScreen extends StatefulWidget {
@@ -28,6 +29,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
   int _soh = 100;
   bool _isRoundTrip = false;
   int _shortStayDuration = 60;
+  String _tripStyle = 'balanced';
 
   String? _startPlaceId;
   String? _destPlaceId;
@@ -60,12 +62,24 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
     });
 
     try {
+      final vehicles = ProviderScope.containerOf(context).read(vehicleProvider);
+
       // 1. Get Coordinates
       final startLatLng = await _placesService.getPlaceDetails(_startPlaceId!);
       final destLatLng = await _placesService.getPlaceDetails(_destPlaceId!);
 
       if (startLatLng == null || destLatLng == null) {
         throw Exception('Failed to get coordinates for selected locations');
+      }
+
+      VehicleProfile? selectedVehicle;
+      if (_selectedVehicleId != null) {
+        for (final vehicle in vehicles) {
+          if (vehicle.id == _selectedVehicleId) {
+            selectedVehicle = vehicle;
+            break;
+          }
+        }
       }
 
       // 2. Calculate Route
@@ -75,9 +89,16 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
         currentSoc: _currentSoc,
         targetSoc: _targetSoc,
         soh: _soh,
+        vehicle: selectedVehicle,
         isRoundTrip: _isRoundTrip,
         shortStayDurationMin: _isRoundTrip ? _shortStayDuration : 0,
       );
+
+      if (routes.isEmpty) {
+        throw Exception(
+          'No route options were returned. Please try different charge settings or locations.',
+        );
+      }
 
       if (mounted) {
         context.push('/planner/result', extra: {
@@ -102,7 +123,26 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
     }
   }
 
-  bool _showOptions = true; // Default to true to show new options
+  bool _showOptions = false;
+
+  void _applyTripStyle(String style) {
+    setState(() {
+      _tripStyle = style;
+      switch (style) {
+        case 'fastest':
+          _targetSoc = 12;
+          _shortStayDuration = 30;
+          break;
+        case 'comfort':
+          _targetSoc = 28;
+          _shortStayDuration = 90;
+          break;
+        default:
+          _targetSoc = 20;
+          _shortStayDuration = 60;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -113,16 +153,14 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
       appBar: AppBar(
         title: const Text('Plan Your Trip'),
         backgroundColor: theme.colorScheme.surface,
-        toolbarHeight: 48,
-        elevation: 0,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(36),
+          preferredSize: const Size.fromHeight(32),
           child: TabBar(
             controller: _tabController,
-            labelPadding: const EdgeInsets.symmetric(horizontal: 16),
+            labelPadding: const EdgeInsets.symmetric(horizontal: 12),
             tabs: const [
-              Tab(text: 'Plan Trip', height: 36),
-              Tab(text: 'Saved Plans', height: 36),
+              Tab(text: 'Plan Trip', height: 32),
+              Tab(text: 'Saved Plans', height: 32),
             ],
           ),
         ),
@@ -151,14 +189,14 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
                   Expanded(
                     child: SingleChildScrollView(
                       child: Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.only(bottom: 10),
                         child: Card(
                           margin: EdgeInsets.zero,
-                          elevation: 4,
+                          elevation: 2,
                           shadowColor: Colors.black26,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                       child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -167,12 +205,24 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
                                   children: [
                                     Column(
                                       children: [
-                                        Icon(PhosphorIcons.circle(PhosphorIconsStyle.fill), size: 12, color: Colors.blue),
+                                        Icon(
+                                          PhosphorIcons.circle(
+                                            PhosphorIconsStyle.fill,
+                                          ),
+                                          size: 12,
+                                          color: theme.colorScheme.primary,
+                                        ),
                                   Container(width: 2, height: 24, color: theme.colorScheme.outlineVariant),
-                                  Icon(PhosphorIcons.mapPin(PhosphorIconsStyle.fill), size: 16, color: Colors.red),
+                                  Icon(
+                                    PhosphorIcons.mapPin(
+                                      PhosphorIconsStyle.fill,
+                                    ),
+                                    size: 16,
+                                    color: theme.colorScheme.error,
+                                  ),
                                       ],
                                     ),
-                                    const Gap(16),
+                                    const Gap(12),
                                     Expanded(
                                       child: Column(
                                         children: [
@@ -200,286 +250,141 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
                                     ),
                                   ],
                                 ),
-                                
-                                // Options
-                                if (_showOptions) ...[
-                                  const Gap(4),
-                                  // Vehicle Selection Dropdown
-                                  Consumer(
-                                    builder: (context, ref, child) {
-                                      final vehicles = ref.watch(vehicleProvider);
-                                      final vehicleNotifier = ref.read(vehicleProvider.notifier);
-                                      
-                                      // Show prompt if no vehicles
-                                      if (vehicles.isEmpty) {
-                                        return Container(
-                                          padding: const EdgeInsets.all(16),
-                                          decoration: BoxDecoration(
-                                            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-                                            borderRadius: BorderRadius.circular(12),
-                                            border: Border.all(
-                                              color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                                            ),
+                                const Gap(12),
+                                _buildVehicleSelector(theme),
+                                const Gap(10),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surfaceContainerLowest,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: theme.colorScheme.outlineVariant,
+                                    ),
+                                  ),
+                                  child: ExpansionTile(
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.all(Radius.circular(16)),
+                                    ),
+                                    collapsedShape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.all(Radius.circular(16)),
+                                    ),
+                                    initiallyExpanded: _showOptions,
+                                    onExpansionChanged: (value) {
+                                      setState(() {
+                                        _showOptions = value;
+                                      });
+                                    },
+                                    tilePadding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 4,
+                                    ),
+                                    childrenPadding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      0,
+                                      16,
+                                      16,
+                                    ),
+                                    title: Text(
+                                      'Advanced trip settings',
+                                      style: theme.textTheme.titleSmall?.copyWith(
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                    subtitle: Text(
+                                      'Trip style, battery buffers, and round-trip controls',
+                                      style: theme.textTheme.bodySmall?.copyWith(
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                    children: [
+                                      Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Text(
+                                          'Trip style',
+                                          style: theme.textTheme.labelLarge?.copyWith(
+                                            fontWeight: FontWeight.w700,
                                           ),
-                                          child: Column(
-                                            children: [
-                                              Icon(
-                                                Icons.directions_car_outlined,
-                                                size: 40,
-                                                color: theme.colorScheme.primary,
-                                              ),
-                                              const Gap(8),
-                                              Text(
-                                                'No Vehicle Added',
-                                                style: theme.textTheme.titleMedium?.copyWith(
-                                                  fontWeight: FontWeight.bold,
-                                                ),
-                                              ),
-                                              const Gap(4),
-                                              Text(
-                                                'Add your EV to get personalized route planning based on your car\'s range',
-                                                textAlign: TextAlign.center,
-                                                style: theme.textTheme.bodySmall?.copyWith(
-                                                  color: theme.colorScheme.onSurfaceVariant,
-                                                ),
-                                              ),
-                                              const Gap(12),
-                                              FilledButton.icon(
-                                                onPressed: () => context.push('/setup/vehicle/add'),
-                                                icon: const Icon(Icons.add, size: 18),
-                                                label: const Text('Add Your Vehicle'),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }
-                                      
-                                      // Initialize selected vehicle with primary vehicle if not set
-                                      if (_selectedVehicleId == null && vehicles.isNotEmpty) {
-                                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                                          if (mounted) {
-                                            setState(() {
-                                              final primary = vehicleNotifier.primaryVehicle;
-                                              _selectedVehicleId = primary?.id ?? vehicles.first.id;
-                                            });
-                                          }
-                                        });
-                                      }
-                                      
-                                      // Get selected vehicle for specs display
-                                      final selectedVehicle = vehicles.where((v) => v.id == _selectedVehicleId).toList();
-                                      final currentVehicle = selectedVehicle.isNotEmpty ? selectedVehicle.first : null;
-                                      
-                                      return Column(
-                                        children: [
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                                            decoration: BoxDecoration(
-                                              border: Border.all(color: theme.colorScheme.outlineVariant),
-                                              borderRadius: BorderRadius.circular(8),
+                                        ),
+                                      ),
+                                      const Gap(8),
+                                      SingleChildScrollView(
+                                        scrollDirection: Axis.horizontal,
+                                        child: Row(
+                                          children: [
+                                            _TripStyleChip(
+                                              label: 'Fastest',
+                                              description: 'Lower reserve, faster arrival',
+                                              isSelected: _tripStyle == 'fastest',
+                                              onTap: () => _applyTripStyle('fastest'),
                                             ),
-                                            child: DropdownButtonHideUnderline(
-                                              child: DropdownButton<String>(
-                                                isExpanded: true,
-                                                value: _selectedVehicleId,
-                                                hint: const Text('Select Vehicle'),
-                                                items: vehicles.map((v) {
-                                                  return DropdownMenuItem(
-                                                    value: v.id,
-                                                    child: Row(
-                                                      children: [
-                                                        // Vehicle image/icon
-                                                        Container(
-                                                          width: 32,
-                                                          height: 32,
-                                                          margin: const EdgeInsets.only(right: 10),
-                                                          decoration: BoxDecoration(
-                                                            borderRadius: BorderRadius.circular(6),
-                                                            color: theme.colorScheme.surfaceContainerHighest,
-                                                          ),
-                                                          clipBehavior: Clip.antiAlias,
-                                                          child: (v.photoUrl != null || v.imageUrl != null)
-                                                              ? Image.network(
-                                                                  v.photoUrl ?? v.imageUrl!,
-                                                                  fit: BoxFit.cover,
-                                                                  errorBuilder: (c, e, s) => Icon(
-                                                                    Icons.directions_car,
-                                                                    size: 18,
-                                                                    color: theme.colorScheme.primary,
-                                                                  ),
-                                                                )
-                                                              : Icon(
-                                                                  Icons.directions_car,
-                                                                  size: 18,
-                                                                  color: theme.colorScheme.primary,
-                                                                ),
-                                                        ),
-                                                        // Vehicle details
-                                                        Expanded(
-                                                          child: Column(
-                                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                                            mainAxisSize: MainAxisSize.min,
-                                                            children: [
-                                                              Row(
-                                                                children: [
-                                                                  Flexible(
-                                                                    child: Text(
-                                                                      '${v.brand} ${v.model}',
-                                                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                                                        fontWeight: FontWeight.w600,
-                                                                      ),
-                                                                      overflow: TextOverflow.ellipsis,
-                                                                    ),
-                                                                  ),
-                                                                  if (v.isPrimary) ...[
-                                                                    const Gap(4),
-                                                                    Icon(
-                                                                      Icons.star,
-                                                                      size: 14,
-                                                                      color: theme.colorScheme.primary,
-                                                                    ),
-                                                                  ],
-                                                                ],
-                                                              ),
-                                                              Text(
-                                                                '${v.variant} • ${v.estimatedRange.toInt()} km',
-                                                                style: theme.textTheme.bodySmall?.copyWith(
-                                                                  color: theme.colorScheme.onSurfaceVariant,
-                                                                ),
-                                                                overflow: TextOverflow.ellipsis,
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  );
-                                                }).toList(),
-                                                onChanged: (id) {
-                                                  setState(() {
-                                                    _selectedVehicleId = id;
-                                                  });
-                                                },
-                                              ),
-                                            ),
-                                          ),
-                                          // Vehicle Specs Card
-                                          if (currentVehicle != null) ...[
                                             const Gap(8),
-                                            Container(
-                                              padding: const EdgeInsets.all(10),
-                                              decoration: BoxDecoration(
-                                                color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                                                borderRadius: BorderRadius.circular(8),
-                                              ),
-                                              child: Row(
-                                                children: [
-                                                  Expanded(
-                                                    child: _buildSpecItem(
-                                                      context,
-                                                      icon: Icons.speed,
-                                                      label: 'Efficiency',
-                                                      value: '${(currentVehicle.rangeEfficiency * 100).toInt()}%',
-                                                    ),
-                                                  ),
-                                                  Container(
-                                                    width: 1,
-                                                    height: 30,
-                                                    color: theme.colorScheme.outlineVariant,
-                                                  ),
-                                                  Expanded(
-                                                    child: _buildSpecItem(
-                                                      context,
-                                                      icon: Icons.battery_charging_full,
-                                                      label: 'Range',
-                                                      value: '${currentVehicle.estimatedRange.toInt()} km',
-                                                    ),
-                                                  ),
-                                                  if (currentVehicle.preferredChargingNetworks.isNotEmpty) ...[
-                                                    Container(
-                                                      width: 1,
-                                                      height: 30,
-                                                      color: theme.colorScheme.outlineVariant,
-                                                    ),
-                                                    Expanded(
-                                                      child: _buildSpecItem(
-                                                        context,
-                                                        icon: Icons.ev_station,
-                                                        label: 'Networks',
-                                                        value: '${currentVehicle.preferredChargingNetworks.length}',
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ],
-                                              ),
+                                            _TripStyleChip(
+                                              label: 'Balanced',
+                                              description: 'Default comfort buffer',
+                                              isSelected: _tripStyle == 'balanced',
+                                              onTap: () => _applyTripStyle('balanced'),
+                                            ),
+                                            const Gap(8),
+                                            _TripStyleChip(
+                                              label: 'Battery Safe',
+                                              description: 'More reserve at stops',
+                                              isSelected: _tripStyle == 'comfort',
+                                              onTap: () => _applyTripStyle('comfort'),
                                             ),
                                           ],
+                                        ),
+                                      ),
+                                      const Gap(10),
+                                      _buildSliderRow(
+                                        context,
+                                        'Current SOC',
+                                        '$_currentSoc%',
+                                        _currentSoc.toDouble(),
+                                        0,
+                                        100,
+                                        (v) => setState(() => _currentSoc = v.round()),
+                                        info: 'State of Charge: The current battery percentage of your vehicle.',
+                                      ),
+                                      _buildSliderRow(
+                                        context,
+                                        'Target SOC',
+                                        '$_targetSoc%',
+                                        _targetSoc.toDouble(),
+                                        0,
+                                        100,
+                                        (v) => setState(() => _targetSoc = v.round()),
+                                        info: 'Target SOC: The minimum battery percentage you want to have when you reach your destination.',
+                                      ),
+                                      _buildSliderRow(
+                                        context,
+                                        'Battery SOH',
+                                        '$_soh%',
+                                        _soh.toDouble(),
+                                        50,
+                                        100,
+                                        (v) => setState(() => _soh = v.round()),
+                                        info: 'State of Health: The current health of your battery relative to when it was new. Lower SOH reduces range.',
+                                      ),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text('Round Trip', style: theme.textTheme.bodyMedium),
+                                          Switch(
+                                            value: _isRoundTrip,
+                                            onChanged: (v) => setState(() => _isRoundTrip = v),
+                                          ),
                                         ],
-                                      );
-                                    },
-                                  ),
-                                  const Gap(8),
-                                  const Divider(height: 1),
-                                  const Gap(4),
-                                  _buildSliderRow(
-                                    context, 
-                                    'Current SOC', 
-                                    '$_currentSoc%', 
-                                    _currentSoc.toDouble(), 
-                                    0, 
-                                    100, 
-                                    (v) => setState(() => _currentSoc = v.round()),
-                                    info: 'State of Charge: The current battery percentage of your vehicle.',
-                                  ),
-                                  _buildSliderRow(
-                                    context, 
-                                    'Target SOC', 
-                                    '$_targetSoc%', 
-                                    _targetSoc.toDouble(), 
-                                    0, 
-                                    100, 
-                                    (v) => setState(() => _targetSoc = v.round()),
-                                    info: 'Target SOC: The minimum battery percentage you want to have when you reach your destination.',
-                                  ),
-                                  _buildSliderRow(
-                                    context, 
-                                    'Battery SOH', 
-                                    '$_soh%', 
-                                    _soh.toDouble(), 
-                                    50, 
-                                    100, 
-                                    (v) => setState(() => _soh = v.round()),
-                                    info: 'State of Health: The current health of your battery relative to when it was new. Lower SOH reduces range.',
-                                  ),
-                                  
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text('Round Trip', style: theme.textTheme.bodyMedium),
-                                      Switch(
-                                        value: _isRoundTrip,
-                                        onChanged: (v) => setState(() => _isRoundTrip = v),
                                       ),
-                                    ],
-                                  ),
-                                  if (_isRoundTrip)
-                                    _buildSliderRow(context, 'Stay Duration', '${_shortStayDuration}m', _shortStayDuration.toDouble(), 0, 240, (v) => setState(() => _shortStayDuration = v.round())),
-                                ],
-                                
-                                const Gap(8),
-                                GestureDetector(
-                                  onTap: () => setState(() => _showOptions = !_showOptions),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        _showOptions ? 'Hide Options' : 'More Options',
-                                        style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold),
-                                      ),
-                                      Icon(
-                                        _showOptions ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
-                                        color: theme.colorScheme.primary,
-                                      ),
+                                      if (_isRoundTrip)
+                                        _buildSliderRow(
+                                          context,
+                                          'Stay Duration',
+                                          '${_shortStayDuration}m',
+                                          _shortStayDuration.toDouble(),
+                                          0,
+                                          240,
+                                          (v) => setState(() => _shortStayDuration = v.round()),
+                                        ),
                                     ],
                                   ),
                                 ),
@@ -495,21 +400,24 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
                   
                   // Floating Action Button for Planning
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     child: SizedBox(
                       width: double.infinity,
-                      height: 48,
+                      height: 42,
                       child: FilledButton.icon(
                         onPressed: _isLoading ? null : _planTrip,
                         style: FilledButton.styleFrom(
-                          elevation: 4,
+                          elevation: 2,
                           shadowColor: Colors.black45,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                         icon: _isLoading 
-                            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Icon(Icons.directions),
-                        label: const Text('Plan Route', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                            ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Icon(Icons.directions, size: 18),
+                        label: const Text('Plan Route', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                       ),
                     ),
                   ),
@@ -571,24 +479,266 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
     );
   }
 
-  Widget _buildSpecItem(BuildContext context, {required IconData icon, required String label, required String value}) {
-    final theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 16, color: theme.colorScheme.primary),
-        const Gap(2),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
-        ),
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-        ),
-      ],
+  Widget _buildVehicleSelector(ThemeData theme) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final vehicles = ref.watch(vehicleProvider);
+        final vehicleNotifier = ref.read(vehicleProvider.notifier);
+
+        if (vehicles.isEmpty) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: theme.colorScheme.primary.withValues(alpha: 0.25),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.directions_car_outlined,
+                      size: 22,
+                      color: theme.colorScheme.primary,
+                    ),
+                    const Gap(10),
+                    Text(
+                      'Vehicle',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+                const Gap(8),
+                Text(
+                  'Add your EV once to get route plans based on your battery and real-world range.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const Gap(12),
+                FilledButton.icon(
+                  onPressed: () => context.push('/setup/vehicle/add'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: const Icon(Icons.add, size: 16),
+                  label: const Text('Add Vehicle'),
+                ),
+              ],
+            ),
+          );
+        }
+
+        if (_selectedVehicleId == null && vehicles.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                final primary = vehicleNotifier.primaryVehicle;
+                _selectedVehicleId = primary?.id ?? vehicles.first.id;
+              });
+            }
+          });
+        }
+
+        final selectedVehicle = vehicles.where((v) => v.id == _selectedVehicleId).toList();
+        final currentVehicle = selectedVehicle.isNotEmpty ? selectedVehicle.first : null;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Vehicle',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const Gap(10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                decoration: BoxDecoration(
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: _selectedVehicleId,
+                    hint: const Text('Select Vehicle'),
+                    items: vehicles.map((v) {
+                      return DropdownMenuItem(
+                        value: v.id,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              margin: const EdgeInsets.only(right: 8),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(6),
+                                color: theme.colorScheme.surfaceContainerHighest,
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: (v.photoUrl != null || v.imageUrl != null)
+                                  ? Image.network(
+                                      v.photoUrl ?? v.imageUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (c, e, s) => Icon(
+                                        Icons.directions_car,
+                                        size: 16,
+                                        color: theme.colorScheme.primary,
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.directions_car,
+                                      size: 16,
+                                      color: theme.colorScheme.primary,
+                                    ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          '${v.brand} ${v.model}',
+                                          style: theme.textTheme.bodySmall?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (v.isPrimary) ...[
+                                        const Gap(4),
+                                        Icon(
+                                          Icons.star,
+                                          size: 12,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  Text(
+                                    '${v.variant} • ${v.estimatedRange.toInt()} km',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (id) {
+                      setState(() {
+                        _selectedVehicleId = id;
+                      });
+                    },
+                  ),
+                ),
+              ),
+              if (currentVehicle != null) ...[
+                const Gap(10),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _buildVehicleChip(
+                        context,
+                        icon: Icons.speed,
+                        value: '${(currentVehicle.rangeEfficiency * 100).toInt()}%',
+                        label: 'Efficiency',
+                      ),
+                      const Gap(6),
+                      _buildVehicleChip(
+                        context,
+                        icon: Icons.battery_charging_full,
+                        value: '${currentVehicle.estimatedRange.toInt()} km',
+                        label: 'Range',
+                      ),
+                      if (currentVehicle.preferredChargingNetworks.isNotEmpty) ...[
+                        const Gap(6),
+                        _buildVehicleChip(
+                          context,
+                          icon: Icons.ev_station,
+                          value: '${currentVehicle.preferredChargingNetworks.length}',
+                          label: 'Networks',
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
+
+  Widget _buildVehicleChip(BuildContext context, {required IconData icon, required String label, required String value}) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: theme.colorScheme.primary),
+          const Gap(4),
+          Text(
+            value,
+            style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          const Gap(4),
+          Text(
+            label,
+            style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _routeHighlightTag(RouteModel route) {
+  final chargingStops =
+      route.stops.where((stop) => stop.type == StopType.charging).length;
+  if (chargingStops == 0) {
+    return 'Non-stop';
+  }
+  if (route.estimatedCost <= 350) {
+    return 'Lowest Cost';
+  }
+  if (route.totalDurationMin <= 240) {
+    return 'Quickest';
+  }
+  return 'Balanced';
 }
 
 class TripSummarySheet extends StatelessWidget {
@@ -607,18 +757,22 @@ class TripSummarySheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return DraggableScrollableSheet(
-      initialChildSize: 0.4,
-      minChildSize: 0.2,
-      maxChildSize: 0.6,
+      initialChildSize: 0.14,
+      minChildSize: 0.09,
+      maxChildSize: 0.42,
       expand: false,
       builder: (context, scrollController) {
         return Container(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
             boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, spreadRadius: 2),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 10,
+                spreadRadius: 1,
+              ),
             ],
           ),
           child: ListView(
@@ -626,7 +780,7 @@ class TripSummarySheet extends StatelessWidget {
             children: [
               Center(
                 child: Container(
-                  width: 40,
+                  width: 30,
                   height: 4,
                   decoration: BoxDecoration(
                     color: Colors.grey[300],
@@ -634,66 +788,106 @@ class TripSummarySheet extends StatelessWidget {
                   ),
                 ),
               ),
-              const Gap(24),
+              const Gap(8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(route.name, style: theme.textTheme.headlineSmall),
+                  Expanded(
+                    child: Text(
+                      route.name,
+                      style: theme.textTheme.titleMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const Gap(8),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.primaryContainer,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      'Best Value', // Logic to determine tag
+                      _routeHighlightTag(route),
                       style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onPrimaryContainer),
                     ),
                   ),
                 ],
               ),
-              const Gap(16),
+              const Gap(6),
               _buildInfoRow(context, 'Total Distance', '${route.totalDistanceKm.toStringAsFixed(1)} km'),
               _buildInfoRow(context, 'Est. Time', '${(route.totalDurationMin / 60).toStringAsFixed(1)} hrs'),
               _buildInfoRow(context, 'Est. Cost', '₹${route.estimatedCost.toStringAsFixed(0)}'),
-              const Divider(height: 32),
-              Text('Charging Stops', style: theme.textTheme.titleMedium),
-              const Gap(16),
-              ...route.stops.where((s) => s.type == StopType.charging).map((stop) => ListTile(
-                leading: const Icon(Icons.ev_station, color: Colors.green),
-                title: Text(stop.name),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Charge: ${stop.chargeDurationMin} mins • Target ${stop.targetSoc}% SOC'),
-                    if (stop.arrivalSoc != null && stop.departureSoc != null)
-                      Text('SOC: ${stop.arrivalSoc}% → ${stop.departureSoc}%', style: theme.textTheme.bodySmall),
-                    if (stop.cost != null)
-                      Text('Est. Cost: ₹${stop.cost!.toStringAsFixed(0)}', style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.primary)),
-                  ],
+              const Divider(height: 18),
+              if (route.guidance.isNotEmpty) ...[
+                Text('Trip Guidance', style: theme.textTheme.titleSmall),
+                const Gap(8),
+                ...route.guidance.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Padding(
+                          padding: EdgeInsets.only(top: 3),
+                          child: Icon(Icons.check_circle_outline, size: 16),
+                        ),
+                        const Gap(8),
+                        Expanded(
+                          child: Text(
+                            item,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                trailing: const Icon(Icons.chevron_right),
-                contentPadding: EdgeInsets.zero,
-                isThreeLine: true,
-              )),
+                const Divider(height: 18),
+              ],
+              Text('Charging Stops', style: theme.textTheme.titleSmall),
+              const Gap(8),
+              ...route.stops
+                  .where((s) => s.type == StopType.charging)
+                  .toList()
+                  .asMap()
+                  .entries
+                  .map(
+                    (entry) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildChargingStopCard(
+                        context,
+                        stop: entry.value,
+                        stepIndex: entry.key + 1,
+                      ),
+                    ),
+                  ),
               if (route.stops.where((s) => s.type == StopType.charging).isEmpty)
-                const Text('No charging stops needed for this trip!'),
+                Text(
+                  'No charging stops needed for this trip!',
+                  style: theme.textTheme.bodySmall,
+                ),
                 
-              const Gap(24),
+              const Gap(12),
               Row(
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
                       onPressed: isSaving ? null : onSave,
                       icon: isSaving 
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
-                          : const Icon(Icons.save_alt),
-                      label: Text(isSaving ? 'Saving...' : 'Save Plan'),
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) 
+                          : const Icon(Icons.save_alt, size: 18),
+                      label: Text(isSaving ? 'Saving...' : 'Save'),
                     ),
                   ),
-                  const Gap(16),
+                  const Gap(10),
                   Expanded(
                     child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
                       onPressed: () async {
                         // Safety check: ensure route has stops
                         if (route.stops.isEmpty) {
@@ -735,7 +929,7 @@ class TripSummarySheet extends StatelessWidget {
                           }
                         }
                       },
-                      icon: const Icon(Icons.navigation),
+                      icon: const Icon(Icons.navigation, size: 18),
                       label: const Text('Navigate'),
                     ),
                   ),
@@ -757,6 +951,282 @@ class TripSummarySheet extends StatelessWidget {
           Text(label, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey)),
           Text(value, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
         ],
+      ),
+    );
+  }
+
+  Widget _buildChargingStopCard(
+    BuildContext context, {
+    required RouteStop stop,
+    required int stepIndex,
+  }) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: () => _showChargingStopActions(context, stop),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$stepIndex',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+                const Gap(10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        stop.name,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (stop.advice != null && stop.advice!.isNotEmpty)
+                        Text(
+                          stop.advice!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+            const Gap(12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (stop.chargeDurationMin != null)
+                  _buildStopMetaChip(
+                    context,
+                    icon: Icons.bolt,
+                    text: '${stop.chargeDurationMin} min charge',
+                  ),
+                if (stop.targetSoc != null)
+                  _buildStopMetaChip(
+                    context,
+                    icon: Icons.battery_charging_full,
+                    text: 'Target ${stop.targetSoc}%',
+                  ),
+                if (stop.arrivalSoc != null && stop.departureSoc != null)
+                  _buildStopMetaChip(
+                    context,
+                    icon: Icons.swap_horiz,
+                    text: '${stop.arrivalSoc}% -> ${stop.departureSoc}%',
+                  ),
+                if (stop.cost != null)
+                  _buildStopMetaChip(
+                    context,
+                    icon: Icons.currency_rupee,
+                    text: '₹${stop.cost!.toStringAsFixed(0)} est.',
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showChargingStopActions(BuildContext context, RouteStop stop) async {
+    final theme = Theme.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(stop.name, style: theme.textTheme.titleMedium),
+                const Gap(6),
+                if (stop.advice != null && stop.advice!.isNotEmpty)
+                  Text(
+                    stop.advice!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                const Gap(10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (stop.chargeDurationMin != null)
+                      _buildStopMetaChip(
+                        context,
+                        icon: Icons.bolt,
+                        text: '${stop.chargeDurationMin} min',
+                      ),
+                    if (stop.targetSoc != null)
+                      _buildStopMetaChip(
+                        context,
+                        icon: Icons.battery_charging_full,
+                        text: 'To ${stop.targetSoc}%',
+                      ),
+                    if (stop.arrivalSoc != null)
+                      _buildStopMetaChip(
+                        context,
+                        icon: Icons.battery_3_bar,
+                        text: 'Arrive ${stop.arrivalSoc}%',
+                      ),
+                    if (stop.departureSoc != null)
+                      _buildStopMetaChip(
+                        context,
+                        icon: Icons.battery_full,
+                        text: 'Leave ${stop.departureSoc}%',
+                      ),
+                  ],
+                ),
+                const Gap(14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () async {
+                      Navigator.of(sheetContext).pop();
+                      await _openChargingStopInMaps(context, stop);
+                    },
+                    icon: const Icon(Icons.navigation, size: 18),
+                    label: const Text('Open in Maps'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStopMetaChip(BuildContext context, {required IconData icon, required String text}) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: theme.colorScheme.primary),
+          const Gap(4),
+          Text(text, style: theme.textTheme.labelMedium),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openChargingStopInMaps(BuildContext context, RouteStop stop) async {
+    try {
+      final availableMaps = await MapLauncher.installedMaps;
+      if (availableMaps.isEmpty) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No map apps installed')),
+          );
+        }
+        return;
+      }
+
+      await availableMaps.first.showMarker(
+        coords: Coords(stop.location.latitude, stop.location.longitude),
+        title: stop.name,
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open charging stop: $e')),
+        );
+      }
+    }
+  }
+}
+
+class _TripStyleChip extends StatelessWidget {
+  final String label;
+  final String description;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _TripStyleChip({
+    required this.label,
+    required this.description,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 150,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color:
+              isSelected
+                  ? theme.colorScheme.primaryContainer
+                  : theme.colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color:
+                isSelected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outlineVariant,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const Gap(4),
+            Text(
+              description,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -34,7 +34,7 @@ class _SavedChargersListState extends ConsumerState<SavedChargersList> {
       });
       _sortByDistance();
     } catch (e) {
-      print('Error getting location: $e');
+      debugPrint('Error getting location: $e');
     }
   }
 
@@ -99,16 +99,16 @@ class _SavedChargersListState extends ConsumerState<SavedChargersList> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error removing charger: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error removing charger: $e')));
       }
     }
   }
 
   String _getDistance(Map<String, dynamic> charger) {
     if (_currentPosition == null) return '';
-    
+
     final distance = Geolocator.distanceBetween(
       _currentPosition!.latitude,
       _currentPosition!.longitude,
@@ -129,106 +129,166 @@ class _SavedChargersListState extends ConsumerState<SavedChargersList> {
 
     return RefreshIndicator(
       onRefresh: _loadSavedChargers,
-      child: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _savedChargers.isEmpty
+      child:
+          _isLoading
               ? ListView(
-                  children: [
-                    SizedBox(
-                      height: 400,
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: 420,
+                    child: Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
-                            PhosphorIcons.heartStraight(PhosphorIconsStyle.duotone),
-                            size: 64,
-                            color: Colors.grey,
+                          CircularProgressIndicator(
+                            color: theme.colorScheme.primary,
                           ),
                           const Gap(16),
                           Text(
-                            'No saved chargers yet',
-                            style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey),
+                            'Loading saved chargers',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
-                          const Gap(8),
+                          const Gap(6),
                           Text(
-                            'Tap the heart icon on any charger to save it',
-                            style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                            'Pulling your favorite stations and sorting them by distance.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
                             textAlign: TextAlign.center,
                           ),
                         ],
                       ),
                     ),
-                  ],
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _savedChargers.length,
-                  itemBuilder: (context, index) {
-                    final charger = _savedChargers[index];
-                    final distance = _getDistance(charger);
-
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        leading: Icon(
-                          PhosphorIcons.plugCharging(PhosphorIconsStyle.duotone),
-                          color: theme.colorScheme.primary,
-                          size: 32,
-                        ),
-                        title: Text(
-                          charger['name'] ?? 'Unknown Station',
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Gap(4),
-                            Text(
-                              charger['address'] ?? 'No address',
-                              style: theme.textTheme.bodySmall,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              )
+              : _savedChargers.isEmpty
+              ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                children: [
+                  SizedBox(
+                    height: 420,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.primaryContainer.withValues(
+                              alpha: 0.35,
                             ),
-                            if (distance.isNotEmpty) ...[
-                              const Gap(4),
-                              Row(
-                                children: [
-                                  Icon(
-                                    PhosphorIcons.mapPin(PhosphorIconsStyle.regular),
-                                    size: 14,
-                                    color: theme.colorScheme.primary,
-                                  ),
-                                  const Gap(4),
-                                  Text(
-                                    distance,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: theme.colorScheme.primary,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
-                        ),
-                        trailing: IconButton(
-                          icon: Icon(
-                            PhosphorIcons.heartStraight(PhosphorIconsStyle.fill),
-                            color: Colors.red,
+                            shape: BoxShape.circle,
                           ),
-                          onPressed: () => _unsaveCharger(charger['id']),
+                          child: Icon(
+                            PhosphorIcons.heartStraight(
+                              PhosphorIconsStyle.duotone,
+                            ),
+                            size: 36,
+                            color: theme.colorScheme.primary,
+                          ),
                         ),
-                        isThreeLine: true,
-                        onTap: () {
-                          // Navigate to station details or show on map
-                          // You can implement this based on your app's navigation
-                        },
+                        const Gap(16),
+                        Text(
+                          'Build your quick-access charger list',
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const Gap(8),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 36),
+                          child: Text(
+                            'Save chargers you trust most so this tab becomes your go-to shortlist during a trip.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                        const Gap(14),
+                        FilledButton.icon(
+                          onPressed: _loadSavedChargers,
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Refresh'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              )
+              : ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: _savedChargers.length,
+                itemBuilder: (context, index) {
+                  final charger = _savedChargers[index];
+                  final distance = _getDistance(charger);
+
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    child: ListTile(
+                      leading: Icon(
+                        PhosphorIcons.plugCharging(PhosphorIconsStyle.duotone),
+                        color: theme.colorScheme.primary,
+                        size: 32,
                       ),
-                    );
-                  },
-                ),
+                      title: Text(
+                        charger['name'] ?? 'Unknown Station',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Gap(4),
+                          Text(
+                            charger['address'] ?? 'No address',
+                            style: theme.textTheme.bodySmall,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (distance.isNotEmpty) ...[
+                            const Gap(4),
+                            Row(
+                              children: [
+                                Icon(
+                                  PhosphorIcons.mapPin(
+                                    PhosphorIconsStyle.regular,
+                                  ),
+                                  size: 14,
+                                  color: theme.colorScheme.primary,
+                                ),
+                                const Gap(4),
+                                Text(
+                                  distance,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: theme.colorScheme.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(
+                          PhosphorIcons.heartStraight(PhosphorIconsStyle.fill),
+                          color: theme.colorScheme.error,
+                        ),
+                        onPressed: () => _unsaveCharger(charger['id']),
+                      ),
+                      isThreeLine: true,
+                      onTap: () {
+                        // Navigate to station details or show on map
+                        // You can implement this based on your app's navigation
+                      },
+                    ),
+                  );
+                },
+              ),
     );
   }
 }

@@ -1,63 +1,35 @@
+import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'station_model.dart';
-import 'places_service.dart';
-
 import 'remote_charger_service.dart';
+import 'station_model.dart';
 
 part 'stations_repository.g.dart';
 
+const LatLng kFallbackMapCenter = LatLng(20.5937, 78.9629);
+
 class StationsRepository {
-  final PlacesService _placesService;
   final RemoteChargerService _remoteService;
 
-  StationsRepository(this._placesService, this._remoteService);
+  StationsRepository(this._remoteService);
 
-  Future<List<StationModel>> getStationsNear(LatLng center, {double radiusKm = 10.0}) async {
-    // Fetch from both sources in parallel
-    final results = await Future.wait([
-      _placesService.fetchChargingStations(center, radiusKm),
-      _remoteService.fetchRemoteStations(center),
-    ]);
-
-    final placesStations = results[0];
-    final remoteStations = results[1];
-
-    // Merge and Deduplicate
-    // We'll use a simple distance-based deduplication.
-    // If a remote station is within 50 meters of a places station, we assume they are the same.
-    // We'll prefer the Remote station as it might have more specific EV details (in a real scenario).
-    
-    final List<StationModel> mergedStations = [...remoteStations];
-    const Distance distance = Distance();
-
-    for (final placeStation in placesStations) {
-      bool isDuplicate = false;
-      for (final remoteStation in remoteStations) {
-        if (distance.as(LengthUnit.Meter, placeStation.location, remoteStation.location) < 50) {
-          isDuplicate = true;
-          break;
-        }
-      }
-
-      if (!isDuplicate) {
-        mergedStations.add(placeStation);
-      }
-    }
-
-    return mergedStations;
+  Future<List<StationModel>> getStationsNear(
+    LatLng center, {
+    double radiusKm = 10.0,
+  }) async {
+    return _remoteService.fetchRemoteStations(center, radiusKm: radiusKm);
   }
 }
 
 @riverpod
 StationsRepository stationsRepository(Ref ref) {
-  return StationsRepository(PlacesService(), RemoteChargerService());
+  return StationsRepository(RemoteChargerService());
 }
 
 @riverpod
 class MapCenter extends _$MapCenter {
   @override
-  LatLng build() => const LatLng(17.3850, 78.4867); // Default: Hyderabad
+  LatLng build() => kFallbackMapCenter;
 
   void update(LatLng newCenter) {
     state = newCenter;
@@ -111,19 +83,23 @@ Future<List<StationModel>> stations(Ref ref) async {
   final center = ref.watch(mapCenterProvider);
   final zoom = ref.watch(mapZoomProvider);
   final filters = ref.watch(connectorFilterProvider);
-  
+
   final radiusKm = _calculateRadiusFromZoom(zoom);
-  print('DEBUG: Fetching stations for center: ${center.latitude}, ${center.longitude}, zoom: $zoom, radius: ${radiusKm}km');
-  
-  final allStations = await repository.getStationsNear(center, radiusKm: radiusKm);
-  
+  debugPrint(
+    'DEBUG: Fetching stations for center: ${center.latitude}, ${center.longitude}, zoom: $zoom, radius: ${radiusKm}km',
+  );
+
+  final allStations = await repository.getStationsNear(
+    center,
+    radiusKm: radiusKm,
+  );
+
   // Apply connector filter
   if (filters.isEmpty) {
     return allStations;
   }
-  
+
   return allStations.where((station) {
     return station.connectors.any((c) => filters.contains(c));
   }).toList();
 }
-

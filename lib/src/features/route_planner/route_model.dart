@@ -8,6 +8,7 @@ class RouteModel {
   final double totalDurationMin;
   final List<RouteStop> stops;
   final double estimatedCost;
+  final List<String> guidance;
 
   const RouteModel({
     required this.id,
@@ -17,6 +18,7 @@ class RouteModel {
     required this.totalDurationMin,
     required this.stops,
     required this.estimatedCost,
+    this.guidance = const [],
   });
 
   factory RouteModel.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,10 @@ class RouteModel {
           .map((stop) => RouteStop.fromJson(stop))
           .toList(),
       estimatedCost: json['estimatedCost'].toDouble(),
+      guidance: (json['guidance'] as List<dynamic>?)
+              ?.map((item) => item as String)
+              .toList() ??
+          const [],
     );
   }
 
@@ -44,6 +50,7 @@ class RouteModel {
       'totalDurationMin': totalDurationMin,
       'stops': stops.map((s) => s.toJson()).toList(),
       'estimatedCost': estimatedCost,
+      'guidance': guidance,
     };
   }
 }
@@ -60,6 +67,7 @@ class RouteStop {
   final double? cost;
   final int? chargeDurationMin;
   final int? targetSoc;
+  final String? advice;
 
   const RouteStop({
     required this.name,
@@ -71,6 +79,7 @@ class RouteStop {
     this.arrivalSoc,
     this.departureSoc,
     this.cost,
+    this.advice,
   });
 
   factory RouteStop.fromJson(Map<String, dynamic> json) {
@@ -84,6 +93,7 @@ class RouteStop {
       arrivalSoc: json['arrivalSoc'],
       departureSoc: json['departureSoc'],
       cost: json['cost']?.toDouble(),
+      advice: json['advice'] as String?,
     );
   }
 
@@ -98,6 +108,7 @@ class RouteStop {
       'arrivalSoc': arrivalSoc,
       'departureSoc': departureSoc,
       'cost': cost,
+      'advice': advice,
     };
   }
 }
