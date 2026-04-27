@@ -752,12 +752,15 @@ async def create_checkin(
 ):
     try:
         ensure_same_user(auth_user, checkin.user_id)
-        data = checkin.dict()
+
+        # Exclude fields that are not DB columns
+        _non_db = {"user_name", "points_earned"}
+        data = {k: v for k, v in checkin.dict().items() if k not in _non_db and v is not None}
         data['created_at'] = datetime.now().isoformat()
-        
+
         # Insert checkin
         response = supabase.table("station_checkins").insert(data).execute()
-        
+
         # Reward points logic - use points from request (default 10)
         points_to_award = checkin.points_earned or 10
         try:
