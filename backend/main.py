@@ -1,8 +1,15 @@
 from contextlib import asynccontextmanager
 import logging
+import os
 
-from fastapi import FastAPI
+import sentry_sdk
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.httpx import HttpxIntegration
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from routers import (
     places,
     routing,
@@ -21,6 +28,16 @@ from routers import (
 )
 from config import settings
 
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN", ""),
+    integrations=[FastApiIntegration(), HttpxIntegration()],
+    environment=settings.APP_ENV,
+    traces_sample_rate=0.05,
+    profiles_sample_rate=0.05,
+)
+
+limiter = Limiter(key_func=get_remote_address)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -37,6 +54,8 @@ logging.basicConfig(
 )
 
 app = FastAPI(title="EV Router Backend", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,

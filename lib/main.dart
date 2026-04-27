@@ -1,5 +1,7 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'src/core/app_config.dart';
@@ -7,6 +9,18 @@ import 'src/core/router.dart';
 import 'src/core/theme.dart';
 
 Future<void> main() async {
+  await SentryFlutter.init(
+    (options) {
+      options.dsn = const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+      options.environment = kReleaseMode ? 'production' : 'debug';
+      options.tracesSampleRate = kReleaseMode ? 0.2 : 0.0;
+      options.attachScreenshot = true;
+    },
+    appRunner: () => _boot(),
+  );
+}
+
+Future<void> _boot() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   if (AppConfig.adsEnabled) {
@@ -15,11 +29,7 @@ Future<void> main() async {
 
   final configError = AppConfig.supabaseConfigError;
   if (configError != null) {
-    runApp(
-      _ConfigurationErrorApp(
-        message: configError,
-      ),
-    );
+    runApp(_ConfigurationErrorApp(message: configError));
     return;
   }
 
@@ -29,7 +39,8 @@ Future<void> main() async {
       anonKey: AppConfig.supabaseAnonKey,
     );
     runApp(const ProviderScope(child: MyApp()));
-  } catch (error) {
+  } catch (error, stack) {
+    await Sentry.captureException(error, stackTrace: stack);
     runApp(
       _ConfigurationErrorApp(
         message:

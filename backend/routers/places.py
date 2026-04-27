@@ -1,9 +1,12 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 import httpx
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from config import settings
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 class Location(BaseModel):
     latitude: float
@@ -14,7 +17,8 @@ class PlacesRequest(BaseModel):
     radius_km: float
 
 @router.post("/nearby")
-async def get_nearby_places(request: PlacesRequest):
+@limiter.limit("60/minute")
+async def get_nearby_places(request: Request, body: PlacesRequest):
     if not settings.GOOGLE_MAPS_API_KEY:
         raise HTTPException(status_code=500, detail="Google Maps API Key not configured")
 
@@ -24,31 +28,32 @@ async def get_nearby_places(request: PlacesRequest):
         "X-Goog-Api-Key": settings.GOOGLE_MAPS_API_KEY,
         "X-Goog-FieldMask": "places.id,places.displayName,places.location,places.evChargeOptions,places.formattedAddress,places.rating,places.userRatingCount",
     }
-    
-    body = {
+
+    payload = {
         "includedTypes": ["electric_vehicle_charging_station"],
         "maxResultCount": 20,
         "locationRestriction": {
             "circle": {
                 "center": {
-                    "latitude": request.center.latitude,
-                    "longitude": request.center.longitude,
+                    "latitude": body.center.latitude,
+                    "longitude": body.center.longitude,
                 },
-                "radius": request.radius_km * 1000,
+                "radius": body.radius_km * 1000,
             }
         }
     }
 
     async with httpx.AsyncClient() as client:
         try:
-            response = await client.post(url, headers=headers, json=body)
+            response = await client.post(url, headers=headers, json=payload)
             response.raise_for_status()
             return response.json()
         except httpx.HTTPError as e:
             raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/autocomplete")
-async def autocomplete(input: str):
+@limiter.limit("60/minute")
+async def autocomplete(request: Request, input: str):
     if not settings.GOOGLE_MAPS_API_KEY:
         raise HTTPException(
             status_code=503,
@@ -59,7 +64,7 @@ async def autocomplete(input: str):
     params = {
         "input": input,
         "key": settings.GOOGLE_MAPS_API_KEY,
-        "components": "country:in", # Restrict to India for this app
+        "components": "country:in",
     }
 
     async with httpx.AsyncClient() as client:
@@ -71,7 +76,8 @@ async def autocomplete(input: str):
             raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/details")
-async def place_details(place_id: str):
+@limiter.limit("60/minute")
+async def place_details(request: Request, place_id: str):
     if not settings.GOOGLE_MAPS_API_KEY:
         raise HTTPException(
             status_code=503,

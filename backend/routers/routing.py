@@ -6,12 +6,15 @@ from typing import Any, Optional
 
 import flexpolyline
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from config import settings
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 
 class LatLng(BaseModel):
@@ -101,26 +104,27 @@ async def _fetch_here_route(params: dict[str, str]) -> dict[str, Any]:
 
 
 @router.post("/")
-async def calculate_route(request: RouteRequest):
+@limiter.limit("20/minute")
+async def calculate_route(request: Request, route_req: RouteRequest):
     if not settings.HERE_API_KEY:
         raise HTTPException(status_code=503, detail="HERE routing is not configured")
 
-    vehicle_profile = _resolve_vehicle_profile(request)
-    base_params = _build_base_here_params(request)
-    ev_params = _build_ev_here_params(base_params, request, vehicle_profile)
+    vehicle_profile = _resolve_vehicle_profile(route_req)
+    base_params = _build_base_here_params(route_req)
+    ev_params = _build_ev_here_params(base_params, route_req, vehicle_profile)
 
     try:
         ev_data = await _fetch_here_route(ev_params)
         if ev_data.get("routes"):
             parsed_routes = _parse_here_routes(
                 ev_data,
-                request,
+                route_req,
                 vehicle_profile,
                 route_source="here_ev",
             )
             return _label_routes(parsed_routes)
 
-        basic_data = await _fetch_here_route(_build_basic_here_params(base_params, request))
+        basic_data = await _fetch_here_route(_build_basic_here_params(base_params, route_req))
         if not basic_data.get("routes"):
             notices = ev_data.get("notices") or basic_data.get("notices") or []
             message = notices[0].get("title") if notices else "No reachable route was found"
@@ -128,16 +132,16 @@ async def calculate_route(request: RouteRequest):
 
         parsed_routes = _parse_here_routes(
             basic_data,
-            request,
+            route_req,
             vehicle_profile,
             route_source="here_basic",
         )
 
         for route in parsed_routes:
-            if _needs_charging_support(route, request):
-                suggested_stops = await _suggest_charging_stops(route, request, vehicle_profile)
-                _apply_suggested_stops(route, suggested_stops, request)
-            _append_route_guidance(route, request)
+            if _needs_charging_support(route, route_req):
+                suggested_stops = await _suggest_charging_stops(route, route_req, vehicle_profile)
+                _apply_suggested_stops(route, suggested_stops, route_req)
+            _append_route_guidance(route, route_req)
 
         return _label_routes(parsed_routes)
 
