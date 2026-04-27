@@ -37,7 +37,6 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final currentUser = ref.watch(userProvider);
 
     return Scaffold(
@@ -51,19 +50,21 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? _LeaderboardState(
+              icon: PhosphorIcons.trophy(PhosphorIconsStyle.duotone),
+              title: 'Loading community leaderboard',
+              subtitle: 'Refreshing streaks and points from the latest activity.',
+              child: const CircularProgressIndicator(),
+            )
           : _entries.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(PhosphorIcons.trophy(PhosphorIconsStyle.duotone), size: 64, color: Colors.grey),
-                      const Gap(16),
-                      Text(
-                        'No leaderboard data yet',
-                        style: theme.textTheme.titleMedium?.copyWith(color: Colors.grey),
-                      ),
-                    ],
+              ? _LeaderboardState(
+                  icon: PhosphorIcons.usersThree(PhosphorIconsStyle.duotone),
+                  title: 'No leaderboard movement yet',
+                  subtitle: 'As members check in, save routes, and build streaks, rankings will appear here.',
+                  child: FilledButton.icon(
+                    onPressed: _loadLeaderboard,
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('Refresh'),
                   ),
                 )
               : ListView.separated(
@@ -87,12 +88,12 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
     IconData? rankIcon;
     
     if (entry.rank == 1) {
-      rankColor = const Color(0xFFFFD700); // Gold
+      rankColor = theme.colorScheme.tertiary;
       rankIcon = PhosphorIcons.crown(PhosphorIconsStyle.fill);
     } else if (entry.rank == 2) {
-      rankColor = const Color(0xFFC0C0C0); // Silver
+      rankColor = theme.colorScheme.secondary;
     } else if (entry.rank == 3) {
-      rankColor = const Color(0xFFCD7F32); // Bronze
+      rankColor = theme.colorScheme.primary;
     }
 
     return Container(
@@ -164,7 +165,7 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
                       Text(
                         '${entry.currentStreak} day streak',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.orange,
+                          color: theme.colorScheme.tertiary,
                           fontSize: 10,
                         ),
                       ),
@@ -177,6 +178,61 @@ class _LeaderboardScreenState extends ConsumerState<LeaderboardScreen> {
           // Points
           PointsBadge(points: entry.totalPoints, compact: true),
         ],
+      ),
+    );
+  }
+}
+
+class _LeaderboardState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _LeaderboardState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 28),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, size: 36, color: theme.colorScheme.primary),
+            ),
+            const Gap(18),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const Gap(8),
+            Text(
+              subtitle,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const Gap(18),
+            child,
+          ],
+        ),
       ),
     );
   }

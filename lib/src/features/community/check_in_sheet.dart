@@ -14,7 +14,7 @@ import '../../core/backend_service.dart';
 
 class CheckInSheet extends ConsumerStatefulWidget {
   final StationModel? station;
-  
+
   const CheckInSheet({super.key, this.station});
 
   @override
@@ -35,6 +35,12 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
   File? _chargingSlip;
   bool _isSubmitting = false;
 
+  // Electric Talks trip context
+  String? _selectedWeather;
+  String? _selectedTripType;
+  int? _selectedPassengers;
+  String? _selectedDriveMode;
+
   // Points configuration
   static const int _basePoints = 10;
   static const int _batteryStartPoints = 2;
@@ -43,6 +49,7 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
   static const int _costPaidPoints = 5;
   static const int _photoPoints = 5;
   static const int _slipPoints = 10;
+  static const int _tripContextPoints = 3; // Bonus for providing trip context
 
   @override
   void initState() {
@@ -72,6 +79,12 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
     if (_costPaidController.text.isNotEmpty) points += _costPaidPoints;
     if (_selectedImage != null) points += _photoPoints;
     if (_chargingSlip != null) points += _slipPoints;
+    // Bonus for trip context
+    if (_selectedWeather != null ||
+        _selectedTripType != null ||
+        _selectedDriveMode != null) {
+      points += _tripContextPoints;
+    }
     return points;
   }
 
@@ -99,12 +112,12 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
     try {
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('${BackendService.baseUrl}/api/chargers/upload-checkin-image'),
+        Uri.parse(
+          '${BackendService.baseUrl}/api/chargers/upload-checkin-image',
+        ),
       );
-      
-      request.files.add(
-        await http.MultipartFile.fromPath('file', file.path),
-      );
+
+      request.files.add(await http.MultipartFile.fromPath('file', file.path));
 
       final response = await request.send();
       if (response.statusCode == 200) {
@@ -113,7 +126,7 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
         return jsonData['image_url'];
       }
     } catch (e) {
-      print('Error uploading image: $e');
+      debugPrint('Error uploading image: $e');
     }
     return null;
   }
@@ -164,10 +177,13 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
               ],
             ),
             const Gap(24),
-            
+
             // Step 0: Select Station (skip if station was pre-provided)
-            if (_step == 0) ...[ 
-              Text('Select a charging station', style: theme.textTheme.titleMedium),
+            if (_step == 0) ...[
+              Text(
+                'Select a charging station',
+                style: theme.textTheme.titleMedium,
+              ),
               const Gap(16),
               if (stations.isEmpty)
                 const Center(child: CircularProgressIndicator())
@@ -182,14 +198,20 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
                         margin: const EdgeInsets.only(bottom: 8),
                         child: ListTile(
                           leading: Icon(
-                            PhosphorIcons.plugCharging(PhosphorIconsStyle.duotone),
+                            PhosphorIcons.plugCharging(
+                              PhosphorIconsStyle.duotone,
+                            ),
                             color: theme.colorScheme.primary,
                           ),
                           title: Text(station.name),
                           subtitle: Text(station.address ?? 'No address'),
-                          trailing: _selectedStation?.id == station.id
-                              ? Icon(Icons.check_circle, color: theme.colorScheme.primary)
-                              : null,
+                          trailing:
+                              _selectedStation?.id == station.id
+                                  ? Icon(
+                                    Icons.check_circle,
+                                    color: theme.colorScheme.primary,
+                                  )
+                                  : null,
                           onTap: () {
                             setState(() {
                               _selectedStation = station;
@@ -204,29 +226,46 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: _selectedStation != null
-                      ? () => setState(() => _step = 1)
-                      : null,
+                  onPressed:
+                      _selectedStation != null
+                          ? () => setState(() => _step = 1)
+                          : null,
                   child: const Text('Next'),
                 ),
               ),
             ]
-            
             // Step 1: Select Status
             else if (_step == 1) ...[
               Text('How is this charger?', style: theme.textTheme.titleMedium),
               const Gap(16),
               Row(
                 children: [
-                  Expanded(child: _buildStatusBtn('Working', Colors.green, PhosphorIcons.checkCircle())),
+                  Expanded(
+                    child: _buildStatusBtn(
+                      'Working',
+                      Colors.green,
+                      PhosphorIcons.checkCircle(),
+                    ),
+                  ),
                   const Gap(12),
-                  Expanded(child: _buildStatusBtn('Busy', Colors.orange, PhosphorIcons.clock())),
+                  Expanded(
+                    child: _buildStatusBtn(
+                      'Busy',
+                      Colors.orange,
+                      PhosphorIcons.clock(),
+                    ),
+                  ),
                   const Gap(12),
-                  Expanded(child: _buildStatusBtn('Broken', Colors.red, PhosphorIcons.xCircle())),
+                  Expanded(
+                    child: _buildStatusBtn(
+                      'Broken',
+                      Colors.red,
+                      PhosphorIcons.xCircle(),
+                    ),
+                  ),
                 ],
               ),
             ]
-            
             // Step 2: Charging Details, Rating, and Images
             else if (_step == 2) ...[
               // Points Preview Card
@@ -244,8 +283,11 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(PhosphorIcons.lightning(PhosphorIconsStyle.fill), 
-                         color: Colors.amber, size: 24),
+                    Icon(
+                      PhosphorIcons.lightning(PhosphorIconsStyle.fill),
+                      color: Colors.amber,
+                      size: 24,
+                    ),
                     const Gap(8),
                     Text(
                       'Points: ${_calculatePoints()}',
@@ -285,10 +327,14 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
 
               // Charging Details Section
               Text('Charging Details', style: theme.textTheme.titleMedium),
-              Text('Fill more for extra points!', 
-                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.secondary)),
+              Text(
+                'Fill more for extra points!',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.secondary,
+                ),
+              ),
               const Gap(12),
-              
+
               Row(
                 children: [
                   Expanded(
@@ -385,6 +431,164 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
                   ),
                 ],
               ),
+              const Gap(16),
+
+              // Trip Context Section - Electric Talks Insights
+              ExpansionTile(
+                title: Row(
+                  children: [
+                    Text('Trip Context', style: theme.textTheme.titleMedium),
+                    const Gap(8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '+$_tripContextPoints pts',
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 12),
+                children: [
+                  // Weather
+                  Text(
+                    'Weather',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Gap(8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _buildContextChip(
+                        '☀️ Hot',
+                        'Hot',
+                        _selectedWeather,
+                        (v) => setState(() => _selectedWeather = v),
+                      ),
+                      _buildContextChip(
+                        '🌧️ Rainy',
+                        'Rainy',
+                        _selectedWeather,
+                        (v) => setState(() => _selectedWeather = v),
+                      ),
+                      _buildContextChip(
+                        '❄️ Cold',
+                        'Cold',
+                        _selectedWeather,
+                        (v) => setState(() => _selectedWeather = v),
+                      ),
+                      _buildContextChip(
+                        '🌤️ Normal',
+                        'Normal',
+                        _selectedWeather,
+                        (v) => setState(() => _selectedWeather = v),
+                      ),
+                    ],
+                  ),
+                  const Gap(12),
+
+                  // Trip Type
+                  Text(
+                    'Trip Type',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Gap(8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _buildContextChip(
+                        '🛣️ Highway',
+                        'Highway',
+                        _selectedTripType,
+                        (v) => setState(() => _selectedTripType = v),
+                      ),
+                      _buildContextChip(
+                        '🏙️ City',
+                        'City',
+                        _selectedTripType,
+                        (v) => setState(() => _selectedTripType = v),
+                      ),
+                      _buildContextChip(
+                        '🔀 Mixed',
+                        'Mixed',
+                        _selectedTripType,
+                        (v) => setState(() => _selectedTripType = v),
+                      ),
+                    ],
+                  ),
+                  const Gap(12),
+
+                  // Passengers
+                  Text(
+                    'Passengers (incl. driver)',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Gap(8),
+                  Wrap(
+                    spacing: 8,
+                    children: List.generate(
+                      5,
+                      (i) => _buildContextChip(
+                        '${i + 1}',
+                        null,
+                        _selectedPassengers?.toString(),
+                        (v) => setState(() => _selectedPassengers = i + 1),
+                        checkValue: '${i + 1}',
+                      ),
+                    ),
+                  ),
+                  const Gap(12),
+
+                  // Drive Mode
+                  Text(
+                    'Drive Mode',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Gap(8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      _buildContextChip(
+                        '🌱 Eco',
+                        'Eco',
+                        _selectedDriveMode,
+                        (v) => setState(() => _selectedDriveMode = v),
+                      ),
+                      _buildContextChip(
+                        '⚡ Normal',
+                        'Normal',
+                        _selectedDriveMode,
+                        (v) => setState(() => _selectedDriveMode = v),
+                      ),
+                      _buildContextChip(
+                        '🚀 Sport',
+                        'Sport',
+                        _selectedDriveMode,
+                        (v) => setState(() => _selectedDriveMode = v),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
               const Gap(24),
 
               // Submit Button
@@ -392,14 +596,21 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
                 width: double.infinity,
                 child: FilledButton.icon(
                   onPressed: _isSubmitting ? null : _submit,
-                  icon: _isSubmitting 
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Icon(PhosphorIcons.checkCircle(PhosphorIconsStyle.fill)),
-                  label: Text(_isSubmitting ? 'Submitting...' : 'Submit Check-In (+${_calculatePoints()} pts)'),
+                  icon:
+                      _isSubmitting
+                          ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : Icon(
+                            PhosphorIcons.checkCircle(PhosphorIconsStyle.fill),
+                          ),
+                  label: Text(
+                    _isSubmitting
+                        ? 'Submitting...'
+                        : 'Submit Check-In (+${_calculatePoints()} pts)',
+                  ),
                 ),
               ),
             ],
@@ -423,11 +634,7 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
         padding: const EdgeInsets.symmetric(vertical: 16),
       ),
       child: Column(
-        children: [
-          Icon(icon, size: 32),
-          const Gap(8),
-          Text(label),
-        ],
+        children: [Icon(icon, size: 32), const Gap(8), Text(label)],
       ),
     );
   }
@@ -443,7 +650,7 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
   }) {
     final theme = Theme.of(context);
     final hasValue = controller.text.isNotEmpty;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -454,7 +661,10 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: hasValue ? Colors.green.withOpacity(0.1) : theme.colorScheme.surfaceContainerHighest,
+                color:
+                    hasValue
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -462,7 +672,10 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: hasValue ? Colors.green : theme.colorScheme.onSurfaceVariant,
+                  color:
+                      hasValue
+                          ? Colors.green
+                          : theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -479,10 +692,39 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
             suffixText: suffix,
             border: const OutlineInputBorder(),
             isDense: true,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildContextChip(
+    String label,
+    String? value,
+    String? selectedValue,
+    Function(String?) onSelect, {
+    String? checkValue,
+  }) {
+    final theme = Theme.of(context);
+    final isSelected = (checkValue ?? value) == selectedValue;
+
+    return FilterChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) {
+          onSelect(value ?? checkValue);
+        } else {
+          onSelect(null);
+        }
+      },
+      selectedColor: theme.colorScheme.primaryContainer,
+      checkmarkColor: theme.colorScheme.primary,
+      showCheckmark: false,
     );
   }
 
@@ -506,7 +748,10 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: hasFile ? Colors.green.withOpacity(0.1) : theme.colorScheme.surfaceContainerHighest,
+                color:
+                    hasFile
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -514,7 +759,10 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: hasFile ? Colors.green : theme.colorScheme.onSurfaceVariant,
+                  color:
+                      hasFile
+                          ? Colors.green
+                          : theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -531,51 +779,60 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
               ),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: hasFile
-                ? Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(7),
-                        child: Image.file(file, fit: BoxFit.cover),
-                      ),
-                      Positioned(
-                        top: 4,
-                        right: 4,
-                        child: GestureDetector(
-                          onTap: onRemove,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: const Icon(Icons.close, size: 14, color: Colors.white),
-                          ),
-                        ),
-                      ),
-                    ],
-                  )
-                : Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+            child:
+                hasFile
+                    ? Stack(
+                      fit: StackFit.expand,
                       children: [
-                        Icon(
-                          isSlip 
-                              ? PhosphorIcons.receipt(PhosphorIconsStyle.duotone)
-                              : PhosphorIcons.camera(PhosphorIconsStyle.duotone),
-                          color: theme.colorScheme.secondary,
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(7),
+                          child: Image.file(file, fit: BoxFit.cover),
                         ),
-                        const Gap(4),
-                        Text(
-                          isSlip ? 'Upload' : 'Take Photo',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.secondary,
+                        Positioned(
+                          top: 4,
+                          right: 4,
+                          child: GestureDetector(
+                            onTap: onRemove,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
                           ),
                         ),
                       ],
+                    )
+                    : Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            isSlip
+                                ? PhosphorIcons.receipt(
+                                  PhosphorIconsStyle.duotone,
+                                )
+                                : PhosphorIcons.camera(
+                                  PhosphorIconsStyle.duotone,
+                                ),
+                            color: theme.colorScheme.secondary,
+                          ),
+                          const Gap(4),
+                          Text(
+                            isSlip ? 'Upload' : 'Take Photo',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.secondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
           ),
         ),
       ],
@@ -608,7 +865,8 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
         status: _selectedStatus,
         stationId: _selectedStation?.id,
         rating: _rating,
-        comment: _commentController.text.isNotEmpty ? _commentController.text : null,
+        comment:
+            _commentController.text.isNotEmpty ? _commentController.text : null,
         imageUrl: imageUrl,
         batteryStartPercent: int.tryParse(_batteryStartController.text),
         batteryEndPercent: int.tryParse(_batteryEndController.text),
@@ -617,43 +875,51 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
         chargingSlipUrl: slipUrl,
         pointsEarned: pointsEarned,
         userName: user.name,
+        weather: _selectedWeather,
+        tripType: _selectedTripType,
+        passengerCount: _selectedPassengers,
+        driveMode: _selectedDriveMode,
       );
 
       if (mounted) {
         Navigator.pop(context);
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Awesome!'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(PhosphorIcons.lightning(PhosphorIconsStyle.fill), 
-                     size: 48, color: Colors.amber),
-                const Gap(16),
-                Text(
-                  'You earned +$pointsEarned Points!',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+          builder:
+              (context) => AlertDialog(
+                title: const Text('Awesome!'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      PhosphorIcons.lightning(PhosphorIconsStyle.fill),
+                      size: 48,
+                      color: Colors.amber,
+                    ),
+                    const Gap(16),
+                    Text(
+                      'You earned +$pointsEarned Points!',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (pointsEarned >= 30) ...[
+                      const Gap(8),
+                      Text(
+                        '🎉 Great job providing detailed info!',
+                        style: Theme.of(context).textTheme.bodySmall,
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
                 ),
-                if (pointsEarned >= 30) ...[
-                  const Gap(8),
-                  Text(
-                    '🎉 Great job providing detailed info!',
-                    style: Theme.of(context).textTheme.bodySmall,
-                    textAlign: TextAlign.center,
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('OK'),
                   ),
                 ],
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('OK'),
               ),
-            ],
-          ),
         );
       }
     } catch (e) {

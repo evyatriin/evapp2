@@ -1,15 +1,20 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'community_service.dart';
 import 'community_models.dart';
 
 final communityServiceProvider = Provider((ref) => CommunityService());
 
-final microCommunitiesProvider = FutureProvider<List<MicroCommunity>>((ref) async {
+final microCommunitiesProvider = FutureProvider<List<MicroCommunity>>((
+  ref,
+) async {
   final service = ref.watch(communityServiceProvider);
   return service.getMicroCommunities();
 });
 
-final feedProvider = AsyncNotifierProvider<FeedNotifier, List<FeedPost>>(FeedNotifier.new);
+final feedProvider = AsyncNotifierProvider<FeedNotifier, List<FeedPost>>(
+  FeedNotifier.new,
+);
 
 class FeedNotifier extends AsyncNotifier<List<FeedPost>> {
   int _offset = 0;
@@ -27,11 +32,11 @@ class FeedNotifier extends AsyncNotifier<List<FeedPost>> {
     _offset = 0;
     _hasMore = true;
     _isLoadingMore = false;
-    
+
     final posts = await service.getFeed(limit: _limit, offset: _offset);
     _offset += posts.length;
     if (posts.length < _limit) _hasMore = false;
-    
+
     return posts;
   }
 
@@ -42,18 +47,18 @@ class FeedNotifier extends AsyncNotifier<List<FeedPost>> {
     try {
       final service = ref.read(communityServiceProvider);
       final newPosts = await service.getFeed(limit: _limit, offset: _offset);
-      
+
       if (newPosts.isEmpty) {
         _hasMore = false;
       } else {
         _offset += newPosts.length;
         if (newPosts.length < _limit) _hasMore = false;
-        
+
         final currentPosts = state.value ?? [];
         state = AsyncValue.data([...currentPosts, ...newPosts]);
       }
     } catch (e) {
-      print('Error loading more posts: $e');
+      debugPrint('Error loading more posts: $e');
     } finally {
       _isLoadingMore = false;
     }

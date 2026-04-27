@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:gap/gap.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'sos_service.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../authentication/user_provider.dart';
 import '../vehicle_profile/vehicle_provider.dart';
 
 class SosScreen extends ConsumerStatefulWidget {
@@ -13,21 +15,21 @@ class SosScreen extends ConsumerStatefulWidget {
   ConsumerState<SosScreen> createState() => _SosScreenState();
 }
 
-class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProviderStateMixin {
+class _SosScreenState extends ConsumerState<SosScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   bool _isSending = false;
   final _formKey = GlobalKey<FormState>();
-  
+
   // Form Controllers
   final _carModelController = TextEditingController();
   final _phoneController = TextEditingController();
   final _messageController = TextEditingController();
   double _currentSoc = 20;
-  
-  // Mock Location (In real app, use Geolocator)
-  final double _latitude = 17.3850;
-  final double _longitude = 78.4867;
-  
+
+  Position? _currentPosition;
+  bool _isResolvingLocation = true;
+
   String? _selectedVehicleId;
 
   @override
@@ -37,6 +39,7 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
+    _resolveCurrentLocation();
   }
 
   @override
@@ -52,18 +55,16 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final vehicles = ref.watch(vehicleProvider);
-    
+
     // Auto-select first vehicle if available and none selected
     if (_selectedVehicleId == null && vehicles.isNotEmpty) {
       _selectedVehicleId = vehicles.first.id;
-      _carModelController.text = '${vehicles.first.brand} ${vehicles.first.model}';
+      _carModelController.text =
+          '${vehicles.first.brand} ${vehicles.first.model}';
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Emergency SOS'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Emergency SOS'), centerTitle: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -71,12 +72,18 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Icon(PhosphorIcons.warning(PhosphorIconsStyle.duotone), size: 64, color: theme.colorScheme.error),
+              Icon(
+                PhosphorIcons.warning(PhosphorIconsStyle.duotone),
+                size: 64,
+                color: theme.colorScheme.error,
+              ),
               const Gap(16),
               Text(
                 'Request Assistance',
                 textAlign: TextAlign.center,
-                style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const Gap(8),
               Text(
@@ -85,34 +92,49 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
                 style: theme.textTheme.bodyMedium,
               ),
               const Gap(32),
-              
+
               // Location (Read-only for now)
               TextFormField(
-                initialValue: '17.3850, 78.4867 (Current Location)',
+                initialValue: _locationLabel(),
                 readOnly: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'GPS Location',
-                  prefixIcon: Icon(Icons.location_on),
-                  border: OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.location_on),
+                  suffixIcon:
+                      _isResolvingLocation
+                          ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                          : IconButton(
+                            onPressed: _resolveCurrentLocation,
+                            icon: const Icon(Icons.refresh),
+                            tooltip: 'Refresh location',
+                          ),
                 ),
               ),
               const Gap(16),
-              
+
               // Car Model (Dropdown or Text)
               if (vehicles.isNotEmpty)
                 DropdownButtonFormField<String>(
-                  value: _selectedVehicleId,
+                  initialValue: _selectedVehicleId,
                   decoration: const InputDecoration(
                     labelText: 'Select Vehicle',
                     prefixIcon: Icon(Icons.directions_car),
                     border: OutlineInputBorder(),
                   ),
-                  items: vehicles.map((v) {
-                    return DropdownMenuItem(
-                      value: v.id,
-                      child: Text('${v.brand} ${v.model} ${v.variant}'),
-                    );
-                  }).toList(),
+                  items:
+                      vehicles.map((v) {
+                        return DropdownMenuItem(
+                          value: v.id,
+                          child: Text('${v.brand} ${v.model} ${v.variant}'),
+                        );
+                      }).toList(),
                   onChanged: (value) {
                     setState(() {
                       _selectedVehicleId = value;
@@ -130,10 +152,14 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
                     prefixIcon: Icon(Icons.directions_car),
                     border: OutlineInputBorder(),
                   ),
-                  validator: (value) => value == null || value.isEmpty ? 'Please enter car model' : null,
+                  validator:
+                      (value) =>
+                          value == null || value.isEmpty
+                              ? 'Please enter car model'
+                              : null,
                 ),
               const Gap(16),
-              
+
               // Phone Number
               TextFormField(
                 controller: _phoneController,
@@ -143,7 +169,11 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
                   prefixIcon: Icon(Icons.phone),
                   border: OutlineInputBorder(),
                 ),
-                validator: (value) => value == null || value.isEmpty ? 'Please enter phone number' : null,
+                validator:
+                    (value) =>
+                        value == null || value.isEmpty
+                            ? 'Please enter phone number'
+                            : null,
               ),
               const Gap(16),
 
@@ -153,28 +183,35 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
                 maxLines: 3,
                 decoration: const InputDecoration(
                   labelText: 'Message (Optional)',
-                  hintText: 'Describe your issue (e.g., Flat tyre, Out of charge)',
+                  hintText:
+                      'Describe your issue (e.g., Flat tyre, Out of charge)',
                   prefixIcon: Icon(Icons.message),
                   border: OutlineInputBorder(),
                   alignLabelWithHint: true,
                 ),
               ),
               const Gap(24),
-              
+
               // SOC Slider
-              Text('Current SOC: ${_currentSoc.round()}%', style: theme.textTheme.titleMedium),
+              Text(
+                'Current SOC: ${_currentSoc.round()}%',
+                style: theme.textTheme.titleMedium,
+              ),
               Slider(
                 value: _currentSoc,
                 min: 0,
                 max: 100,
                 divisions: 100,
                 label: _currentSoc.round().toString(),
-                activeColor: _currentSoc < 20 ? theme.colorScheme.error : theme.colorScheme.primary,
+                activeColor:
+                    _currentSoc < 20
+                        ? theme.colorScheme.error
+                        : theme.colorScheme.primary,
                 onChanged: (value) => setState(() => _currentSoc = value),
               ),
-              
+
               const Gap(32),
-              
+
               // SOS Button
               GestureDetector(
                 onTap: _isSending ? null : _handleSosPress,
@@ -185,33 +222,44 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
                       height: 80,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(40),
-                        color: _isSending ? Colors.grey : theme.colorScheme.error,
+                        color:
+                            _isSending ? Colors.grey : theme.colorScheme.error,
                         boxShadow: [
                           if (!_isSending)
                             BoxShadow(
-                              color: theme.colorScheme.error.withValues(alpha: 0.4),
+                              color: theme.colorScheme.error.withValues(
+                                alpha: 0.4,
+                              ),
                               blurRadius: 10 + (_controller.value * 10),
                               spreadRadius: 2 + (_controller.value * 5),
                             ),
                         ],
                       ),
                       child: Center(
-                        child: _isSending
-                            ? const CircularProgressIndicator(color: Colors.white)
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(Icons.sos, color: Colors.white, size: 32),
-                                  const Gap(12),
-                                  Text(
-                                    'SEND ALERT',
-                                    style: theme.textTheme.titleLarge?.copyWith(
+                        child:
+                            _isSending
+                                ? const CircularProgressIndicator(
+                                  color: Colors.white,
+                                )
+                                : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.sos,
                                       color: Colors.white,
-                                      fontWeight: FontWeight.bold,
+                                      size: 32,
                                     ),
-                                  ),
-                                ],
-                              ),
+                                    const Gap(12),
+                                    Text(
+                                      'SEND ALERT',
+                                      style: theme.textTheme.titleLarge
+                                          ?.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                  ],
+                                ),
                       ),
                     );
                   },
@@ -226,6 +274,14 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
 
   void _handleSosPress() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_currentPosition == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Current location is required before sending SOS'),
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isSending = true;
@@ -233,13 +289,15 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
 
     try {
       final service = SosService();
-      // TODO: Get actual user ID from Auth Provider
-      const userId = "user_123"; 
-      
+      final userId = ref.read(userProvider)?.id;
+      if (userId == null) {
+        throw Exception('Please log in before sending an SOS alert');
+      }
+
       final result = await service.sendSosAlert(
         userId: userId,
-        latitude: _latitude,
-        longitude: _longitude,
+        latitude: _currentPosition!.latitude,
+        longitude: _currentPosition!.longitude,
         carModel: _carModelController.text,
         phoneNumber: _phoneController.text,
         message: _messageController.text,
@@ -248,8 +306,10 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Success: ${result['message']} to ${result['users_notified']} users!'),
-            backgroundColor: Colors.green,
+            content: Text(
+              'Success: ${result['message']} to ${result['users_notified']} users!',
+            ),
+            backgroundColor: Theme.of(context).colorScheme.primary,
             duration: const Duration(seconds: 4),
           ),
         );
@@ -258,7 +318,10 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send alert: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Failed to send alert: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     } finally {
@@ -269,4 +332,59 @@ class _SosScreenState extends ConsumerState<SosScreen> with SingleTickerProvider
       }
     }
   }
+
+  String _locationLabel() {
+    if (_currentPosition == null) {
+      return _isResolvingLocation
+          ? 'Resolving current location...'
+          : 'Location unavailable. Refresh and try again.';
+    }
+    return '${_currentPosition!.latitude.toStringAsFixed(5)}, ${_currentPosition!.longitude.toStringAsFixed(5)}';
+  }
+
+  Future<void> _resolveCurrentLocation() async {
+    setState(() {
+      _isResolvingLocation = true;
+    });
+
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        throw Exception('Location permission is required to send an SOS alert');
+      }
+
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw Exception('Location services are disabled on this device');
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _currentPosition = position;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Location error: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResolvingLocation = false;
+        });
+      }
+    }
+  }
+
 }

@@ -6,6 +6,7 @@ import '../mapping/app_drawer.dart';
 import '../../core/ad_banner_widget.dart';
 import '../authentication/user_provider.dart';
 import '../community/gamification_widgets.dart';
+import '../vehicle_profile/vehicle_provider.dart';
 
 class MainScreen extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
@@ -25,12 +26,28 @@ class MainScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(userProvider);
+    final vehicles = ref.watch(vehicleProvider);
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('EV-Ranger'),
+        title: const Text('EVraahein'),
         centerTitle: false,
+        toolbarHeight: 44,
         actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: FilledButton.icon(
+              onPressed: () => context.push('/sos'),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+                minimumSize: Size.zero,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              label: const Text('SOS'),
+            ),
+          ),
           // Points Badge - shows user's current points
           if (user != null)
             Padding(
@@ -51,19 +68,32 @@ class MainScreen extends ConsumerWidget {
             icon: Icon(PhosphorIcons.userCircle(PhosphorIconsStyle.duotone)),
             onPressed: () => context.push('/profile'),
             tooltip: 'Profile',
+            visualDensity: VisualDensity.compact,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
         ],
       ),
       drawer: const AppDrawer(),
       body: Column(
         children: [
+          if (user != null && vehicles.isEmpty)
+            MaterialBanner(
+              content: const Text(
+                'Add your vehicle once so route planning, charging estimates, and OBD insights stay personalized.',
+              ),
+              leading: const Icon(Icons.directions_car_outlined),
+              actions: [
+                TextButton(
+                  onPressed: () => context.push('/setup/vehicle/add'),
+                  child: const Text('Add Vehicle'),
+                ),
+              ],
+            ),
           Expanded(child: navigationShell),
           const AdBannerWidget(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        height: 60, // Reduced from default 80
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: _goBranch,
@@ -86,7 +116,7 @@ class MainScreen extends ConsumerWidget {
           NavigationDestination(
             icon: Icon(PhosphorIcons.usersThree(PhosphorIconsStyle.duotone)),
             selectedIcon: Icon(PhosphorIcons.usersThree(PhosphorIconsStyle.fill)),
-            label: 'Resources',
+            label: 'Community',
           ),
         ],
       ),

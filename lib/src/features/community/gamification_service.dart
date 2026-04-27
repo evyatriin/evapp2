@@ -1,5 +1,8 @@
 import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+
 import '../../core/backend_service.dart';
 
 class Badge {
@@ -69,7 +72,7 @@ class GamificationService {
   Future<List<LeaderboardEntry>> getLeaderboard() async {
     try {
       final response = await http.get(Uri.parse('$_baseUrl/leaderboard'));
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((json) => LeaderboardEntry.fromJson(json)).toList();
@@ -77,7 +80,7 @@ class GamificationService {
         throw Exception('Failed to load leaderboard');
       }
     } catch (e) {
-      print('Error fetching leaderboard: $e');
+      debugPrint('Error fetching leaderboard: $e');
       return [];
     }
   }
@@ -85,7 +88,7 @@ class GamificationService {
   Future<List<Badge>> getBadges() async {
     try {
       final response = await http.get(Uri.parse('$_baseUrl/badges'));
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((json) => Badge.fromJson(json)).toList();
@@ -93,15 +96,17 @@ class GamificationService {
         throw Exception('Failed to load badges');
       }
     } catch (e) {
-      print('Error fetching badges: $e');
+      debugPrint('Error fetching badges: $e');
       return [];
     }
   }
 
   Future<List<Badge>> getUserBadges(String userId) async {
     try {
-      final response = await http.get(Uri.parse('$_baseUrl/badges/user/$userId'));
-      
+      final response = await http.get(
+        Uri.parse('$_baseUrl/badges/user/$userId'),
+      );
+
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((json) => Badge.fromJson(json['badge'])).toList();
@@ -109,11 +114,11 @@ class GamificationService {
         throw Exception('Failed to load user badges');
       }
     } catch (e) {
-      print('Error fetching user badges: $e');
+      debugPrint('Error fetching user badges: $e');
       return [];
     }
   }
-  
+
   Future<void> updateStreak(String userId) async {
     try {
       await http.post(
@@ -122,7 +127,7 @@ class GamificationService {
         body: jsonEncode({'user_id': userId}),
       );
     } catch (e) {
-      print('Error updating streak: $e');
+      debugPrint('Error updating streak: $e');
     }
   }
 }

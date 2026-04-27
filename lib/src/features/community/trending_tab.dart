@@ -69,34 +69,30 @@ class _TrendingTabState extends State<TrendingTab> {
               future: _newsService.getNews(category: _selectedCategory),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(PhosphorIcons.warning(PhosphorIconsStyle.duotone), 
-                             size: 48, color: Colors.grey),
-                        const Gap(16),
-                        Text('Error loading news', style: theme.textTheme.titleMedium),
-                      ],
+                  return _TrendingStateCard(
+                    icon: PhosphorIcons.newspaper(PhosphorIconsStyle.duotone),
+                    title: 'Loading latest updates',
+                    subtitle: 'Pulling EV stories and industry signals for you.',
+                    child: const Padding(
+                      padding: EdgeInsets.only(top: 12),
+                      child: CircularProgressIndicator(),
                     ),
                   );
                 }
 
+                if (snapshot.hasError) {
+                  return _TrendingStateCard(
+                    icon: PhosphorIcons.warning(PhosphorIconsStyle.duotone),
+                    title: 'Couldn\'t load updates',
+                    subtitle: 'Pull to retry and refresh the latest EV articles.',
+                  );
+                }
+
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(PhosphorIcons.newspaper(PhosphorIconsStyle.duotone), 
-                             size: 48, color: Colors.grey),
-                        const Gap(16),
-                        Text('No news available', style: theme.textTheme.titleMedium),
-                      ],
-                    ),
+                  return _TrendingStateCard(
+                    icon: PhosphorIcons.newspaper(PhosphorIconsStyle.duotone),
+                    title: 'No stories in this category',
+                    subtitle: 'Try another filter or refresh for newer coverage.',
                   );
                 }
 
@@ -128,26 +124,16 @@ class _NewsCard extends StatelessWidget {
       throw Exception('Could not launch ${article.sourceUrl}');
     }
   }
-
-  Color _getCategoryColor() {
-    switch (article.category) {
-      case 'vehicles':
-        return Colors.blue;
-      case 'policy':
-        return Colors.green;
-      case 'charging':
-        return Colors.amber;
-      case 'industry':
-        return Colors.purple;
-      default:
-        return Colors.grey;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final categoryColor = _getCategoryColor();
+    final categoryColor = switch (article.category) {
+      'vehicles' => theme.colorScheme.primary,
+      'policy' => theme.colorScheme.secondary,
+      'charging' => theme.colorScheme.tertiary,
+      'industry' => theme.colorScheme.error,
+      _ => theme.colorScheme.outline,
+    };
 
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -175,9 +161,12 @@ class _NewsCard extends StatelessWidget {
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Container(
                     height: 180,
-                    color: Colors.grey[300],
-                    child: Icon(PhosphorIcons.image(PhosphorIconsStyle.duotone), 
-                                size: 48, color: Colors.grey),
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    child: Icon(
+                      PhosphorIcons.image(PhosphorIconsStyle.duotone),
+                      size: 48,
+                      color: theme.colorScheme.outline,
+                    ),
                   ),
                 ),
               ),
@@ -247,7 +236,7 @@ class _NewsCard extends StatelessWidget {
                   Text(
                     article.summary,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey[700],
+                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
@@ -259,28 +248,28 @@ class _NewsCard extends StatelessWidget {
                   Row(
                     children: [
                       Icon(PhosphorIcons.newspaper(PhosphorIconsStyle.duotone), 
-                           size: 16, color: Colors.grey[600]),
+                           size: 16, color: theme.colorScheme.onSurfaceVariant),
                       const Gap(4),
                       Text(
                         article.sourceName,
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
+                          color: theme.colorScheme.onSurfaceVariant,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
                       const Gap(8),
                       Text(
                         '•',
-                        style: TextStyle(color: Colors.grey[600]),
+                        style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
                       ),
                       const Gap(8),
                       Icon(PhosphorIcons.clock(PhosphorIconsStyle.duotone), 
-                           size: 16, color: Colors.grey[600]),
+                           size: 16, color: theme.colorScheme.onSurfaceVariant),
                       const Gap(4),
                       Text(
                         timeago.format(article.publishedAt),
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: Colors.grey[600],
+                          color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
                       const Spacer(),
@@ -292,6 +281,55 @@ class _NewsCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TrendingStateCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget? child;
+
+  const _TrendingStateCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 44, color: theme.colorScheme.primary),
+              const Gap(12),
+              Text(title, style: theme.textTheme.titleMedium),
+              const Gap(6),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (child != null) child!,
+            ],
+          ),
         ),
       ),
     );

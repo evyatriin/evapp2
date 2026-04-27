@@ -1,176 +1,191 @@
 import 'package:flutter/material.dart';
+import 'package:gap/gap.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:gap/gap.dart';
 
-class ResourcesTab extends StatelessWidget {
+import 'content_service.dart';
+
+class ResourcesTab extends StatefulWidget {
   const ResourcesTab({super.key});
+
+  @override
+  State<ResourcesTab> createState() => _ResourcesTabState();
+}
+
+class _ResourcesTabState extends State<ResourcesTab> {
+  final _contentService = ContentService();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    return FutureBuilder<List<ResourceSectionModel>>(
+      future: _contentService.getResources(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _ResourcesState(
+            icon: PhosphorIcons.bookOpenText(PhosphorIconsStyle.duotone),
+            title: 'Loading practical EV guides',
+            subtitle: 'Pulling charging help, ownership tips, and emergency contacts.',
+            child: const CircularProgressIndicator(),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return _ResourcesState(
+            icon: PhosphorIcons.warningCircle(PhosphorIconsStyle.duotone),
+            title: 'Guides are unavailable right now',
+            subtitle: 'We could not load the latest help content. Pull to retry in a moment.',
+            child: FilledButton.icon(
+              onPressed: () => setState(() {}),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('Retry'),
+            ),
+          );
+        }
+
+        final sections = snapshot.data ?? const <ResourceSectionModel>[];
+        if (sections.isEmpty) {
+          return _ResourcesState(
+            icon: PhosphorIcons.bookmarksSimple(PhosphorIconsStyle.duotone),
+            title: 'No guides published yet',
+            subtitle: 'This area will fill with charging help, policy tips, and emergency resources.',
+            child: const SizedBox.shrink(),
+          );
+        }
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(
+              'Practical EV Guides',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const Gap(8),
+            Text(
+              'Charging help, ownership advice, and emergency support you can act on quickly.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const Gap(24),
+            ...sections.map(
+              (section) => Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: _ResourceSection(section: section),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ResourcesState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _ResourcesState({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return ListView(
-      padding: const EdgeInsets.all(16),
+      physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        Text(
-          'EV Resources',
-          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+        SizedBox(
+          height: 420,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, size: 34, color: theme.colorScheme.primary),
+                  ),
+                  const Gap(18),
+                  Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const Gap(8),
+                  Text(
+                    subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const Gap(18),
+                  child,
+                ],
+              ),
+            ),
+          ),
         ),
-        const Gap(8),
-        Text(
-          'Everything you need to know about EV ownership',
-          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-        ),
-        const Gap(24),
-
-        // Charging Guides
-        _ResourceSection(
-          icon: PhosphorIcons.lightning(PhosphorIconsStyle.duotone),
-          title: 'Charging Guides',
-          color: Colors.amber,
-          items: const [
-            _ResourceItem(
-              title: 'Understanding Connector Types',
-              subtitle: 'CCS, CHAdeMO, Type 2 explained',
-              url: 'https://evyatra.com/charging-connectors',
-            ),
-            _ResourceItem(
-              title: 'Charging Etiquette',
-              subtitle: 'Best practices at public chargers',
-              url: 'https://evyatra.com/charging-etiquette',
-            ),
-            _ResourceItem(
-              title: 'AC vs DC Charging',
-              subtitle: 'Speed differences and when to use',
-              url: 'https://evyatra.com/ac-vs-dc',
-            ),
-          ],
-        ),
-
-        const Gap(16),
-
-        // Ownership Tips
-        _ResourceSection(
-          icon: PhosphorIcons.car(PhosphorIconsStyle.duotone),
-          title: 'EV Ownership Tips',
-          color: Colors.blue,
-          items: const [
-            _ResourceItem(
-              title: 'Battery Care Guide',
-              subtitle: 'Maximize battery life and health',
-              url: 'https://evyatra.com/battery-care',
-            ),
-            _ResourceItem(
-              title: 'Range Optimization',
-              subtitle: 'Get the most out of every charge',
-              url: 'https://evyatra.com/range-tips',
-            ),
-            _ResourceItem(
-              title: 'Seasonal Driving Tips',
-              subtitle: 'Winter and summer best practices',
-              url: 'https://evyatra.com/seasonal-tips',
-            ),
-          ],
-        ),
-
-        const Gap(16),
-
-        // Government Schemes
-        _ResourceSection(
-          icon: PhosphorIcons.bank(PhosphorIconsStyle.duotone),
-          title: 'Government Schemes',
-          color: Colors.green,
-          items: const [
-            _ResourceItem(
-              title: 'FAME II Subsidy',
-              subtitle: 'Central government EV incentives',
-              url: 'https://fame2.heavyindustries.gov.in/',
-            ),
-            _ResourceItem(
-              title: 'State EV Policies',
-              subtitle: 'State-specific benefits and subsidies',
-              url: 'https://evyatra.com/state-policies',
-            ),
-            _ResourceItem(
-              title: 'Tax Benefits',
-              subtitle: 'Income tax deductions for EV owners',
-              url: 'https://evyatra.com/tax-benefits',
-            ),
-          ],
-        ),
-
-        const Gap(16),
-
-        // Emergency Contacts
-        _ResourceSection(
-          icon: PhosphorIcons.phone(PhosphorIconsStyle.duotone),
-          title: 'Emergency Contacts',
-          color: Colors.red,
-          items: const [
-            _ResourceItem(
-              title: 'Tata Motors EV Support',
-              subtitle: 'Tap to call: 1800-209-7979',
-              url: 'tel:18002097979',
-            ),
-            _ResourceItem(
-              title: 'MG Motor Support',
-              subtitle: 'Tap to call: 1800-102-4644',
-              url: 'tel:18001024644',
-            ),
-            _ResourceItem(
-              title: 'Hyundai EV Helpline',
-              subtitle: 'Tap to call: 1800-11-4645',
-              url: 'tel:1800114645',
-            ),
-          ],
-        ),
-
-        // TODO: Enable Useful Links when ready
-        // const Gap(16),
-        // _ResourceSection(
-        //   icon: PhosphorIcons.link(PhosphorIconsStyle.duotone),
-        //   title: 'Useful Links',
-        //   color: Colors.purple,
-        //   items: const [
-        //     _ResourceItem(
-        //       title: 'EV Yatra',
-        //       subtitle: 'Comprehensive EV information portal',
-        //       url: 'https://evyatra.com',
-        //     ),
-        //     _ResourceItem(
-        //       title: 'Charging Station Finder',
-        //       subtitle: 'Find chargers across India',
-        //       url: 'https://evyatra.com/charging-stations',
-        //     ),
-        //     _ResourceItem(
-        //       title: 'EV Forums India',
-        //       subtitle: 'Connect with EV community',
-        //       url: 'https://evyatra.com/forums',
-        //     ),
-        //   ],
-        // ),
       ],
     );
   }
 }
 
 class _ResourceSection extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final Color color;
-  final List<_ResourceItem> items;
+  final ResourceSectionModel section;
 
-  const _ResourceSection({
-    required this.icon,
-    required this.title,
-    required this.color,
-    required this.items,
-  });
+  const _ResourceSection({required this.section});
+
+  Color _toneColor(ThemeData theme) {
+    switch (section.tone) {
+      case 'amber':
+        return theme.colorScheme.tertiary;
+      case 'blue':
+        return theme.colorScheme.secondary;
+      case 'green':
+        return theme.colorScheme.primary;
+      case 'red':
+        return theme.colorScheme.error;
+      default:
+        return theme.colorScheme.primary;
+    }
+  }
+
+  IconData _iconData() {
+    switch (section.icon) {
+      case 'lightning':
+        return PhosphorIcons.lightning(PhosphorIconsStyle.duotone);
+      case 'car':
+        return PhosphorIcons.car(PhosphorIconsStyle.duotone);
+      case 'bank':
+        return PhosphorIcons.bank(PhosphorIconsStyle.duotone);
+      case 'phone':
+        return PhosphorIcons.phone(PhosphorIconsStyle.duotone);
+      default:
+        return PhosphorIcons.bookOpenText(PhosphorIconsStyle.duotone);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final color = _toneColor(theme);
 
     return Card(
       elevation: 2,
@@ -188,20 +203,40 @@ class _ResourceSection extends StatelessWidget {
                     color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(icon, color: color, size: 24),
+                  child: Icon(_iconData(), color: color, size: 24),
                 ),
                 const Gap(12),
-                Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        section.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (section.description.isNotEmpty) ...[
+                        const Gap(2),
+                        Text(
+                          section.description,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
               ],
             ),
             const Gap(16),
-            ...items.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: item,
-            )),
+            ...section.items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _ResourceItem(item: item),
+              ),
+            ),
           ],
         ),
       ),
@@ -210,20 +245,14 @@ class _ResourceSection extends StatelessWidget {
 }
 
 class _ResourceItem extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final String url;
+  final ResourceItemModel item;
 
-  const _ResourceItem({
-    required this.title,
-    required this.subtitle,
-    required this.url,
-  });
+  const _ResourceItem({required this.item});
 
   Future<void> _launchUrl() async {
-    final uri = Uri.parse(url);
+    final uri = Uri.parse(item.url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      throw Exception('Could not launch $url');
+      throw Exception('Could not launch ${item.url}');
     }
   }
 
@@ -243,13 +272,17 @@ class _ResourceItem extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    title,
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    item.title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const Gap(4),
                   Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
+                    item.subtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),

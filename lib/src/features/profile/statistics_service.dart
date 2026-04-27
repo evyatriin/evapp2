@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../core/backend_service.dart';
 
@@ -44,10 +45,12 @@ class UserStatistics {
 class StatisticsService {
   Future<UserStatistics> getUserStatistics(String userId) async {
     try {
-      final response = await BackendService.get('/api/users/$userId/statistics');
+      final response = await BackendService.get(
+        '/api/users/$userId/statistics',
+      );
       return UserStatistics.fromJson(response);
     } catch (e) {
-      print('Error fetching statistics: $e');
+      debugPrint('Error fetching statistics: $e');
       // Return empty stats on error
       return UserStatistics.empty();
     }

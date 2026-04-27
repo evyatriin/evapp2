@@ -17,12 +17,11 @@ class CommunityScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return DefaultTabController(
-      length: 3, // Reduced from 5 - For You and My Communities commented out
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Resource Hub'),
+          title: const Text('Community'),
           centerTitle: false,
-          toolbarHeight: 48,
           actions: [
             Padding(
               padding: const EdgeInsets.only(right: 8),
@@ -33,7 +32,10 @@ class CommunityScreen extends ConsumerWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: theme.colorScheme.error,
                   foregroundColor: theme.colorScheme.onError,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 4,
+                  ),
                 ),
               ),
             ),
@@ -45,11 +47,8 @@ class CommunityScreen extends ConsumerWidget {
               tabAlignment: TabAlignment.start,
               labelPadding: const EdgeInsets.symmetric(horizontal: 12),
               tabs: const [
-                // TODO: Enable these tabs when features are ready
-                // Tab(text: 'For You', height: 36),
-                // Tab(text: 'My Communities', height: 36),
                 Tab(text: 'Trending', height: 36),
-                Tab(text: 'Resources', height: 36),
+                Tab(text: 'Guides', height: 36),
                 Tab(text: 'Leaderboard', height: 36),
               ],
             ),
@@ -57,31 +56,11 @@ class CommunityScreen extends ConsumerWidget {
         ),
         body: TabBarView(
           children: [
-            // TODO: Enable these tabs when features are ready
-            // const _ForYouTab(),
-            // _buildPlaceholderTab(context, 'My Communities'),
             const TrendingTab(),
             const ResourcesTab(),
             const LeaderboardScreen(),
           ],
         ),
-        floatingActionButton: FloatingActionButton(
-          onPressed: () {},
-          child: const Icon(Icons.add),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPlaceholderTab(BuildContext context, String title) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(PhosphorIcons.wrench(PhosphorIconsStyle.duotone), size: 48, color: Colors.grey),
-          const Gap(16),
-          Text('$title Coming Soon', style: Theme.of(context).textTheme.titleMedium),
-        ],
       ),
     );
   }
@@ -110,7 +89,8 @@ class _ForYouTabState extends ConsumerState<_ForYouTab> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       ref.read(feedProvider.notifier).loadMore();
     }
   }
@@ -122,7 +102,7 @@ class _ForYouTabState extends ConsumerState<_ForYouTab> {
 
     return RefreshIndicator(
       onRefresh: () async {
-        ref.refresh(microCommunitiesProvider);
+        ref.invalidate(microCommunitiesProvider);
         await ref.read(feedProvider.notifier).refresh();
       },
       child: CustomScrollView(
@@ -138,8 +118,15 @@ class _ForYouTabState extends ConsumerState<_ForYouTab> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Micro-Communities', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                      TextButton(onPressed: () {}, child: const Text('See All')),
+                      Text(
+                        'Micro-Communities',
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      TextButton(
+                        onPressed: () {},
+                        child: const Text('See All'),
+                      ),
                     ],
                   ),
                 ),
@@ -147,7 +134,11 @@ class _ForYouTabState extends ConsumerState<_ForYouTab> {
                   height: 140,
                   child: microCommunitiesAsync.when(
                     data: (communities) {
-                      if (communities.isEmpty) return const Center(child: Text('No communities found'));
+                      if (communities.isEmpty) {
+                        return const Center(
+                          child: Text('No communities found'),
+                        );
+                      }
                       return ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -162,54 +153,70 @@ class _ForYouTabState extends ConsumerState<_ForYouTab> {
                         },
                       );
                     },
-                    loading: () => const Center(child: CircularProgressIndicator()),
+                    loading:
+                        () => const Center(child: CircularProgressIndicator()),
                     error: (e, s) => Center(child: Text('Error: $e')),
                   ),
                 ),
                 const Divider(height: 16),
-                
+
                 // Feed Section Header
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('Latest Discussions', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Latest Discussions',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 const Gap(8),
               ]),
             ),
           ),
-          
+
           // Feed List
           feedAsync.when(
             data: (posts) {
               if (posts.isEmpty) {
-                return const SliverToBoxAdapter(child: Center(child: Text('No posts yet')));
+                return const SliverToBoxAdapter(
+                  child: Center(child: Text('No posts yet')),
+                );
               }
               return SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final post = posts[index];
-                    return _FeedPostCard(
-                      avatarUrl: post.avatarUrl,
-                      userName: post.userName,
-                      timeAgo: post.timeAgo,
-                      title: post.title,
-                      content: post.content,
-                      likes: post.likes,
-                      comments: post.comments,
-                      isAlert: post.isAlert,
-                      isOfficial: post.isOfficial,
-                      hasImage: post.hasImage,
-                      imageUrl: post.imageUrl,
-                    );
-                  },
-                  childCount: posts.length,
-                ),
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final post = posts[index];
+                  return _FeedPostCard(
+                    avatarUrl: post.avatarUrl,
+                    userName: post.userName,
+                    timeAgo: post.timeAgo,
+                    title: post.title,
+                    content: post.content,
+                    likes: post.likes,
+                    comments: post.comments,
+                    isAlert: post.isAlert,
+                    isOfficial: post.isOfficial,
+                    hasImage: post.hasImage,
+                    imageUrl: post.imageUrl,
+                  );
+                }, childCount: posts.length),
               );
             },
-            loading: () => const SliverToBoxAdapter(child: Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))),
-            error: (e, s) => SliverToBoxAdapter(child: Center(child: Text('Error loading feed: $e'))),
+            loading:
+                () => const SliverToBoxAdapter(
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(32),
+                      child: CircularProgressIndicator(),
+                    ),
+                  ),
+                ),
+            error:
+                (e, s) => SliverToBoxAdapter(
+                  child: Center(child: Text('Error loading feed: $e')),
+                ),
           ),
-          
+
           // Bottom padding
           const SliverPadding(padding: EdgeInsets.only(bottom: 20)),
         ],
@@ -223,7 +230,11 @@ class _MicroCommunityCard extends StatelessWidget {
   final String members;
   final String image;
 
-  const _MicroCommunityCard({required this.name, required this.members, required this.image});
+  const _MicroCommunityCard({
+    required this.name,
+    required this.members,
+    required this.image,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -236,30 +247,42 @@ class _MicroCommunityCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
-              child: image.isNotEmpty
-                  ? Image.network(
-                      image,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      cacheWidth: 280,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Container(
-                          color: Colors.grey[200],
-                          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                        );
-                      },
-                      errorBuilder: (c, e, s) => Container(color: Colors.grey[300]),
-                    )
-                  : Container(color: Colors.grey[300]),
+              child:
+                  image.isNotEmpty
+                      ? Image.network(
+                        image,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        cacheWidth: 280,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: Colors.grey[200],
+                            child: const Center(
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        },
+                        errorBuilder:
+                            (c, e, s) => Container(color: Colors.grey[300]),
+                      )
+                      : Container(color: Colors.grey[300]),
             ),
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name, style: Theme.of(context).textTheme.labelLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  Text('$members members', style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    name,
+                    style: Theme.of(context).textTheme.labelLarge,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    '$members members',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ],
               ),
             ),
@@ -300,7 +323,7 @@ class _FeedPostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       elevation: 1,
@@ -315,7 +338,8 @@ class _FeedPostCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundImage: avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
+                  backgroundImage:
+                      avatarUrl.isNotEmpty ? NetworkImage(avatarUrl) : null,
                   onBackgroundImageError: (e, s) {},
                   child: const Icon(Icons.person, size: 16),
                 ),
@@ -326,11 +350,20 @@ class _FeedPostCard extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Text(userName, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold)),
+                          Text(
+                            userName,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                           if (isOfficial) ...[
                             const Gap(4),
-                            Icon(Icons.verified, size: 14, color: theme.colorScheme.primary),
-                          ]
+                            Icon(
+                              Icons.verified,
+                              size: 14,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ],
                         ],
                       ),
                       Text(timeAgo, style: theme.textTheme.bodySmall),
@@ -339,36 +372,53 @@ class _FeedPostCard extends StatelessWidget {
                 ),
                 if (isAlert)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: theme.colorScheme.errorContainer,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.warning_amber, size: 14, color: theme.colorScheme.error),
+                        Icon(
+                          Icons.warning_amber,
+                          size: 14,
+                          color: theme.colorScheme.error,
+                        ),
                         const Gap(4),
-                        Text('Alert', style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.error)),
+                        Text(
+                          'Alert',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
                       ],
                     ),
                   ),
               ],
             ),
             const Gap(12),
-            
+
             // Content
-            Text(title, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const Gap(4),
             Text(content, style: theme.textTheme.bodyMedium),
-            
+
             if (hasImage && imageUrl != null && imageUrl!.isNotEmpty) ...[
               const Gap(12),
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: Image.network(
-                  imageUrl!, 
-                  width: double.infinity, 
-                  height: 180, 
+                  imageUrl!,
+                  width: double.infinity,
+                  height: 180,
                   fit: BoxFit.cover,
                   cacheWidth: 800,
                   loadingBuilder: (context, child, loadingProgress) {
@@ -376,28 +426,45 @@ class _FeedPostCard extends StatelessWidget {
                     return Container(
                       height: 180,
                       color: Colors.grey[200],
-                      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      child: const Center(
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
                     );
                   },
-                  errorBuilder: (context, error, stackTrace) => Container(
-                    height: 180,
-                    color: Colors.grey[300],
-                    child: const Center(child: Icon(Icons.broken_image, size: 48, color: Colors.grey)),
-                  ),
+                  errorBuilder:
+                      (context, error, stackTrace) => Container(
+                        height: 180,
+                        color: Colors.grey[300],
+                        child: const Center(
+                          child: Icon(
+                            Icons.broken_image,
+                            size: 48,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ),
                 ),
               ),
             ],
-            
+
             const Gap(12),
             const Divider(height: 1),
-            
+
             // Actions
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildActionButton(context, PhosphorIcons.thumbsUp(), '$likes'),
-                _buildActionButton(context, PhosphorIcons.chatCircle(), '$comments'),
-                _buildActionButton(context, PhosphorIcons.shareNetwork(), 'Share'),
+                _buildActionButton(
+                  context,
+                  PhosphorIcons.chatCircle(),
+                  '$comments',
+                ),
+                _buildActionButton(
+                  context,
+                  PhosphorIcons.shareNetwork(),
+                  'Share',
+                ),
               ],
             ),
           ],
@@ -415,7 +482,13 @@ class _FeedPostCard extends StatelessWidget {
           children: [
             Icon(icon, size: 20, color: Colors.grey[600]),
             const Gap(6),
-            Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.bold, color: Colors.grey[600])),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[600],
+              ),
+            ),
           ],
         ),
       ),
