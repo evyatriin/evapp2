@@ -1,6 +1,0 @@
-<step title="Incoming Request" date="2025-12-01T15:24:09.738" instance="761fac" url="/logstream" method="GET" type="request" pid="768,1,3" Host="evyatribackend-bqc7hqdjgaezh6gd.scm.southindia-01.azurewebsites.net" User-Agent="AZURECLI/2.80.0 (HOMEBREW)" Accept-Encoding="identity" Authorization="Bea..." x-ms-client-request-id="c5f42dce-cec9-11f0-bdad-4ef58866546f" X-ARR-LOG-ID="c5f42dce-cec9-11f0-bdad-4ef58866546f" CLIENT-IP="49.37.135.35:53114" X-SITE-DEPLOYMENT-ID="evyatribackend" WAS-DEFAULT-HOSTNAME="evyatribackend-bqc7hqdjgaezh6gd.scm.southindia-01.azurewebsites.net" X-Forwarded-Proto="https" X-AppService-Proto="https" X-Forwarded-TlsVersion="1.3" X-WAWS-Unencoded-URL="/logstream" X-Client-IP="49.37.135.35" X-Client-Port="53114" >
-  <step title="Cleanup Xml Logs" date="2025-12-01T15:24:09.742" /><!-- duration: 6ms -->
-  <step title="LogStreamHandlerMiddleware.Invoke" date="2025-12-01T15:24:09.784" /><!-- duration: 57ms -->
-  <step title="Error occurred" date="2025-12-01T15:25:09.843" type="error" text="LogStreamManager: ProcessRequest end" /><!-- duration: 5ms -->
-  <step title="Outgoing response" date="2025-12-01T15:25:09.853" type="response" statusCode="200" statusText="OK" /><!-- duration: 2ms -->
-</step><!-- duration: 60119ms -->
