@@ -272,6 +272,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         ref.read(mapZoomProvider.notifier).update(_currentZoom);
                       }
                     },
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: false,
+                  ),
+
+                  // My Location Button
+                  Positioned(
+                    bottom: 90,
+                    right: 12,
+                    child: FloatingActionButton.small(
+                      heroTag: 'map_my_location',
+                      tooltip: 'Center on my location',
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                      elevation: 2,
+                      onPressed: () => _bootstrapMapLocation(showErrors: true),
+                      child: const Icon(Icons.my_location, size: 20),
+                    ),
                   ),
 
                   // Streak Widget Overlay
