@@ -21,8 +21,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
 
   // Step 1: Profile
   final _nameController = TextEditingController();
-  final _phoneController = TextEditingController();
-  bool _isPhoneVerified = false;
 
   // Step 2: Location
   bool _locationGranted = false;
@@ -45,7 +43,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   void dispose() {
     _pageController.dispose();
     _nameController.dispose();
-    _phoneController.dispose();
     super.dispose();
   }
 
@@ -53,63 +50,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     _pageController.nextPage(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
-    );
-  }
-
-  Future<void> _verifyPhone() async {
-    if (_phoneController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a phone number')),
-      );
-      return;
-    }
-
-    // Mock OTP Flow
-    final otpController = TextEditingController();
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Verify Phone'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Enter the OTP sent to your phone (Mock: 123456)'),
-            const Gap(16),
-            TextField(
-              controller: otpController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'OTP',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (otpController.text == '123456') {
-                setState(() {
-                  _isPhoneVerified = true;
-                });
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Phone verified successfully!')),
-                );
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Invalid OTP')),
-                );
-              }
-            },
-            child: const Text('Verify'),
-          ),
-        ],
-      ),
     );
   }
 
@@ -151,8 +91,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       }
 
       await ref.read(userProvider.notifier).completeOnboarding(
-        phoneNumber: _phoneController.text,
-        isPhoneVerified: _isPhoneVerified,
+        phoneNumber: '',
+        isPhoneVerified: false,
         vehicleDetails: {}, // Vehicle will be added via vehicle selection screen
       );
 
@@ -242,10 +182,6 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your name')));
                           return;
                         }
-                        if (_phoneController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your phone number')));
-                          return;
-                        }
                         // Navigate to vehicle selection screen
                         context.push('/onboarding/vehicle-select');
                         _nextPage();
@@ -289,56 +225,43 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
             ),
           ),
           const Gap(24),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _phoneController,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone Number',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.phone_outlined),
-                  ),
-                  onChanged: (_) => setState(() => _isPhoneVerified = false), // Reset verification on change
-                ),
-              ),
-              const Gap(16),
-              if (_isPhoneVerified)
-                const Icon(Icons.check_circle, color: Colors.green, size: 32)
-              else
-                FilledButton(
-                  onPressed: _verifyPhone,
-                  child: const Text('Verify'),
-                ),
-                const Gap(8),
-                TextButton(
-                  onPressed: () {
-                    // Validation logic for profile step
-                    if (_nameController.text.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your name')));
-                      return;
-                    }
-                    if (_phoneController.text.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your phone number')));
-                      return;
-                    }
-                    
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone verification skipped')));
-                    
-                    // Navigate to vehicle selection screen
-                    context.push('/onboarding/vehicle-select');
-                    _nextPage();
-                  },
-                  child: const Text('Skip'),
-                ),
-            ],
-          ),
-          if (_isPhoneVerified)
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: Text('Phone verified', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(20),
             ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.phone_outlined,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const Gap(12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Phone verification moved to profile settings',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Gap(4),
+                      Text(
+                        'You can finish setup faster now and add your phone later from Profile when you want SOS and community help enabled.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

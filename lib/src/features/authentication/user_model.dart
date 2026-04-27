@@ -3,6 +3,7 @@ class UserProfile {
   final String name;
   final String email;
   final String? profileImageUrl;
+  final String? phoneNumber;
   final bool isPhoneVerified;
   final int points;
   final int streak;
@@ -13,6 +14,7 @@ class UserProfile {
     required this.name,
     required this.email,
     this.profileImageUrl,
+    this.phoneNumber,
     this.isPhoneVerified = false,
     this.points = 0,
     this.streak = 0,
@@ -24,6 +26,7 @@ class UserProfile {
     String? name,
     String? email,
     String? profileImageUrl,
+    String? phoneNumber,
     bool? isPhoneVerified,
     int? points,
     int? streak,
@@ -34,6 +37,7 @@ class UserProfile {
       name: name ?? this.name,
       email: email ?? this.email,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
       points: points ?? this.points,
       streak: streak ?? this.streak,
@@ -48,6 +52,7 @@ class UserProfile {
       name: json['name'] as String,
       email: json['email'] as String,
       profileImageUrl: json['profile_image_url'] as String?,
+      phoneNumber: json['phone_number'] as String?,
       isPhoneVerified: json['is_phone_verified'] as bool? ?? false,
       points: json['points'] as int? ?? 0,
       streak: json['streak'] as int? ?? 0,
@@ -61,6 +66,7 @@ class UserProfile {
       'name': name,
       'email': email,
       'profile_image_url': profileImageUrl,
+      'phone_number': phoneNumber,
       'is_phone_verified': isPhoneVerified,
       'points': points,
       'streak': streak,

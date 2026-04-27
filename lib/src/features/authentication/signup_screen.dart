@@ -24,6 +24,20 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
+  String _formatSignupError(Object error) {
+    final raw = error.toString();
+    if (raw.contains('Failed host lookup') || raw.contains('SocketException')) {
+      return 'Could not reach the authentication server. Please update the app or try again on a stable network.';
+    }
+    if (raw.contains('email_address_invalid')) {
+      return 'Please enter a valid email address.';
+    }
+    if (raw.contains('User already registered')) {
+      return 'An account with this email already exists.';
+    }
+    return 'Signup failed. Please try again.';
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -85,7 +99,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Signup failed: ${e.toString()}'),
+            content: Text(_formatSignupError(e)),
             backgroundColor: Colors.red,
           ),
         );
@@ -121,7 +135,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   ),
                   const Gap(16),
                   Text(
-                    'EV-Ranger',
+                    'EVraahein',
                     style: theme.textTheme.headlineLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,

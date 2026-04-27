@@ -31,7 +31,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
   File? _photoFile;
   List<String> _selectedNetworks = [];
   bool _isUploading = false;
-  
+
   final List<String> _availableNetworks = [
     'Tesla Supercharger',
     'Tata Power',
@@ -63,52 +63,60 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(isEditing ? 'Edit Vehicle' : 'Add Vehicle'),
-        centerTitle: true,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         children: [
-          const Gap(20),
-          Icon(
-            PhosphorIcons.carProfile(PhosphorIconsStyle.duotone),
-            size: 64,
-            color: theme.colorScheme.primary,
+          AppCard(
+            child: Column(
+              children: [
+                Icon(
+                  PhosphorIcons.carProfile(PhosphorIconsStyle.duotone),
+                  size: 52,
+                  color: theme.colorScheme.primary,
+                ),
+                const Gap(12),
+                Text(
+                  'Vehicle basics',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Gap(14),
+                _buildDropdown(
+                  context,
+                  label: 'Brand',
+                  value: _brand,
+                  items: ['Tata', 'MG', 'Hyundai', 'Mahindra'],
+                  onChanged: (val) => setState(() => _brand = val!),
+                ),
+                const Gap(12),
+                _buildDropdown(
+                  context,
+                  label: 'Model',
+                  value: _model,
+                  items: ['Nexon EV', 'Tiago EV', 'ZS EV', 'Kona', 'XUV 400'],
+                  onChanged: (val) => setState(() => _model = val!),
+                ),
+                const Gap(12),
+                _buildDropdown(
+                  context,
+                  label: 'Variant',
+                  value: _variant,
+                  items: ['Prime', 'Max', 'Excite', 'Exclusive'],
+                  onChanged: (val) => setState(() => _variant = val!),
+                ),
+              ],
+            ),
           ),
-          const Gap(32),
-          _buildDropdown(
-            context,
-            label: 'Brand',
-            value: _brand,
-            items: ['Tata', 'MG', 'Hyundai', 'Mahindra'],
-            onChanged: (val) => setState(() => _brand = val!),
-          ),
-          const Gap(16),
-          _buildDropdown(
-            context,
-            label: 'Model',
-            value: _model,
-            items: ['Nexon EV', 'Tiago EV', 'ZS EV', 'Kona', 'XUV 400'],
-            onChanged: (val) => setState(() => _model = val!),
-          ),
-          const Gap(16),
-          _buildDropdown(
-            context,
-            label: 'Variant',
-            value: _variant,
-            items: ['Prime', 'Max', 'Excite', 'Exclusive'],
-            onChanged: (val) => setState(() => _variant = val!),
-          ),
-          const Gap(16),
-          _buildImagePicker(theme),
-          const Gap(16),
-          _buildPhotoPicker(theme),
-          const Gap(16),
-          _buildChargingNetworkSelector(theme),
-          const Gap(40),
-          Text(
-            'Real World Range Estimate',
-            style: theme.textTheme.titleMedium,
-          ),
+          const Gap(14),
+          AppCard(child: _buildImagePicker(theme)),
+          const Gap(14),
+          AppCard(child: _buildPhotoPicker(theme)),
+          const Gap(14),
+          AppCard(child: _buildChargingNetworkSelector(theme)),
+          const Gap(14),
+          Text('Range estimate', style: theme.textTheme.titleMedium),
           const Gap(8),
           AppCard(
             color: theme.colorScheme.surfaceContainerHighest,
@@ -153,7 +161,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
               ],
             ),
           ),
-          const Gap(40),
+          const Gap(20),
           AppButton(
             label: 'Save Vehicle',
             icon: Icons.save,
@@ -173,12 +181,13 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
     required ValueChanged<String?> onChanged,
   }) {
     return DropdownButtonFormField<String>(
-      value: items.contains(value) ? value : items.first,
+      initialValue: items.contains(value) ? value : items.first,
       decoration: InputDecoration(
         labelText: label,
         border: const OutlineInputBorder(),
       ),
-      items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+      items:
+          items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
       onChanged: onChanged,
     );
   }
@@ -187,7 +196,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Vehicle Image', style: theme.textTheme.titleSmall),
+        Text('Reference image', style: theme.textTheme.titleSmall),
         const Gap(8),
         InkWell(
           onTap: _pickImage,
@@ -199,35 +208,48 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
               color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: theme.colorScheme.outlineVariant),
-              image: _imageUrl != null
-                  ? DecorationImage(
-                      image: _getImageProvider(_imageUrl!),
-                      fit: BoxFit.cover,
-                    )
-                  : null,
+              image:
+                  _imageUrl != null
+                      ? DecorationImage(
+                        image: _getImageProvider(_imageUrl!),
+                        fit: BoxFit.cover,
+                      )
+                      : null,
             ),
-            child: _imageUrl == null
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(PhosphorIcons.camera(PhosphorIconsStyle.duotone), size: 32, color: theme.colorScheme.primary),
-                      const Gap(8),
-                      Text('Tap to add image', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.primary)),
-                    ],
-                  )
-                : Stack(
-                    children: [
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: IconButton.filled(
-                          onPressed: () => setState(() => _imageUrl = null),
-                          icon: const Icon(Icons.close),
-                          style: IconButton.styleFrom(backgroundColor: theme.colorScheme.error),
+            child:
+                _imageUrl == null
+                    ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          PhosphorIcons.camera(PhosphorIconsStyle.duotone),
+                          size: 32,
+                          color: theme.colorScheme.primary,
                         ),
-                      ),
-                    ],
-                  ),
+                        const Gap(8),
+                        Text(
+                          'Tap to add image',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    )
+                    : Stack(
+                      children: [
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: IconButton.filled(
+                            onPressed: () => setState(() => _imageUrl = null),
+                            icon: const Icon(Icons.close),
+                            style: IconButton.styleFrom(
+                              backgroundColor: theme.colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
           ),
         ),
       ],
@@ -254,7 +276,7 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Vehicle Photo (from Storage)', style: theme.textTheme.titleSmall),
+        Text('My vehicle photo', style: theme.textTheme.titleSmall),
         const Gap(8),
         InkWell(
           onTap: _pickPhotoFromGallery,
@@ -266,39 +288,59 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
               color: theme.colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: theme.colorScheme.outlineVariant),
-              image: _photoFile != null
-                  ? DecorationImage(image: FileImage(_photoFile!), fit: BoxFit.cover)
-                  : _photoUrl != null
-                      ? DecorationImage(image: NetworkImage(_photoUrl!), fit: BoxFit.cover)
+              image:
+                  _photoFile != null
+                      ? DecorationImage(
+                        image: FileImage(_photoFile!),
+                        fit: BoxFit.cover,
+                      )
+                      : _photoUrl != null
+                      ? DecorationImage(
+                        image: NetworkImage(_photoUrl!),
+                        fit: BoxFit.cover,
+                      )
                       : null,
             ),
-            child: _photoFile == null && _photoUrl == null
-                ? Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(PhosphorIcons.camera(PhosphorIconsStyle.duotone), size: 32, color: theme.colorScheme.primary),
-                      const Gap(8),
-                      Text('Tap to upload photo', style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.primary)),
-                    ],
-                  )
-                : _isUploading
+            child:
+                _photoFile == null && _photoUrl == null
+                    ? Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          PhosphorIcons.camera(PhosphorIconsStyle.duotone),
+                          size: 32,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const Gap(8),
+                        Text(
+                          'Tap to upload photo',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    )
+                    : _isUploading
                     ? const Center(child: CircularProgressIndicator())
                     : Stack(
-                        children: [
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: IconButton.filled(
-                              onPressed: () => setState(() {
-                                _photoFile = null;
-                                _photoUrl = null;
-                              }),
-                              icon: const Icon(Icons.close),
-                              style: IconButton.styleFrom(backgroundColor: theme.colorScheme.error),
+                      children: [
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: IconButton.filled(
+                            onPressed:
+                                () => setState(() {
+                                  _photoFile = null;
+                                  _photoUrl = null;
+                                }),
+                            icon: const Icon(Icons.close),
+                            style: IconButton.styleFrom(
+                              backgroundColor: theme.colorScheme.error,
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
+                    ),
           ),
         ),
       ],
@@ -340,40 +382,43 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: _availableNetworks.map((network) {
-            final isSelected = _selectedNetworks.contains(network);
-            return FilterChip(
-              label: Text(network),
-              selected: isSelected,
-              onSelected: (selected) {
-                setState(() {
-                  if (selected) {
-                    _selectedNetworks.add(network);
-                  } else {
-                    _selectedNetworks.remove(network);
-                  }
-                });
-              },
-            );
-          }).toList(),
+          children:
+              _availableNetworks.map((network) {
+                final isSelected = _selectedNetworks.contains(network);
+                return FilterChip(
+                  label: Text(network),
+                  selected: isSelected,
+                  onSelected: (selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedNetworks.add(network);
+                      } else {
+                        _selectedNetworks.remove(network);
+                      }
+                    });
+                  },
+                );
+              }).toList(),
         ),
       ],
     );
   }
 
-  void _saveVehicle() {
+  Future<void> _saveVehicle() async {
     // Get actual user ID from user provider
     final userId = ref.read(userProvider)?.id;
-    
+
     if (userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please login to save vehicle')),
       );
       return;
     }
-    
+
     final vehicle = VehicleProfile(
-      id: widget.vehicleToEdit?.id ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      id:
+          widget.vehicleToEdit?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
       userId: widget.vehicleToEdit?.userId ?? userId,
       brand: _brand,
       model: _model,
@@ -384,15 +429,30 @@ class _VehicleFormScreenState extends ConsumerState<VehicleFormScreen> {
       preferredChargingNetworks: _selectedNetworks,
     );
 
-    if (widget.vehicleToEdit != null) {
-      ref.read(vehicleProvider.notifier).updateVehicle(vehicle);
-    } else {
-      ref.read(vehicleProvider.notifier).addVehicle(vehicle);
-    }
+    try {
+      final savedVehicle =
+          widget.vehicleToEdit != null
+              ? await ref.read(vehicleProvider.notifier).updateVehicle(vehicle)
+              : await ref.read(vehicleProvider.notifier).addVehicle(vehicle);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Vehicle Saved!')),
-    );
-    context.pop();
+      if (!mounted) return;
+
+      if (savedVehicle == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not save vehicle')),
+        );
+        return;
+      }
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Vehicle saved!')));
+      context.pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not save vehicle: $e')));
+    }
   }
 }

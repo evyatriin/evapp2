@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import 'vehicle_model.dart';
 import 'vehicle_provider.dart';
@@ -13,13 +11,22 @@ class VehicleSelectionScreen extends ConsumerStatefulWidget {
   const VehicleSelectionScreen({super.key});
 
   @override
-  ConsumerState<VehicleSelectionScreen> createState() => _VehicleSelectionScreenState();
+  ConsumerState<VehicleSelectionScreen> createState() =>
+      _VehicleSelectionScreenState();
 }
 
-class _VehicleSelectionScreenState extends ConsumerState<VehicleSelectionScreen> {
+class _VehicleSelectionScreenState
+    extends ConsumerState<VehicleSelectionScreen> {
   String _selectedFilter = 'All';
   VehicleTemplate? _selectedTemplate;
   bool _isAdding = false;
+  final _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,53 +36,72 @@ class _VehicleSelectionScreenState extends ConsumerState<VehicleSelectionScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add new vehicle'),
-        centerTitle: true,
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: CircleAvatar(
-            backgroundColor: Colors.green,
-            child: BackButton(color: Colors.white),
-          ),
-        ),
       ),
       body: templatesAsync.when(
         data: (templates) {
-          final brands = ['All', ...templates.map((t) => t.brand).toSet().toList()];
-          final filteredTemplates = _selectedFilter == 'All'
-              ? templates
-              : templates.where((t) => t.brand == _selectedFilter).toList();
+          final brands = ['All', ...templates.map((t) => t.brand).toSet()];
+          final query = _searchController.text.trim().toLowerCase();
+          final filteredTemplates =
+              _selectedFilter == 'All'
+                  ? templates
+                  : templates.where((t) => t.brand == _selectedFilter).toList();
+          final visibleTemplates =
+              query.isEmpty
+                  ? filteredTemplates
+                  : filteredTemplates.where((t) {
+                    final haystack =
+                        '${t.brand} ${t.model} ${t.variant}'.toLowerCase();
+                    return haystack.contains(query);
+                  }).toList();
 
           return Column(
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (_) => setState(() {}),
+                  decoration: const InputDecoration(
+                    hintText: 'Search brand or model',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                ),
+              ),
               // Filters
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
                 child: Row(
-                  children: brands.map((brand) {
-                    final isSelected = _selectedFilter == brand;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: FilterChip(
-                        label: Text(brand),
-                        selected: isSelected,
-                        onSelected: (selected) {
-                          setState(() => _selectedFilter = brand);
-                        },
-                        backgroundColor: Colors.white,
-                        selectedColor: Colors.green,
-                        labelStyle: TextStyle(
-                          color: isSelected ? Colors.white : Colors.black,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          side: BorderSide(color: Colors.grey.shade300),
-                        ),
-                        showCheckmark: false,
-                      ),
-                    );
-                  }).toList(),
+                  children:
+                      brands.map((brand) {
+                        final isSelected = _selectedFilter == brand;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(brand),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              setState(() => _selectedFilter = brand);
+                            },
+                            selectedColor: theme.colorScheme.primary,
+                            labelStyle: TextStyle(
+                              color:
+                                  isSelected
+                                      ? theme.colorScheme.onPrimary
+                                      : theme.colorScheme.onSurface,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(color: theme.colorScheme.outlineVariant),
+                            ),
+                            showCheckmark: false,
+                          ),
+                        );
+                      }).toList(),
                 ),
               ),
 
@@ -85,13 +111,13 @@ class _VehicleSelectionScreenState extends ConsumerState<VehicleSelectionScreen>
                   padding: const EdgeInsets.all(16),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    childAspectRatio: 0.8,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
+                    childAspectRatio: 0.84,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
                   ),
-                  itemCount: filteredTemplates.length,
+                  itemCount: visibleTemplates.length,
                   itemBuilder: (context, index) {
-                    final template = filteredTemplates[index];
+                    final template = visibleTemplates[index];
                     final isSelected = _selectedTemplate?.id == template.id;
 
                     return InkWell(
@@ -99,10 +125,16 @@ class _VehicleSelectionScreenState extends ConsumerState<VehicleSelectionScreen>
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
                         decoration: BoxDecoration(
-                          color: isSelected ? Colors.green.withOpacity(0.2) : Colors.white,
+                          color:
+                              isSelected
+                                  ? theme.colorScheme.primaryContainer
+                                  : theme.colorScheme.surfaceContainerLowest,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: isSelected ? Colors.green : Colors.grey.shade200,
+                            color:
+                                isSelected
+                                    ? theme.colorScheme.primary
+                                    : theme.colorScheme.outlineVariant,
                             width: 2,
                           ),
                         ),
@@ -116,13 +148,38 @@ class _VehicleSelectionScreenState extends ConsumerState<VehicleSelectionScreen>
                                   template.imageUrl,
                                   fit: BoxFit.contain,
                                   cacheWidth: 400,
-                                  loadingBuilder: (context, child, loadingProgress) {
+                                  loadingBuilder: (
+                                    context,
+                                    child,
+                                    loadingProgress,
+                                  ) {
                                     if (loadingProgress == null) return child;
-                                    return const Center(child: CircularProgressIndicator(strokeWidth: 2));
+                                    return const Center(
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    );
                                   },
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      const Icon(Icons.directions_car, size: 48, color: Colors.grey),
+                                  errorBuilder:
+                                      (context, error, stackTrace) =>
+                                          const Icon(
+                                            Icons.directions_car,
+                                            size: 48,
+                                            color: Colors.grey,
+                                          ),
                                 ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text(
+                                template.variant,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             Padding(
@@ -145,24 +202,32 @@ class _VehicleSelectionScreenState extends ConsumerState<VehicleSelectionScreen>
 
               // Add Button
               Padding(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: SizedBox(
                   width: double.infinity,
-                  height: 56,
+                  height: 48,
                   child: FilledButton(
-                    onPressed: _selectedTemplate == null || _isAdding
-                        ? null
-                        : () => _addVehicle(context, _selectedTemplate!),
+                    onPressed:
+                        _selectedTemplate == null || _isAdding
+                            ? null
+                            : () => _addVehicle(context, _selectedTemplate!),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
                     ),
-                    child: _isAdding
-                        ? const CircularProgressIndicator(color: Colors.white)
-                        : const Text(
-                            'Add This Vehicle',
-                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
+                    child:
+                        _isAdding
+                            ? const CircularProgressIndicator(
+                              color: Colors.white,
+                            )
+                            : const Text(
+                              'Add This Vehicle',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                   ),
                 ),
               ),
@@ -175,7 +240,10 @@ class _VehicleSelectionScreenState extends ConsumerState<VehicleSelectionScreen>
     );
   }
 
-  Future<void> _addVehicle(BuildContext context, VehicleTemplate template) async {
+  Future<void> _addVehicle(
+    BuildContext context,
+    VehicleTemplate template,
+  ) async {
     setState(() => _isAdding = true);
 
     final userId = ref.read(userProvider)?.id;
@@ -197,18 +265,39 @@ class _VehicleSelectionScreenState extends ConsumerState<VehicleSelectionScreen>
       imageUrl: template.imageUrl,
       preferredChargingNetworks: template.preferredChargingNetworks,
     );
+    final messenger = ScaffoldMessenger.of(context);
+    final router = GoRouter.of(context);
 
-    await ref.read(vehicleProvider.notifier).addVehicle(vehicle);
+    if (!mounted) return;
 
-    if (mounted) {
-      setState(() => _isAdding = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vehicle Added Successfully!')),
+    try {
+      final addedVehicle = await ref.read(vehicleProvider.notifier).addVehicle(
+        vehicle,
       );
-      
-      // Check if we are in onboarding flow or normal app flow
-      // If in onboarding, we pop to return to the OnboardingScreen which has moved to the Location step
-      context.pop();
+
+      if (!mounted) return;
+
+      setState(() => _isAdding = false);
+
+      if (addedVehicle == null) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Could not save vehicle. Please try again.'),
+          ),
+        );
+        return;
+      }
+
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Vehicle added successfully.')),
+      );
+      router.pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isAdding = false);
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not save vehicle: $e')),
+      );
     }
   }
 }

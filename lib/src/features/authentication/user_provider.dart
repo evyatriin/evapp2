@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'user_model.dart';
-import 'auth_service.dart';
+
 import '../../core/backend_service.dart';
+import 'auth_service.dart';
+import 'user_model.dart';
 
 part 'user_provider.g.dart';
 
@@ -37,23 +39,17 @@ class User extends _$User {
       );
       state = user;
     } catch (e) {
-      print('Sign up error in provider: $e');
+      debugPrint('Sign up error in provider: $e');
       rethrow;
     }
   }
 
-  Future<void> signIn({
-    required String email,
-    required String password,
-  }) async {
+  Future<void> signIn({required String email, required String password}) async {
     try {
-      final user = await _authService.signIn(
-        email: email,
-        password: password,
-      );
+      final user = await _authService.signIn(email: email, password: password);
       state = user;
     } catch (e) {
-      print('Sign in error in provider: $e');
+      debugPrint('Sign in error in provider: $e');
       rethrow;
     }
   }
@@ -63,7 +59,7 @@ class User extends _$User {
       await _authService.signOut();
       state = null;
     } catch (e) {
-      print('Sign out error in provider: $e');
+      debugPrint('Sign out error in provider: $e');
       rethrow;
     }
   }
@@ -75,20 +71,40 @@ class User extends _$User {
   }) async {
     try {
       if (state == null) throw Exception('User not logged in');
-      
-      await BackendService.put('/api/users/profile', body: {
-        'user_id': state!.id,
-        'phone_number': phoneNumber,
-        'is_phone_verified': isPhoneVerified,
-        'vehicle_details': vehicleDetails,
-      });
-      
+
+      await BackendService.put(
+        '/api/users/profile',
+        body: {
+          'user_id': state!.id,
+          'phone_number': phoneNumber,
+          'is_phone_verified': isPhoneVerified,
+          'vehicle_details': vehicleDetails,
+        },
+        headers: {
+          if (_authService.getAuthToken() case final token?) 'Authorization': 'Bearer $token',
+        },
+      );
+
       // Update local state
       if (state != null) {
         state = state!.copyWith(isPhoneVerified: isPhoneVerified);
       }
     } catch (e) {
-      print('Onboarding error: $e');
+      debugPrint('Onboarding error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> refresh() async {
+    await _loadCurrentUser();
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      await _authService.deleteAccount();
+      state = null;
+    } catch (e) {
+      debugPrint('Delete account error in provider: $e');
       rethrow;
     }
   }
@@ -100,6 +116,6 @@ class User extends _$User {
   }
 
   String? get userId => state?.id;
-  
+
   bool get isAuthenticated => state != null;
 }

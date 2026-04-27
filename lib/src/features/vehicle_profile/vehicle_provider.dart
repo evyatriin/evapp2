@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../authentication/user_provider.dart';
 import 'vehicle_model.dart';
 import 'vehicle_template_model.dart';
 import 'vehicle_service.dart';
@@ -10,25 +11,37 @@ class Vehicle extends Notifier<List<VehicleProfile>> {
   
   @override
   List<VehicleProfile> build() {
-    // Load cached vehicles immediately, then validate
-    _loadWithCache();
-    
-    // Return empty list initially, will be populated by _loadWithCache
+    ref.listen(userProvider.select((user) => user?.id), (previous, next) {
+      if (next == null) {
+        state = [];
+        _service.clearCache(previous);
+        return;
+      }
+
+      if (previous != next) {
+        state = [];
+        _loadWithCache(next);
+      }
+    });
+
+    final userId = ref.watch(userProvider.select((user) => user?.id));
+    if (userId != null) {
+      _loadWithCache(userId);
+    }
+
     return [];
   }
 
-  Future<void> _loadWithCache() async {
-    final userId = _service.getCurrentUserId();
-    
-    if (userId != null) {
-      // First, try to load cached data immediately for instant UI
-      final cached = await _service.getCachedVehicles();
-      if (cached.isNotEmpty) {
-        state = cached;
-      }
-      
-      // Then fetch with cache validation (will update if stale)
-      final vehicles = await _service.fetchVehiclesWithCache(userId);
+  Future<void> _loadWithCache(String userId) async {
+    final cached = await _service.getCachedVehicles(userId);
+    if (cached.isNotEmpty && ref.mounted) {
+      state = cached;
+    }
+
+    if (!ref.mounted) return;
+
+    final vehicles = await _service.fetchVehiclesWithCache(userId);
+    if (ref.mounted && ref.read(userProvider)?.id == userId) {
       state = vehicles;
     }
   }
@@ -40,28 +53,47 @@ class Vehicle extends Notifier<List<VehicleProfile>> {
     return primary.isNotEmpty ? primary.first : state.first;
   }
 
-  Future<void> addVehicle(VehicleProfile vehicle) async {
+  Future<VehicleProfile?> addVehicle(VehicleProfile vehicle) async {
     final addedVehicle = await _service.addVehicle(vehicle);
     if (addedVehicle != null) {
-      state = [...state, addedVehicle];
+      final nextState = [
+        for (final existing in state)
+          existing.copyWith(
+            isPrimary: addedVehicle.isPrimary ? false : existing.isPrimary,
+          ),
+        addedVehicle,
+      ];
+      state = nextState;
     }
+    return addedVehicle;
   }
 
-  Future<void> updateVehicle(VehicleProfile updatedVehicle) async {
+  Future<VehicleProfile?> updateVehicle(VehicleProfile updatedVehicle) async {
     final updated = await _service.updateVehicle(updatedVehicle);
     if (updated != null) {
       state = [
         for (final vehicle in state)
-          if (vehicle.id == updated.id) updated else vehicle,
+          if (vehicle.id == updated.id)
+            updated
+          else
+            vehicle.copyWith(
+              isPrimary: updated.isPrimary ? false : vehicle.isPrimary,
+            ),
       ];
     }
+    return updated;
   }
 
-  Future<void> removeVehicle(String id) async {
+  Future<bool> removeVehicle(String id) async {
     final success = await _service.deleteVehicle(id);
     if (success) {
-      state = state.where((v) => v.id != id).toList();
+      final updated = state.where((v) => v.id != id).toList();
+      if (updated.isNotEmpty && !updated.any((vehicle) => vehicle.isPrimary)) {
+        updated[0] = updated[0].copyWith(isPrimary: true);
+      }
+      state = updated;
     }
+    return success;
   }
 
   /// Set a vehicle as the primary vehicle
@@ -76,7 +108,12 @@ class Vehicle extends Notifier<List<VehicleProfile>> {
   }
 
   Future<void> refresh() async {
-    await _loadWithCache();
+    final userId = ref.read(userProvider)?.id;
+    if (userId == null) {
+      state = [];
+      return;
+    }
+    await _loadWithCache(userId);
   }
 }
 

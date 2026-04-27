@@ -21,18 +21,38 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   Future<void> _checkOnboardingStatus() async {
     // Add a small delay to show the splash screen
     await Future.delayed(const Duration(seconds: 2));
-    
+
     // Check authentication status
     final authService = AuthService();
     final isAuthenticated = authService.isAuthenticated();
-    
+
     if (mounted) {
       if (isAuthenticated) {
-        // User is logged in, check if they completed profile onboarding
         final prefs = await SharedPreferences.getInstance();
-        final profileOnboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
-        
-        if (profileOnboardingCompleted) {
+        if (!mounted) return;
+        final profileOnboardingCompleted =
+            prefs.getBool('onboarding_completed') ?? false;
+
+        if (!profileOnboardingCompleted) {
+          final currentUser = await authService.getCurrentUser();
+          if (!mounted) return;
+
+          final hasExistingProfile =
+              currentUser != null &&
+              currentUser.email.isNotEmpty &&
+              currentUser.name.trim().isNotEmpty;
+
+          if (hasExistingProfile) {
+            await prefs.setBool('onboarding_completed', true);
+          }
+        }
+
+        final shouldSkipOnboarding =
+            prefs.getBool('onboarding_completed') ?? false;
+
+        if (!mounted) return;
+
+        if (shouldSkipOnboarding) {
           // Profile setup done, go to home
           context.go('/');
         } else {
@@ -61,11 +81,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             ),
             const SizedBox(height: 24),
             Text(
-              'EV-Ranger',
+              'EVraahein',
               style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
             const SizedBox(height: 24),
             const CircularProgressIndicator(),

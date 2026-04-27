@@ -1,4 +1,6 @@
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class VehiclePhotoService {
@@ -9,7 +11,7 @@ class VehiclePhotoService {
     try {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = '$userId/$timestamp.jpg';
-      
+
       final response = await _supabase.storage
           .from('vehicle-photos')
           .upload(fileName, photo);
@@ -19,16 +21,14 @@ class VehiclePhotoService {
       }
       return null;
     } catch (e) {
-      print('Error uploading photo: $e');
+      debugPrint('Error uploading photo: $e');
       return null;
     }
   }
 
   /// Get public URL for a photo
   String getPhotoUrl(String path) {
-    return _supabase.storage
-        .from('vehicle-photos')
-        .getPublicUrl(path);
+    return _supabase.storage.from('vehicle-photos').getPublicUrl(path);
   }
 
   /// Delete photo from Supabase Storage
@@ -36,15 +36,21 @@ class VehiclePhotoService {
     try {
       // Extract path from URL
       final uri = Uri.parse(photoUrl);
-      final path = uri.pathSegments.last;
-      
-      await _supabase.storage
-          .from('vehicle-photos')
-          .remove([path]);
-      
+      final marker = '/storage/v1/object/public/vehicle-photos/';
+      final fullPath = uri.path;
+      if (!fullPath.contains(marker)) {
+        return false;
+      }
+      final path = fullPath.split(marker).last;
+      if (path.isEmpty) {
+        return false;
+      }
+
+      await _supabase.storage.from('vehicle-photos').remove([path]);
+
       return true;
     } catch (e) {
-      print('Error deleting photo: $e');
+      debugPrint('Error deleting photo: $e');
       return false;
     }
   }

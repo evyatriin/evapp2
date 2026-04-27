@@ -1,8 +1,13 @@
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../core/backend_service.dart';
 import 'user_model.dart';
 
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
+  static bool _userStatsTableAvailable = true;
+  static bool _userBadgesTableAvailable = true;
 
   /// Sign up a new user
   Future<UserProfile?> signUp({
@@ -26,7 +31,7 @@ class AuthService {
       }
       return null;
     } catch (e) {
-      print('Sign up error: $e');
+      debugPrint('Sign up error: $e');
       rethrow;
     }
   }
@@ -43,70 +48,11 @@ class AuthService {
       );
 
       if (response.user != null) {
-        final userData = response.user!.userMetadata ?? {};
-        
-        // Fetch additional profile data
-        // Fetch additional profile data
-        bool isVerified = false;
-        int points = 0;
-        int streak = 0;
-        List<String> badges = [];
-
-        try {
-          // Fetch profile preferences
-          final profileResponse = await _supabase
-              .from('profiles')
-              .select('preferences')
-              .eq('id', response.user!.id)
-              .maybeSingle();
-          
-          if (profileResponse != null) {
-             final prefs = profileResponse['preferences'];
-             if (prefs is Map) {
-               isVerified = prefs['is_phone_verified'] == true;
-             }
-          }
-
-          // Fetch user stats
-          final statsResponse = await _supabase
-              .from('user_stats')
-              .select('total_points, current_streak')
-              .eq('user_id', response.user!.id)
-              .maybeSingle();
-          
-          if (statsResponse != null) {
-            points = statsResponse['total_points'] ?? 0;
-            streak = statsResponse['current_streak'] ?? 0;
-          }
-
-          // Fetch badges
-          final badgesResponse = await _supabase
-              .from('user_badges')
-              .select('badge_id')
-              .eq('user_id', response.user!.id);
-          
-          if (badgesResponse != null) {
-            badges = (badgesResponse as List).map((e) => e['badge_id'] as String).toList();
-          }
-
-        } catch (e) {
-          print('Error fetching user data: $e');
-        }
-
-        return UserProfile(
-          id: response.user!.id,
-          email: response.user!.email!,
-          name: userData['name'] ?? '',
-          profileImageUrl: userData['profile_image_url'],
-          isPhoneVerified: isVerified,
-          points: points,
-          streak: streak,
-          badges: badges,
-        );
+        return _buildUserProfile(response.user!);
       }
       return null;
     } catch (e) {
-      print('Sign in error: $e');
+      debugPrint('Sign in error: $e');
       rethrow;
     }
   }
@@ -116,7 +62,7 @@ class AuthService {
     try {
       await _supabase.auth.signOut();
     } catch (e) {
-      print('Sign out error: $e');
+      debugPrint('Sign out error: $e');
       rethrow;
     }
   }
@@ -126,71 +72,98 @@ class AuthService {
     try {
       final user = _supabase.auth.currentUser;
       if (user != null) {
-        final userData = user.userMetadata ?? {};
-        
-        // Fetch additional profile data
-        bool isVerified = false;
-        int points = 0;
-        int streak = 0;
-        List<String> badges = [];
+        return _buildUserProfile(user);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Get current user error: $e');
+      return null;
+    }
+  }
 
-        try {
-          // Fetch profile preferences
-          final profileResponse = await _supabase
+  Future<UserProfile> _buildUserProfile(User user) async {
+    final userData = user.userMetadata ?? {};
+    var isVerified = user.phoneConfirmedAt != null;
+    String? phoneNumber = _cleanPhoneNumber(user.phone);
+    var points = 0;
+    var streak = 0;
+    var badges = <String>[];
+
+    try {
+      final profileResponse =
+          await _supabase
               .from('profiles')
               .select('preferences')
               .eq('id', user.id)
               .maybeSingle();
-          
-          if (profileResponse != null) {
-             final prefs = profileResponse['preferences'];
-             if (prefs is Map) {
-               isVerified = prefs['is_phone_verified'] == true;
-             }
-          }
 
-          // Fetch user stats
-          final statsResponse = await _supabase
-              .from('user_stats')
-              .select('total_points, current_streak')
-              .eq('user_id', user.id)
-              .maybeSingle();
-          
-          if (statsResponse != null) {
-            points = statsResponse['total_points'] ?? 0;
-            streak = statsResponse['current_streak'] ?? 0;
+      if (profileResponse != null) {
+        final prefs = profileResponse['preferences'];
+        if (prefs is Map) {
+          isVerified = isVerified || prefs['is_phone_verified'] == true;
+          final rawPhone = prefs['phone_number'];
+          if (rawPhone is String && rawPhone.trim().isNotEmpty) {
+            phoneNumber = rawPhone.trim();
           }
-
-          // Fetch badges
-          final badgesResponse = await _supabase
-              .from('user_badges')
-              .select('badge_id')
-              .eq('user_id', user.id);
-          
-          if (badgesResponse != null) {
-            badges = (badgesResponse as List).map((e) => e['badge_id'] as String).toList();
-          }
-
-        } catch (e) {
-          print('Error fetching user data: $e');
         }
-
-        return UserProfile(
-          id: user.id,
-          email: user.email!,
-          name: userData['name'] ?? '',
-          profileImageUrl: userData['profile_image_url'],
-          isPhoneVerified: isVerified,
-          points: points,
-          streak: streak,
-          badges: badges,
-        );
       }
-      return null;
     } catch (e) {
-      print('Get current user error: $e');
-      return null;
+      debugPrint('Error fetching profile data: $e');
     }
+
+    if (_userStatsTableAvailable) {
+      try {
+        final statsResponse =
+            await _supabase
+                .from('user_stats')
+                .select('total_points, current_streak')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+        if (statsResponse != null) {
+          points = statsResponse['total_points'] ?? 0;
+          streak = statsResponse['current_streak'] ?? 0;
+        }
+      } catch (e) {
+        _userStatsTableAvailable = !_isMissingTableError(e);
+        debugPrint('Error fetching user stats: $e');
+      }
+    }
+
+    if (_userBadgesTableAvailable) {
+      try {
+        final badgesResponse = await _supabase
+            .from('user_badges')
+            .select('badge_id')
+            .eq('user_id', user.id);
+
+        badges =
+            (badgesResponse as List)
+                .map((e) => e['badge_id'] as String)
+                .toList();
+      } catch (e) {
+        _userBadgesTableAvailable = !_isMissingTableError(e);
+        debugPrint('Error fetching user badges: $e');
+      }
+    }
+
+    return UserProfile(
+      id: user.id,
+      email: user.email!,
+      name: userData['name'] ?? '',
+      profileImageUrl: userData['profile_image_url'],
+      phoneNumber: phoneNumber,
+      isPhoneVerified: isVerified,
+      points: points,
+      streak: streak,
+      badges: badges,
+    );
+  }
+
+  bool _isMissingTableError(Object error) {
+    final message = error.toString();
+    return message.contains('PGRST205') ||
+        message.contains("Could not find the table 'public.");
   }
 
   /// Get the current session access token
@@ -214,19 +187,8 @@ class AuthService {
   }
 
   /// Update user profile (name, email)
-  Future<UserProfile?> updateProfile({
-    String? name,
-    String? email,
-  }) async {
+  Future<UserProfile?> updateProfile({String? name, String? email}) async {
     try {
-      final updates = <String, dynamic>{};
-      if (name != null) {
-        updates['data'] = {'name': name};
-      }
-      if (email != null) {
-        updates['email'] = email;
-      }
-
       final response = await _supabase.auth.updateUser(
         UserAttributes(
           email: email,
@@ -241,11 +203,13 @@ class AuthService {
           email: response.user!.email!,
           name: userData['name'] ?? '',
           profileImageUrl: userData['profile_image_url'],
+          phoneNumber: _cleanPhoneNumber(response.user!.phone),
+          isPhoneVerified: response.user!.phoneConfirmedAt != null,
         );
       }
       return null;
     } catch (e) {
-      print('Update profile error: $e');
+      debugPrint('Update profile error: $e');
       rethrow;
     }
   }
@@ -253,11 +217,9 @@ class AuthService {
   /// Change password
   Future<void> changePassword(String newPassword) async {
     try {
-      await _supabase.auth.updateUser(
-        UserAttributes(password: newPassword),
-      );
+      await _supabase.auth.updateUser(UserAttributes(password: newPassword));
     } catch (e) {
-      print('Change password error: $e');
+      debugPrint('Change password error: $e');
       rethrow;
     }
   }
@@ -267,7 +229,7 @@ class AuthService {
     try {
       await _supabase.auth.resetPasswordForEmail(email);
     } catch (e) {
-      print('Password reset error: $e');
+      debugPrint('Password reset error: $e');
       rethrow;
     }
   }
@@ -275,16 +237,84 @@ class AuthService {
   /// Delete user account
   Future<void> deleteAccount() async {
     try {
-      final userId = _supabase.auth.currentUser?.id;
-      if (userId != null) {
-        // Note: Supabase doesn't have a direct delete user method from client
-        // This would typically be done via an admin API or Edge Function
-        // For now, we'll just sign out
-        await signOut();
+      final accessToken = _supabase.auth.currentSession?.accessToken;
+      if (accessToken == null) {
+        throw Exception('You must be signed in to delete your account.');
       }
+
+      await BackendService.delete(
+        '/api/users/me',
+        headers: {'Authorization': 'Bearer $accessToken'},
+      );
+      await signOut();
     } catch (e) {
-      print('Delete account error: $e');
+      debugPrint('Delete account error: $e');
       rethrow;
     }
+  }
+
+  Future<String> requestPhoneVerification(String phoneNumber) async {
+    final normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (normalizedPhone == null) {
+      throw Exception(
+        'Enter a valid phone number with country code. Indian 10-digit numbers are supported automatically.',
+      );
+    }
+
+    try {
+      await _supabase.auth.updateUser(UserAttributes(phone: normalizedPhone));
+      return normalizedPhone;
+    } catch (e) {
+      debugPrint('Request phone verification error: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> verifyPhoneOtp({
+    required String phoneNumber,
+    required String otp,
+  }) async {
+    final normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (normalizedPhone == null) {
+      throw Exception('Enter a valid phone number before verifying.');
+    }
+    if (otp.trim().isEmpty) {
+      throw Exception('Enter the OTP sent to your phone.');
+    }
+
+    try {
+      await _supabase.auth.verifyOTP(
+        phone: normalizedPhone,
+        token: otp.trim(),
+        type: OtpType.phoneChange,
+      );
+    } catch (e) {
+      debugPrint('Verify phone OTP error: $e');
+      rethrow;
+    }
+  }
+
+  String? normalizePhoneNumber(String input) {
+    final digits = input.replaceAll(RegExp(r'[^0-9+]'), '');
+    if (digits.isEmpty) {
+      return null;
+    }
+    if (digits.startsWith('+')) {
+      return digits.length >= 8 ? digits : null;
+    }
+
+    final numericOnly = digits.replaceAll(RegExp(r'[^0-9]'), '');
+    if (numericOnly.length == 10) {
+      return '+91$numericOnly';
+    }
+    if (numericOnly.length >= 8) {
+      return '+$numericOnly';
+    }
+    return null;
+  }
+
+  String? _cleanPhoneNumber(String? phoneNumber) {
+    final trimmed = phoneNumber?.trim();
+    return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
   }
 }

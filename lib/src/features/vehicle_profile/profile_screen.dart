@@ -18,10 +18,7 @@ class ProfileScreen extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Profile'), centerTitle: true),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -32,7 +29,9 @@ class ProfileScreen extends ConsumerWidget {
               radius: 50,
               backgroundColor: theme.colorScheme.primaryContainer,
               child: Text(
-                (user?.name.isNotEmpty ?? false) ? user!.name[0].toUpperCase() : 'U',
+                (user?.name.isNotEmpty ?? false)
+                    ? user!.name[0].toUpperCase()
+                    : 'U',
                 style: theme.textTheme.displayMedium?.copyWith(
                   color: theme.colorScheme.onPrimaryContainer,
                 ),
@@ -52,7 +51,7 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
             const Gap(40),
-            
+
             // Vehicles Section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -74,7 +73,7 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
             const Gap(16),
-            
+
             if (vehicles.isEmpty)
               _buildEmptyState(context)
             else
@@ -91,7 +90,7 @@ class ProfileScreen extends ConsumerWidget {
                   },
                 ),
               ),
-              
+
             const Gap(40),
             // Other Profile Options (Placeholder)
             ListTile(
@@ -123,7 +122,11 @@ class ProfileScreen extends ConsumerWidget {
       ),
       child: Column(
         children: [
-          Icon(PhosphorIcons.car(PhosphorIconsStyle.duotone), size: 48, color: Theme.of(context).colorScheme.primary),
+          Icon(
+            PhosphorIcons.car(PhosphorIconsStyle.duotone),
+            size: 48,
+            color: Theme.of(context).colorScheme.primary,
+          ),
           const Gap(16),
           const Text('No vehicles added yet'),
           const Gap(16),
@@ -145,7 +148,7 @@ class _VehicleCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -159,34 +162,39 @@ class _VehicleCard extends ConsumerWidget {
               Positioned.fill(
                 child: ColorFiltered(
                   colorFilter: ColorFilter.mode(
-                    Colors.black.withOpacity(0.4),
+                    Colors.black.withValues(alpha: 0.4),
                     BlendMode.darken,
                   ),
                   child: Image(
-                    image: vehicle.imageUrl!.startsWith('http')
-                        ? NetworkImage(vehicle.imageUrl!)
-                        : FileImage(File(vehicle.imageUrl!)) as ImageProvider,
+                    image:
+                        vehicle.imageUrl!.startsWith('http')
+                            ? NetworkImage(vehicle.imageUrl!)
+                            : FileImage(File(vehicle.imageUrl!))
+                                as ImageProvider,
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
-                      return Container(color: theme.colorScheme.surfaceContainerHighest);
+                      return Container(
+                        color: theme.colorScheme.surfaceContainerHighest,
+                      );
                     },
                   ),
                 ),
               ),
-              
+
             // Content
             Container(
               decoration: BoxDecoration(
-                gradient: vehicle.imageUrl == null
-                    ? LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          theme.colorScheme.primaryContainer,
-                          theme.colorScheme.surface,
-                        ],
-                      )
-                    : null,
+                gradient:
+                    vehicle.imageUrl == null
+                        ? LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            theme.colorScheme.primaryContainer,
+                            theme.colorScheme.surface,
+                          ],
+                        )
+                        : null,
               ),
               padding: const EdgeInsets.all(20),
               child: Column(
@@ -198,18 +206,30 @@ class _VehicleCard extends ConsumerWidget {
                       Icon(
                         PhosphorIcons.carProfile(PhosphorIconsStyle.fill),
                         size: 32,
-                        color: vehicle.imageUrl != null ? Colors.white : theme.colorScheme.primary,
+                        color:
+                            vehicle.imageUrl != null
+                                ? Colors.white
+                                : theme.colorScheme.primary,
                       ),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
-                          color: (vehicle.imageUrl != null ? Colors.white : theme.colorScheme.primary).withOpacity(0.2),
+                          color: (vehicle.imageUrl != null
+                                  ? Colors.white
+                                  : theme.colorScheme.primary)
+                              .withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
                           vehicle.brand,
                           style: theme.textTheme.labelMedium?.copyWith(
-                            color: vehicle.imageUrl != null ? Colors.white : theme.colorScheme.primary,
+                            color:
+                                vehicle.imageUrl != null
+                                    ? Colors.white
+                                    : theme.colorScheme.primary,
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -227,22 +247,33 @@ class _VehicleCard extends ConsumerWidget {
                   Text(
                     vehicle.variant,
                     style: theme.textTheme.bodyMedium?.copyWith(
-                      color: vehicle.imageUrl != null ? Colors.white70 : theme.colorScheme.onSurfaceVariant,
+                      color:
+                          vehicle.imageUrl != null
+                              ? Colors.white70
+                              : theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                   const Gap(16),
                   Row(
                     children: [
                       Icon(
-                        PhosphorIcons.batteryCharging(PhosphorIconsStyle.duotone),
+                        PhosphorIcons.batteryCharging(
+                          PhosphorIconsStyle.duotone,
+                        ),
                         size: 16,
-                        color: vehicle.imageUrl != null ? Colors.white70 : theme.colorScheme.tertiary,
+                        color:
+                            vehicle.imageUrl != null
+                                ? Colors.white70
+                                : theme.colorScheme.tertiary,
                       ),
                       const Gap(4),
                       Text(
                         '${vehicle.estimatedRange.toInt()} km range',
                         style: theme.textTheme.bodyMedium?.copyWith(
-                          color: vehicle.imageUrl != null ? Colors.white : theme.colorScheme.tertiary,
+                          color:
+                              vehicle.imageUrl != null
+                                  ? Colors.white
+                                  : theme.colorScheme.tertiary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
