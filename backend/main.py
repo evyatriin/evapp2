@@ -1,14 +1,46 @@
+from contextlib import asynccontextmanager
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import places, routing, chargers, community, vehicles, auth, routes, chat, sos, users, admin, gamification
-# from routers import news  # Uncomment to enable EV news API
+from routers import (
+    places,
+    routing,
+    chargers,
+    community,
+    vehicles,
+    auth,
+    routes,
+    chat,
+    sos,
+    users,
+    admin,
+    gamification,
+    news,
+    content,
+)
+from config import settings
 
-app = FastAPI(title="EV Router Backend")
 
-# Allow all origins for development
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    yield
+
+
+logging.basicConfig(
+    level=getattr(
+        logging,
+        str(getattr(settings, "LOG_LEVEL", "INFO")).upper(),
+        logging.INFO,
+    ),
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+
+app = FastAPI(title="EV Router Backend", lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,8 +58,27 @@ app.include_router(sos.router, prefix="/api/sos", tags=["SOS"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(gamification.router, prefix="/api/gamification", tags=["Gamification"])
-# app.include_router(news.router, prefix="/api/news", tags=["News"])  # Uncomment to enable EV news API
+app.include_router(news.router, prefix="/api/news", tags=["News"])
+app.include_router(content.router, prefix="/api/content", tags=["Content"])
 
 @app.get("/")
 def read_root():
-    return {"message": "EV Router Backend is running"}
+    return {
+        "message": "EV Router Backend is running",
+        "environment": settings.APP_ENV,
+    }
+
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+
+@app.get("/ready")
+def readiness_check():
+    return {
+        "status": "ready",
+        "supabase_configured": bool(settings.SUPABASE_URL and settings.SUPABASE_KEY),
+        "here_configured": bool(settings.HERE_API_KEY),
+        "google_maps_configured": bool(settings.GOOGLE_MAPS_API_KEY),
+    }

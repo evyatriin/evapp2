@@ -1,10 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
 from datetime import datetime
-from supabase import Client
 from supabase_client import supabase
-import os
+from auth_utils import ensure_same_user, get_authenticated_user
 
 router = APIRouter()
 
@@ -81,8 +81,12 @@ async def get_feed(community_id: Optional[str] = None, limit: int = 10, offset: 
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/posts", response_model=CommunityPost)
-async def create_post(request: CreatePostRequest):
+async def create_post(
+    request: CreatePostRequest,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     try:
+        ensure_same_user(auth_user, request.user_id)
         data = request.dict()
         response = supabase.table("community_posts").insert(data).execute()
         return response.data[0]
@@ -90,8 +94,13 @@ async def create_post(request: CreatePostRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/posts/{post_id}/like")
-async def like_post(post_id: str, user_id: str):
+async def like_post(
+    post_id: str,
+    user_id: str,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     try:
+        ensure_same_user(auth_user, user_id)
         # Check if already liked
         existing = supabase.table("post_likes").select("*").eq("post_id", post_id).eq("user_id", user_id).execute()
         

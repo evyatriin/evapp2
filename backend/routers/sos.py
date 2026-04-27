@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 from supabase import Client
 from supabase_client import supabase
+from auth_utils import get_authenticated_user, ensure_same_user
 import os
 
 router = APIRouter()
@@ -31,8 +32,12 @@ class CreateAlertRequest(BaseModel):
     phone_number: str
 
 @router.post("/alert", response_model=SOSAlert)
-async def create_sos_alert(request: CreateAlertRequest):
+async def create_sos_alert(
+    request: CreateAlertRequest,
+    auth_user=Depends(get_authenticated_user),
+):
     try:
+        ensure_same_user(auth_user, request.user_id)
         # Check if user has verified phone number
         profile = supabase.table("profiles").select("preferences").eq("id", request.user_id).execute()
         if not profile.data:

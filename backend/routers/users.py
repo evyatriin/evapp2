@@ -1,11 +1,17 @@
-from fastapi import APIRouter, HTTPException
+import logging
+from urllib.parse import urlparse
+
+from fastapi import APIRouter, HTTPException, Depends, Header
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
-from supabase import Client
-from supabase_client import supabase
-import os
+import httpx
+
+from config import settings
+from supabase_client import supabase, service_supabase
+from auth_utils import get_authenticated_user, ensure_same_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Supabase Setup
 # Supabase Setup - using centralized client
@@ -27,6 +33,124 @@ class UpdateProfileRequest(BaseModel):
     is_phone_verified: Optional[bool] = None
     vehicle_details: Optional[Dict[str, Any]] = None
 
+def _extract_storage_target(url: Optional[str]) -> Optional[tuple[str, str]]:
+    if not url:
+        return None
+
+    parsed = urlparse(url)
+    path = parsed.path or ""
+    for marker in ("/storage/v1/object/public/", "/storage/v1/object/sign/"):
+        if marker in path:
+            relative = path.split(marker, 1)[1].strip("/")
+            parts = relative.split("/", 1)
+            if len(parts) == 2 and parts[0] and parts[1]:
+                return parts[0], parts[1]
+    return None
+
+
+def _delete_storage_urls(admin_client, urls: list[str]) -> None:
+    bucket_to_paths: Dict[str, set[str]] = {}
+    for url in urls:
+        target = _extract_storage_target(url)
+        if target is None:
+            continue
+        bucket, path = target
+        bucket_to_paths.setdefault(bucket, set()).add(path)
+
+    for bucket, paths in bucket_to_paths.items():
+        if not paths:
+            continue
+        try:
+            admin_client.storage.from_(bucket).remove(list(paths))
+        except Exception as exc:
+            logger.warning("Failed to delete storage objects from %s: %s", bucket, exc)
+
+
+def _cleanup_user_storage(user_id: str, admin_client) -> None:
+    urls: list[str] = []
+
+    sources = [
+        ("vehicles", "user_id", ["photo_url"]),
+        ("station_checkins", "user_id", ["image_url", "charging_slip_url"]),
+        ("community_posts", "user_id", ["image_url"]),
+        ("charging_stations", "owner_id", ["charger_photos"]),
+    ]
+
+    for table_name, filter_column, columns in sources:
+        try:
+            response = admin_client.table(table_name).select(",".join(columns)).eq(filter_column, user_id).execute()
+        except Exception as exc:
+            logger.info("Skipping storage cleanup lookup for %s: %s", table_name, exc)
+            continue
+
+        for row in response.data or []:
+            for column in columns:
+                value = row.get(column)
+                if isinstance(value, str) and value.strip():
+                    urls.append(value.strip())
+                elif isinstance(value, list):
+                    urls.extend(str(item).strip() for item in value if str(item).strip())
+
+    _delete_storage_urls(admin_client, urls)
+
+
+def _delete_user_rows(user_id: str):
+    admin_client = service_supabase or supabase
+    if not admin_client:
+        raise HTTPException(status_code=503, detail="Database service not configured")
+
+    _cleanup_user_storage(user_id, admin_client)
+
+    user_id_tables = [
+        "vehicles",
+        "saved_routes",
+        "saved_chargers",
+        "charging_sessions",
+        "station_checkins",
+        "trip_logs",
+        "user_badges",
+        "user_stats",
+        "community_posts",
+        "post_likes",
+        "sos_alerts",
+    ]
+
+    for table_name in user_id_tables:
+        admin_client.table(table_name).delete().eq("user_id", user_id).execute()
+
+    admin_client.table("charger_requests").delete().eq("requester_user_id", user_id).execute()
+    admin_client.table("charger_requests").delete().eq("host_user_id", user_id).execute()
+    admin_client.table("charging_stations").delete().eq("owner_id", user_id).execute()
+    admin_client.table("user_blocks").delete().eq("blocker_id", user_id).execute()
+    admin_client.table("user_blocks").delete().eq("blocked_id", user_id).execute()
+    admin_client.table("user_reports").delete().eq("reporter_id", user_id).execute()
+    admin_client.table("user_reports").delete().eq("reported_user_id", user_id).execute()
+    admin_client.table("direct_messages").delete().eq("sender_id", user_id).execute()
+    admin_client.table("direct_messages").delete().eq("receiver_id", user_id).execute()
+    admin_client.table("profiles").delete().eq("id", user_id).execute()
+
+async def _delete_supabase_auth_user(user_id: str):
+    if not settings.SUPABASE_URL or not settings.SUPABASE_SERVICE_ROLE_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="SUPABASE_SERVICE_ROLE_KEY is required for account deletion",
+        )
+
+    url = f"{settings.SUPABASE_URL}/auth/v1/admin/users/{user_id}"
+    headers = {
+        "apiKey": settings.SUPABASE_SERVICE_ROLE_KEY,
+        "Authorization": f"Bearer {settings.SUPABASE_SERVICE_ROLE_KEY}",
+    }
+
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        response = await client.delete(url, headers=headers)
+
+    if response.status_code not in (200, 204):
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to delete auth user: {response.text}",
+        )
+
 @router.post("/block")
 async def block_user(request: BlockRequest):
     try:
@@ -46,8 +170,12 @@ async def report_user(request: ReportRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/profile")
-async def update_profile(request: UpdateProfileRequest):
+async def update_profile(
+    request: UpdateProfileRequest,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     try:
+        ensure_same_user(auth_user, request.user_id)
         # Fetch existing profile to merge preferences
         current = supabase.table("profiles").select("preferences").eq("id", request.user_id).execute()
         current_prefs = current.data[0].get("preferences", {}) if current.data else {}
@@ -64,8 +192,6 @@ async def update_profile(request: UpdateProfileRequest):
             
         supabase.table("profiles").update({"preferences": current_prefs}).eq("id", request.user_id).execute()
         return {"status": "success", "message": "Profile updated"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -138,14 +264,22 @@ async def get_user_statistics(user_id: str):
             "total_trips": total_trips
         }
     except Exception as e:
-        # Return zeros on error rather than failing
-        print(f"Error fetching statistics: {e}")
-        return {
-            "total_km": 0,
-            "total_kwh_charged": 0,
-            "co2_saved_kg": 0,
-            "money_saved": 0,
-            "total_check_ins": 0,
-            "total_trips": 0
-        }
+        logger.exception("Error fetching statistics for user %s", user_id)
+        raise HTTPException(status_code=500, detail=f"Error fetching statistics: {e}")
 
+@router.delete("/me")
+async def delete_my_account(auth_user: Dict[str, Any] = Depends(get_authenticated_user)):
+
+    try:
+        _delete_user_rows(auth_user["user_id"])
+        await _delete_supabase_auth_user(auth_user["user_id"])
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Account deletion failed: {e}")
+
+    return {
+        "status": "success",
+        "message": "Account deleted successfully",
+        "user_id": auth_user["user_id"],
+    }

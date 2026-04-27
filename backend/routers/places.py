@@ -50,15 +50,10 @@ async def get_nearby_places(request: PlacesRequest):
 @router.get("/autocomplete")
 async def autocomplete(input: str):
     if not settings.GOOGLE_MAPS_API_KEY:
-        # Return mock data if no key
-        return {
-            "predictions": [
-                {"description": "Hyderabad, Telangana", "place_id": "ChIJx9L8AAq3yzsR_r_yq2k9j90"},
-                {"description": "Warangal, Telangana", "place_id": "ChIJ_w7s1_m3yzsR_r_yq2k9j90"},
-                {"description": "Vijayawada, Andhra Pradesh", "place_id": "ChIJ_w7s1_m3yzsR_r_yq2k9j90"},
-                {"description": "Visakhapatnam, Andhra Pradesh", "place_id": "ChIJ_w7s1_m3yzsR_r_yq2k9j90"},
-            ]
-        }
+        raise HTTPException(
+            status_code=503,
+            detail="Google Maps Places autocomplete is not configured",
+        )
 
     url = "https://maps.googleapis.com/maps/api/place/autocomplete/json"
     params = {
@@ -78,20 +73,10 @@ async def autocomplete(input: str):
 @router.get("/details")
 async def place_details(place_id: str):
     if not settings.GOOGLE_MAPS_API_KEY:
-        # Return mock data if no key
-        # Mock coordinates for the mock places in autocomplete
-        mock_coords = {
-            "ChIJx9L8AAq3yzsR_r_yq2k9j90": {"lat": 17.3850, "lng": 78.4867}, # Hyderabad
-            "ChIJ_w7s1_m3yzsR_r_yq2k9j90": {"lat": 17.9689, "lng": 79.5941}, # Warangal
-        }
-        coords = mock_coords.get(place_id, {"lat": 17.3850, "lng": 78.4867})
-        return {
-            "result": {
-                "geometry": {
-                    "location": coords
-                }
-            }
-        }
+        raise HTTPException(
+            status_code=503,
+            detail="Google Maps place details are not configured",
+        )
 
     url = "https://maps.googleapis.com/maps/api/place/details/json"
     params = {

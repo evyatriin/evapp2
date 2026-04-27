@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
 from typing import List, Optional
@@ -6,6 +8,7 @@ from supabase_client import get_supabase
 
 router = APIRouter(prefix="/gamification", tags=["Gamification"])
 supabase = get_supabase()
+logger = logging.getLogger(__name__)
 
 # --- Models ---
 
@@ -189,4 +192,4 @@ async def _check_streak_badge(user_id: str, streak: int):
                     "badge_id": badge["id"]
                 }).execute()
     except Exception as e:
-        print(f"Error checking streak badges: {e}")
+        logger.warning("Error checking streak badges: %s", e)

@@ -1,7 +1,10 @@
+import logging
+
 from supabase_client import get_supabase
 from datetime import datetime
 
 supabase = get_supabase()
+logger = logging.getLogger(__name__)
 
 async def award_points_internal(user_id: str, points: int, action_type: str):
     """
@@ -46,7 +49,7 @@ async def award_points_internal(user_id: str, points: int, action_type: str):
         
         return new_points
     except Exception as e:
-        print(f"Error awarding points: {e}")
+        logger.warning("Error awarding points: %s", e)
         return None
 
 async def _check_badge_unlocks(user_id: str, stats: dict):
@@ -77,6 +80,6 @@ async def _check_badge_unlocks(user_id: str, stats: dict):
                     "user_id": user_id,
                     "badge_id": badge["id"]
                 }).execute()
-                print(f"Badge unlocked: {badge['name']} for user {user_id}")
+                logger.info("Badge unlocked: %s for user %s", badge["name"], user_id)
     except Exception as e:
-        print(f"Error checking badges: {e}")
+        logger.warning("Error checking badges: %s", e)

@@ -1,10 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
 from datetime import datetime
-from supabase import Client
 from supabase_client import supabase
-import os
+from auth_utils import ensure_same_user, get_authenticated_user
 
 router = APIRouter()
 
@@ -25,8 +25,13 @@ class SendMessageRequest(BaseModel):
     content: str
 
 @router.get("/messages/{user_id}/{other_user_id}", response_model=List[DirectMessage])
-async def get_conversation(user_id: str, other_user_id: str):
+async def get_conversation(
+    user_id: str,
+    other_user_id: str,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     try:
+        ensure_same_user(auth_user, user_id)
         response = supabase.table("direct_messages").select("*").or_(
             f"and(sender_id.eq.{user_id},receiver_id.eq.{other_user_id}),"
             f"and(sender_id.eq.{other_user_id},receiver_id.eq.{user_id})"
@@ -37,8 +42,12 @@ async def get_conversation(user_id: str, other_user_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/send", response_model=DirectMessage)
-async def send_message(request: SendMessageRequest):
+async def send_message(
+    request: SendMessageRequest,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     try:
+        ensure_same_user(auth_user, request.sender_id)
         # Check for blocks (handled by RLS, but good to have explicit check or handle error)
         # We rely on RLS policy "User send message" which checks user_blocks
         
@@ -54,5 +63,7 @@ async def send_message(request: SendMessageRequest):
             raise HTTPException(status_code=403, detail="Message could not be sent. You might be blocked.")
             
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

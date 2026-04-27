@@ -1,6 +1,6 @@
 # Database Migrations
 
-This directory contains SQL migration files for the EV-Ranger database.
+This directory contains SQL migration files for the EVraahein database.
 
 ## Running Migrations
 
@@ -32,6 +32,15 @@ psql -h your-db-host -U postgres -d postgres -f migrations/001_create_station_ch
 - `001_create_station_checkins.sql` - Creates station_checkins table and adds points column to profiles
 - `002_create_saved_chargers.sql` - Creates saved_chargers table for user's favorite charging stations
 - `003_create_ev_news.sql` - Creates ev_news table for AI-curated EV news articles
+- `004_create_gamification.sql` - Creates leaderboard, badges, and user stats tables
+- `005_create_nearby_stations_rpc.sql` - Adds nearby station lookup helper for legacy charger records
+- `006_add_voting_to_checkins.sql` - Adds community voting fields to station check-ins
+- `007_fix_station_id_type.sql` - Aligns station IDs to text-compatible source identifiers
+- `008_add_trip_context.sql` - Adds trip context fields to charger check-ins
+- `009_align_live_schema.sql` - Aligns live Supabase schema with updated app/backend contracts
+- `010_content_catalog.sql` - Seeds the content catalog used for community guides and resources
+- `011_create_obd_sessions.sql` - Creates OBD session storage with RLS policies
+- `012_create_canonical_chargers.sql` - Adds PostGIS-backed canonical charger/source tables for backend aggregation
 
 ## Rollback
 

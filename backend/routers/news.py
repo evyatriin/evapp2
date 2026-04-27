@@ -1,11 +1,13 @@
+import logging
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, HttpUrl
 from typing import Optional, List
 from datetime import datetime
 from supabase_client import get_supabase
 
-router = APIRouter(prefix="/news", tags=["news"])
+router = APIRouter()
 supabase = get_supabase()
+logger = logging.getLogger(__name__)
 
 
 class NewsCreate(BaseModel):
@@ -46,6 +48,9 @@ async def get_news(
     - **category**: Filter by category (policy, vehicles, charging, industry)
     - **featured_only**: Return only featured articles
     """
+    if not supabase:
+        return []
+
     try:
         query = supabase.table("ev_news").select("*").order("published_at", desc=True).limit(limit)
         
@@ -58,7 +63,8 @@ async def get_news(
         response = query.execute()
         return response.data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching news: {str(e)}")
+        logger.warning("Error fetching news feed: %s", e)
+        return []
 
 
 @router.get("/{news_id}", response_model=NewsResponse)
