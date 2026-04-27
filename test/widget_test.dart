@@ -6,9 +6,6 @@
 // tree, read text, and verify that the values of widget properties are correct.
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:ev_router_app2/main.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 void main() {
   testWidgets('App starts with Splash Screen', (WidgetTester tester) async {

@@ -1,6 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+
+import 'app_config.dart';
 
 class AdBannerWidget extends StatefulWidget {
   const AdBannerWidget({super.key});
@@ -13,20 +14,23 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
   BannerAd? _bannerAd;
   bool _isLoaded = false;
 
-  // Test Ad Unit IDs - Replace with real ones in production
-  static final String _adUnitId = Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/6300978111' // Android test banner
-      : 'ca-app-pub-3940256099942544/2934735716'; // iOS test banner
-
   @override
   void initState() {
     super.initState();
-    _loadAd();
+    if (AppConfig.adsEnabled) {
+      _loadAd();
+    }
   }
 
   void _loadAd() {
+    final adUnitId = AppConfig.bannerAdUnitId;
+    if (adUnitId == null) {
+      debugPrint('Ads are disabled because no release ad unit ID is configured.');
+      return;
+    }
+
     _bannerAd = BannerAd(
-      adUnitId: _adUnitId,
+      adUnitId: adUnitId,
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
@@ -34,11 +38,11 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
           setState(() => _isLoaded = true);
         },
         onAdFailedToLoad: (ad, error) {
-          print('Ad failed to load: $error');
+          debugPrint('Ad failed to load: $error');
           ad.dispose();
         },
-        onAdOpened: (ad) => print('Ad opened'),
-        onAdClosed: (ad) => print('Ad closed'),
+        onAdOpened: (ad) => debugPrint('Ad opened'),
+        onAdClosed: (ad) => debugPrint('Ad closed'),
       ),
     )..load();
   }

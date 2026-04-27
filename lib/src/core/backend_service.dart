@@ -1,71 +1,98 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 
-class BackendService {
-  // Use 10.0.2.2 for Android Emulator, localhost for iOS Simulator
+import 'app_config.dart';
 
+class BackendService {
   static String get baseUrl {
-    return 'https://evyatribackend-bqc7hqdjgaezh6gd.southindia-01.azurewebsites.net';
+    return AppConfig.backendBaseUrl;
   }
 
-  static Future<dynamic> get(String endpoint, {Map<String, String>? queryParams}) async {
-    final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: queryParams);
+  static Future<dynamic> get(
+    String endpoint, {
+    Map<String, String>? queryParams,
+    Map<String, String>? headers,
+  }) async {
+    final uri = Uri.parse(
+      '$baseUrl$endpoint',
+    ).replace(queryParameters: queryParams);
     try {
-      final response = await http.get(uri);
+      final response = await http.get(uri, headers: headers);
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Backend Error: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Backend Error: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       throw Exception('Network Error: $e');
     }
   }
 
-  static Future<dynamic> post(String endpoint, {required Map<String, dynamic> body}) async {
+  static Future<dynamic> post(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    Map<String, String>? headers,
+  }) async {
     final uri = Uri.parse('$baseUrl$endpoint');
     try {
       final response = await http.post(
         uri,
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', ...?headers},
         body: jsonEncode(body),
       );
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Backend Error: ${response.statusCode} - ${response.body}');
-      }
-    } catch (e) {
-      throw Exception('Network Error: $e');
-    }
-  }
-  static Future<dynamic> put(String endpoint, {required Map<String, dynamic> body}) async {
-    final uri = Uri.parse('$baseUrl$endpoint');
-    try {
-      final response = await http.put(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception('Backend Error: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Backend Error: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       throw Exception('Network Error: $e');
     }
   }
 
-  static Future<dynamic> delete(String endpoint) async {
+  static Future<dynamic> put(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    Map<String, String>? headers,
+  }) async {
     final uri = Uri.parse('$baseUrl$endpoint');
     try {
-      final response = await http.delete(uri);
+      final response = await http.put(
+        uri,
+        headers: {'Content-Type': 'application/json', ...?headers},
+        body: jsonEncode(body),
+      );
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception('Backend Error: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Backend Error: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      throw Exception('Network Error: $e');
+    }
+  }
+
+  static Future<dynamic> delete(
+    String endpoint, {
+    Map<String, String>? headers,
+  }) async {
+    final uri = Uri.parse('$baseUrl$endpoint');
+    try {
+      final response = await http.delete(uri, headers: headers);
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      } else if (response.statusCode == 204 || response.body.trim().isEmpty) {
+        return null;
+      } else {
+        throw Exception(
+          'Backend Error: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       throw Exception('Network Error: $e');

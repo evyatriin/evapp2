@@ -2,22 +2,42 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'src/core/app_config.dart';
 import 'src/core/router.dart';
 import 'src/core/theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Initialize AdMob
-  await MobileAds.instance.initialize();
 
-  // Initialize Supabase
-  await Supabase.initialize(
-    url: 'https://mzxwbfpxmyjmbfhosgkk.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16eHdiZnB4bXlqbWJmaG9zZ2trIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1NTY0NjIsImV4cCI6MjA4MDEzMjQ2Mn0.dX-ZkKDOgXfOeyYrkyA77NLZmM-sWyf2zjXfVp7zFWg',
-  );
-  
-  runApp(const ProviderScope(child: MyApp()));
+  if (AppConfig.adsEnabled) {
+    await MobileAds.instance.initialize();
+  }
+
+  final configError = AppConfig.supabaseConfigError;
+  if (configError != null) {
+    runApp(
+      _ConfigurationErrorApp(
+        message: configError,
+      ),
+    );
+    return;
+  }
+
+  try {
+    await Supabase.initialize(
+      url: AppConfig.supabaseUrl,
+      anonKey: AppConfig.supabaseAnonKey,
+    );
+    runApp(const ProviderScope(child: MyApp()));
+  } catch (error) {
+    runApp(
+      _ConfigurationErrorApp(
+        message:
+            'App services could not be reached. Check BACKEND_URL, SUPABASE_URL, and your network connection, then rebuild the app.',
+        details: error.toString(),
+      ),
+    );
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -26,12 +46,73 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'EV-Ranger',
+      title: 'EVraahein',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.system,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+class _ConfigurationErrorApp extends StatelessWidget {
+  const _ConfigurationErrorApp({required this.message, this.details});
+
+  final String message;
+  final String? details;
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.cloud_off_outlined,
+                    size: 72,
+                    color: Colors.redAccent,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Configuration Needed',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  if (details != null && details!.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      details!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Colors.black54,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

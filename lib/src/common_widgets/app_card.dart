@@ -27,16 +27,16 @@ class AppCard extends StatelessWidget {
     return Card(
       elevation: elevation,
       margin: margin,
-      color: color ?? theme.colorScheme.surface,
+      color: color ?? theme.colorScheme.surfaceContainerLowest,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         side: border?.top ?? BorderSide.none, // Simplified for now
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: padding ?? const EdgeInsets.all(16),
+          padding: padding ?? const EdgeInsets.all(18),
           child: child,
         ),
       ),

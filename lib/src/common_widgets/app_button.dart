@@ -86,19 +86,13 @@ class AppButton extends StatelessWidget {
       AppButtonType.filled => FilledButton.styleFrom(
           backgroundColor: backgroundColor,
           foregroundColor: foregroundColor,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       AppButtonType.outlined => OutlinedButton.styleFrom(
           foregroundColor: foregroundColor,
           side: backgroundColor != null ? BorderSide(color: backgroundColor!) : null,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       AppButtonType.text => TextButton.styleFrom(
           foregroundColor: foregroundColor,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
     };
     return baseStyle;

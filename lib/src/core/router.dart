@@ -1,6 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/mapping/home_screen.dart';
+import '../features/mapping/location_search_screen.dart';
 import '../features/vehicle_profile/profile_screen.dart';
 import '../features/vehicle_profile/vehicle_form_screen.dart';
 import '../features/vehicle_profile/vehicle_model.dart';
@@ -10,9 +12,9 @@ import '../features/onboarding/splash_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/navigation/main_screen.dart';
 import '../features/charge/charge_screen.dart';
+import '../features/charge/community_charging_screen.dart';
 import '../features/community/community_screen.dart';
 import '../features/route_planner/route_result_screen.dart';
-import '../features/route_planner/route_model.dart';
 import '../features/authentication/login_screen.dart';
 import '../features/authentication/signup_screen.dart';
 import '../features/authentication/forgot_password_screen.dart';
@@ -22,22 +24,15 @@ import '../features/profile/change_password_screen.dart';
 import '../features/profile/statistics_screen.dart';
 import '../features/route_planner/saved_routes_screen.dart';
 import '../features/vehicle_profile/vehicle_selection_screen.dart';
+import '../features/obd/obd_analytics_screen.dart';
+import '../features/obd/obd_telemetry_screen.dart';
 
 final router = GoRouter(
   initialLocation: '/splash',
   routes: [
-    GoRoute(
-      path: '/splash',
-      builder: (context, state) => const SplashScreen(),
-    ),
-    GoRoute(
-      path: '/login',
-      builder: (context, state) => const LoginScreen(),
-    ),
-    GoRoute(
-      path: '/signup',
-      builder: (context, state) => const SignupScreen(),
-    ),
+    GoRoute(path: '/splash', builder: (context, state) => const SplashScreen()),
+    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+    GoRoute(path: '/signup', builder: (context, state) => const SignupScreen()),
     GoRoute(
       path: '/forgot-password',
       builder: (context, state) => const ForgotPasswordScreen(),
@@ -57,8 +52,33 @@ final router = GoRouter(
       builder: (context, state) => const SavedRoutesScreen(),
     ),
     GoRoute(
+      path: '/planner/result',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>;
+        return RouteResultScreen(extra: extra);
+      },
+    ),
+    GoRoute(
       path: '/statistics',
       builder: (context, state) => const StatisticsScreen(),
+    ),
+    GoRoute(
+      path: '/community-charging',
+      builder: (context, state) => const CommunityChargingScreen(),
+    ),
+    GoRoute(
+      path: '/search',
+      builder: (context, state) => const LocationSearchScreen(),
+    ),
+    GoRoute(
+      path: '/obd',
+      builder: (context, state) => const _ObdPage(),
+      routes: [
+        GoRoute(
+          path: 'analytics',
+          builder: (context, state) => const ObdAnalyticsScreen(),
+        ),
+      ],
     ),
     GoRoute(
       path: '/profile',
@@ -91,10 +111,7 @@ final router = GoRouter(
         ),
       ],
     ),
-    GoRoute(
-      path: '/sos',
-      builder: (context, state) => const SosScreen(),
-    ),
+    GoRoute(path: '/sos', builder: (context, state) => const SosScreen()),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return MainScreen(navigationShell: navigationShell);
@@ -103,10 +120,7 @@ final router = GoRouter(
         // Find (Map)
         StatefulShellBranch(
           routes: [
-            GoRoute(
-              path: '/',
-              builder: (context, state) => const HomeScreen(),
-            ),
+            GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
           ],
         ),
         // Plan (Route Planner)
@@ -115,18 +129,8 @@ final router = GoRouter(
             GoRoute(
               path: '/planner',
               builder: (context, state) => const RoutePlannerScreen(),
-              routes: [
-                GoRoute(
-                  path: 'result',
-                  builder: (context, state) {
-                    final extra = state.extra as Map<String, dynamic>;
-                    return RouteResultScreen(extra: extra);
-                  },
-                ),
-              ],
             ),
           ],
-
         ),
         // Charge
         StatefulShellBranch(
@@ -150,3 +154,14 @@ final router = GoRouter(
     ),
   ],
 );
+
+class _ObdPage extends StatelessWidget {
+  const _ObdPage();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      body: ObdTelemetryScreen(),
+    );
+  }
+}
