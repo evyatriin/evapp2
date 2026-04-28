@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from datetime import datetime
-from supabase_client import supabase
+from supabase_client import supabase, service_supabase
 import uuid
 from auth_utils import ensure_same_user, get_authenticated_user
 from utils.charger_aggregation import aggregate_chargers_nearby
@@ -758,8 +758,8 @@ async def create_checkin(
         data = {k: v for k, v in checkin.dict().items() if k not in _non_db and v is not None}
         data['created_at'] = datetime.now().isoformat()
 
-        # Insert checkin
-        response = supabase.table("station_checkins").insert(data).execute()
+        # Insert checkin — use service client to bypass RLS (user already verified above)
+        response = service_supabase.table("station_checkins").insert(data).execute()
 
         # Reward points logic - use points from request (default 10)
         points_to_award = checkin.points_earned or 10
