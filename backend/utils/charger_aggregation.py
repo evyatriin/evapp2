@@ -12,6 +12,7 @@ import httpx
 
 from config import settings
 from supabase_client import service_supabase, supabase
+from metrics_tracker import track_external_api
 
 logger = logging.getLogger(__name__)
 
@@ -396,12 +397,17 @@ async def _fetch_google_places_nearby(
     }
 
     async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.post(
-            "https://places.googleapis.com/v1/places:searchNearby",
-            headers=headers,
-            json=body,
-        )
-        response.raise_for_status()
+        try:
+            response = await client.post(
+                "https://places.googleapis.com/v1/places:searchNearby",
+                headers=headers,
+                json=body,
+            )
+            response.raise_for_status()
+            track_external_api("google_places_nearby", success=True)
+        except httpx.HTTPError:
+            track_external_api("google_places_nearby", success=False)
+            raise
         data = response.json()
 
     chargers: list[NormalizedCharger] = []
@@ -498,11 +504,16 @@ async def _fetch_here_ev_nearby(
     }
 
     async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.get(
-            "https://browse.search.hereapi.com/v1/browse",
-            params=params,
-        )
-        response.raise_for_status()
+        try:
+            response = await client.get(
+                "https://browse.search.hereapi.com/v1/browse",
+                params=params,
+            )
+            response.raise_for_status()
+            track_external_api("here_browse", success=True)
+        except httpx.HTTPError:
+            track_external_api("here_browse", success=False)
+            raise
         data = response.json()
 
     chargers: list[NormalizedCharger] = []
@@ -750,12 +761,17 @@ async def _fetch_open_charge_map_nearby(
     headers = {"X-API-Key": api_key}
 
     async with httpx.AsyncClient(timeout=20.0) as client:
-        response = await client.get(
-            "https://api.openchargemap.io/v3/poi/",
-            params=params,
-            headers=headers,
-        )
-        response.raise_for_status()
+        try:
+            response = await client.get(
+                "https://api.openchargemap.io/v3/poi/",
+                params=params,
+                headers=headers,
+            )
+            response.raise_for_status()
+            track_external_api("openchargemap", success=True)
+        except httpx.HTTPError:
+            track_external_api("openchargemap", success=False)
+            raise
         rows = response.json()
 
     chargers: list[NormalizedCharger] = []

@@ -4,6 +4,7 @@ import httpx
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from config import settings
+from metrics_tracker import track_external_api
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -47,8 +48,10 @@ async def get_nearby_places(request: Request, body: PlacesRequest):
         try:
             response = await client.post(url, headers=headers, json=payload)
             response.raise_for_status()
+            track_external_api("google_places_nearby", success=True)
             return response.json()
         except httpx.HTTPError as e:
+            track_external_api("google_places_nearby", success=False)
             raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/autocomplete")
@@ -71,8 +74,10 @@ async def autocomplete(request: Request, input: str):
         try:
             response = await client.get(url, params=params)
             response.raise_for_status()
+            track_external_api("google_autocomplete", success=True)
             return response.json()
         except httpx.HTTPError as e:
+            track_external_api("google_autocomplete", success=False)
             raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/details")
@@ -95,6 +100,8 @@ async def place_details(request: Request, place_id: str):
         try:
             response = await client.get(url, params=params)
             response.raise_for_status()
+            track_external_api("google_place_details", success=True)
             return response.json()
         except httpx.HTTPError as e:
+            track_external_api("google_place_details", success=False)
             raise HTTPException(status_code=500, detail=str(e))

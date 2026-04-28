@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from supabase_client import supabase
+from metrics_tracker import track_user_event
 
 router = APIRouter()
 
@@ -37,6 +38,7 @@ async def signup(request: SignUpRequest):
         })
         
         if response.user:
+            track_user_event("signup")
             return {
                 "user": {
                     "id": response.user.id,
@@ -67,9 +69,9 @@ async def login(request: SignInRequest):
         })
         
         if response.user and response.session:
-            # Get user metadata
+            track_user_event("login")
             user_data = response.user.user_metadata or {}
-            
+
             return {
                 "user": {
                     "id": response.user.id,

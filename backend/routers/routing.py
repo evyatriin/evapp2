@@ -95,10 +95,16 @@ CHARGE_OPERATOR_IDS: dict[str, str] = {
 
 
 async def _fetch_here_route(params: dict[str, str]) -> dict[str, Any]:
+    from metrics_tracker import track_external_api
     async with httpx.AsyncClient(timeout=60.0) as client:
-        response = await client.get("https://router.hereapi.com/v8/routes", params=params)
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = await client.get("https://router.hereapi.com/v8/routes", params=params)
+            response.raise_for_status()
+            track_external_api("here_routing", success=True)
+            return response.json()
+        except httpx.HTTPError:
+            track_external_api("here_routing", success=False)
+            raise
 
 
 @router.post("/")

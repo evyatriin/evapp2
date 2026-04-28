@@ -1,12 +1,14 @@
 from contextlib import asynccontextmanager
 import logging
 import os
+import time
 
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.httpx import HttpxIntegration
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -38,6 +40,20 @@ sentry_sdk.init(
 
 limiter = Limiter(key_func=get_remote_address)
 
+_SKIP_METRICS = {"/", "/health", "/ready", "/api/admin/dashboard"}
+
+
+class _MetricsMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path in _SKIP_METRICS or request.url.path.startswith("/api/admin/metrics"):
+            return await call_next(request)
+        start = time.monotonic()
+        response = await call_next(request)
+        duration_ms = int((time.monotonic() - start) * 1000)
+        from metrics_tracker import track_api_call
+        track_api_call(request.url.path, request.method, response.status_code, duration_ms)
+        return response
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -57,6 +73,7 @@ app = FastAPI(title="EV Router Backend", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+app.add_middleware(_MetricsMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,

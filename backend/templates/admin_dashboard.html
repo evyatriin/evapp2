@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EVraahein · Admin Dashboard</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    body { background: #0f172a; color: #e2e8f0; font-family: system-ui, sans-serif; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; }
+    .pill-green { background: #14532d; color: #86efac; border-radius: 9999px; padding: 2px 10px; font-size: 0.75rem; }
+    .pill-red   { background: #450a0a; color: #fca5a5; border-radius: 9999px; padding: 2px 10px; font-size: 0.75rem; }
+    table { border-collapse: collapse; width: 100%; }
+    th { color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px; text-align: left; border-bottom: 1px solid #334155; }
+    td { padding: 8px 12px; border-bottom: 1px solid #1e293b; font-size: 0.875rem; }
+    tr:hover td { background: #1e293b55; }
+    input { background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; color: #e2e8f0; padding: 10px 14px; width: 100%; }
+    input:focus { outline: 2px solid #22c55e; }
+    .btn { padding: 10px 20px; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+    .btn:hover { opacity: 0.85; }
+    .btn-green { background: #16a34a; color: white; }
+    .btn-ghost { background: #334155; color: #cbd5e1; }
+    ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ LOGIN ═══════════════ -->
+<div id="login-wrap" class="min-h-screen flex items-center justify-center p-4">
+  <div class="card p-8 w-full max-w-sm">
+    <div class="text-center mb-6">
+      <span class="text-3xl font-bold" style="color:#22c55e">⚡ EVraahein</span>
+      <p class="text-slate-400 mt-1 text-sm">Admin Dashboard</p>
+    </div>
+    <div class="space-y-4">
+      <input id="loginEmail"    type="email"    placeholder="Admin email" />
+      <input id="loginPassword" type="password" placeholder="Password" />
+      <button class="btn btn-green w-full" onclick="doLogin()">Sign In</button>
+      <p id="loginError" class="text-red-400 text-sm text-center hidden"></p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ DASHBOARD ═══════════════ -->
+<div id="dash-wrap" class="hidden min-h-screen">
+
+  <!-- Header -->
+  <header class="sticky top-0 z-10 flex items-center justify-between px-6 py-3 border-b border-slate-700" style="background:#0f172a">
+    <span class="text-lg font-bold" style="color:#22c55e">⚡ EVraahein Admin</span>
+    <div class="flex items-center gap-3">
+      <span id="lastRefresh" class="text-slate-400 text-xs"></span>
+      <select id="daysPicker" class="btn btn-ghost text-sm py-1.5 px-3" onchange="loadData()">
+        <option value="7">Last 7 days</option>
+        <option value="30" selected>Last 30 days</option>
+        <option value="90">Last 90 days</option>
+      </select>
+      <button class="btn btn-green text-sm py-1.5" onclick="loadData()">↺ Refresh</button>
+      <button class="btn btn-ghost text-sm py-1.5" onclick="doLogout()">Logout</button>
+    </div>
+  </header>
+
+  <main class="p-6 space-y-6 max-w-screen-2xl mx-auto">
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+      <div class="card p-4 col-span-1">
+        <p class="text-slate-400 text-xs mb-1">API Calls Today</p>
+        <p id="c-calls" class="text-2xl font-bold text-white">—</p>
+      </div>
+      <div class="card p-4 col-span-1">
+        <p class="text-slate-400 text-xs mb-1">Error Rate</p>
+        <p id="c-errors" class="text-2xl font-bold text-white">—</p>
+      </div>
+      <div class="card p-4 col-span-1">
+        <p class="text-slate-400 text-xs mb-1">Avg Latency</p>
+        <p id="c-latency" class="text-2xl font-bold text-white">—</p>
+      </div>
+      <div class="card p-4 col-span-1">
+        <p class="text-slate-400 text-xs mb-1">Logins Today</p>
+        <p id="c-logins" class="text-2xl font-bold text-white">—</p>
+      </div>
+      <div class="card p-4 col-span-1">
+        <p class="text-slate-400 text-xs mb-1">New Signups</p>
+        <p id="c-signups" class="text-2xl font-bold" style="color:#22c55e">—</p>
+      </div>
+      <div class="card p-4 col-span-1">
+        <p class="text-slate-400 text-xs mb-1">Total Users</p>
+        <p id="c-users" class="text-2xl font-bold" style="color:#38bdf8">—</p>
+      </div>
+    </div>
+
+    <!-- Cost Banner -->
+    <div class="card p-4 flex flex-wrap gap-6 items-center">
+      <div>
+        <p class="text-slate-400 text-xs">Est. This Month (API)</p>
+        <p id="cost-month" class="text-xl font-bold text-white">—</p>
+      </div>
+      <div>
+        <p class="text-slate-400 text-xs">Google Credit Remaining</p>
+        <p id="cost-credit" class="text-xl font-bold" style="color:#22c55e">—</p>
+      </div>
+      <div>
+        <p class="text-slate-400 text-xs">Cloud Run Est.</p>
+        <p id="cost-cr" class="text-xl font-bold" style="color:#a78bfa">—</p>
+      </div>
+      <div class="ml-auto text-right">
+        <p class="text-slate-400 text-xs">Net Monthly Total</p>
+        <p id="cost-net" class="text-2xl font-bold" style="color:#fb923c">—</p>
+        <p class="text-slate-500 text-xs">after Google $200 credit</p>
+      </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card p-4">
+        <p class="font-semibold mb-3 text-slate-200">API Call Volume</p>
+        <canvas id="callsChart" height="140"></canvas>
+      </div>
+      <div class="card p-4">
+        <p class="font-semibold mb-3 text-slate-200">User Activity (Logins + Signups)</p>
+        <canvas id="userChart" height="140"></canvas>
+      </div>
+    </div>
+
+    <!-- External API + Top Endpoints -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+      <!-- External APIs -->
+      <div class="card p-4">
+        <p class="font-semibold mb-3 text-slate-200">External API Usage &amp; Cost (This Month)</p>
+        <table>
+          <thead><tr>
+            <th>Service</th><th>Calls/Day</th><th>Calls/Month</th><th>Free Tier</th><th>Rate/$1K</th><th>Month Cost</th>
+          </tr></thead>
+          <tbody id="ext-table"></tbody>
+        </table>
+      </div>
+
+      <!-- Top Endpoints -->
+      <div class="card p-4">
+        <p class="font-semibold mb-3 text-slate-200">Top Endpoints (Today)</p>
+        <table>
+          <thead><tr>
+            <th>Endpoint</th><th>Method</th><th>Calls</th><th>Errors</th><th>Avg ms</th>
+          </tr></thead>
+          <tbody id="ep-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Monthly Cost Breakdown Bar -->
+    <div class="card p-4">
+      <p class="font-semibold mb-3 text-slate-200">Monthly Cost Breakdown by Service</p>
+      <canvas id="costChart" height="80"></canvas>
+    </div>
+
+  </main>
+</div>
+
+<script>
+const BASE = '';  // same origin
+let token = sessionStorage.getItem('ev_admin_token');
+let callsChart, userChart, costChart;
+
+function fmt(n) { return n == null ? '—' : n.toLocaleString(); }
+function usd(v) { return v == null ? '—' : '$' + v.toFixed(2); }
+function ms(v)  { return v == null ? '—' : v + ' ms'; }
+function pct(v) { return v == null ? '—' : v.toFixed(2) + '%'; }
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pwd   = document.getElementById('loginPassword').value;
+  const errEl = document.getElementById('loginError');
+  errEl.classList.add('hidden');
+  try {
+    const res = await fetch(BASE + '/api/auth/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({email, password: pwd}),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Login failed');
+    token = data.session?.access_token;
+    sessionStorage.setItem('ev_admin_token', token);
+    showDash();
+  } catch(e) {
+    errEl.textContent = e.message;
+    errEl.classList.remove('hidden');
+  }
+}
+
+function doLogout() {
+  sessionStorage.removeItem('ev_admin_token');
+  token = null;
+  document.getElementById('dash-wrap').classList.add('hidden');
+  document.getElementById('login-wrap').classList.remove('hidden');
+}
+
+function showDash() {
+  document.getElementById('login-wrap').classList.add('hidden');
+  document.getElementById('dash-wrap').classList.remove('hidden');
+  loadData();
+}
+
+async function loadData() {
+  const days = document.getElementById('daysPicker').value;
+  let data;
+  try {
+    const res = await fetch(`${BASE}/api/admin/metrics?days=${days}`, {
+      headers: { Authorization: 'Bearer ' + token },
+    });
+    if (res.status === 401 || res.status === 403) { doLogout(); return; }
+    data = await res.json();
+  } catch(e) { alert('Failed to load metrics: ' + e.message); return; }
+
+  document.getElementById('lastRefresh').textContent = 'Updated ' + new Date().toLocaleTimeString();
+
+  const t = data.today || {};
+  const c = data.costs || {};
+
+  // Cards
+  document.getElementById('c-calls').textContent   = fmt(t.total_calls);
+  document.getElementById('c-errors').textContent  = pct(t.error_rate_pct);
+  document.getElementById('c-latency').textContent = ms(t.avg_latency_ms);
+  document.getElementById('c-logins').textContent  = fmt(t.logins);
+  document.getElementById('c-signups').textContent = fmt(t.new_signups);
+  document.getElementById('c-users').textContent   = fmt(data.total_registered_users);
+
+  // Cost banner
+  document.getElementById('cost-month').textContent  = usd(c.api_total_month_usd);
+  const creditLeft = (c.google_monthly_credit_usd || 200) - (c.google_credit_applied_usd || 0);
+  document.getElementById('cost-credit').textContent = usd(Math.max(0, creditLeft));
+  document.getElementById('cost-cr').textContent     = usd(c.cloud_run_estimate_month_usd);
+  document.getElementById('cost-net').textContent    = usd(c.net_monthly_usd);
+
+  // Charts
+  const trend = data.daily_trend || [];
+  const labels = trend.map(d => d.date.slice(5));  // MM-DD
+  renderLineChart(labels, trend);
+  renderUserChart(labels, trend);
+
+  // External API table
+  const extTbody = document.getElementById('ext-table');
+  extTbody.innerHTML = '';
+  (data.external_services || []).forEach(s => {
+    const costStyle = s.cost_month_usd > 0 ? 'color:#fb923c' : 'color:#22c55e';
+    const freeLabel = s.free_tier >= 999999 ? 'Free' : fmt(s.free_tier) + '/mo';
+    extTbody.innerHTML += `<tr>
+      <td class="font-medium">${s.label}</td>
+      <td>${fmt(s.calls_today)}</td>
+      <td>${fmt(s.calls_month)}</td>
+      <td class="text-slate-400">${freeLabel}</td>
+      <td class="text-slate-400">${s.rate_per_1000_usd === 0 ? 'Free' : '$' + s.rate_per_1000_usd}</td>
+      <td style="${costStyle}" class="font-semibold">${usd(s.cost_month_usd)}</td>
+    </tr>`;
+  });
+
+  // Cost breakdown chart
+  renderCostChart(data.external_services || [], c.cloud_run_estimate_month_usd || 0);
+
+  // Top endpoints table
+  const epTbody = document.getElementById('ep-table');
+  epTbody.innerHTML = '';
+  (data.top_endpoints || []).forEach(ep => {
+    const errStyle = ep.errors > 0 ? 'color:#f87171' : 'color:#94a3b8';
+    epTbody.innerHTML += `<tr>
+      <td class="font-mono text-xs">${ep.endpoint}</td>
+      <td><span class="pill-green">${ep.method}</span></td>
+      <td>${fmt(ep.calls)}</td>
+      <td style="${errStyle}">${fmt(ep.errors)}</td>
+      <td class="text-slate-400">${ms(ep.avg_latency_ms)}</td>
+    </tr>`;
+  });
+}
+
+function renderLineChart(labels, trend) {
+  const ctx = document.getElementById('callsChart').getContext('2d');
+  if (callsChart) callsChart.destroy();
+  callsChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: 'API Calls', data: trend.map(d => d.total_calls || 0), borderColor: '#22c55e', backgroundColor: '#22c55e22', fill: true, tension: 0.3, pointRadius: 2 },
+        { label: 'Errors',    data: trend.map(d => d.error_calls || 0), borderColor: '#f87171', backgroundColor: '#f8717122', fill: true, tension: 0.3, pointRadius: 2 },
+      ],
+    },
+    options: { responsive: true, plugins: { legend: { labels: { color: '#94a3b8' } } },
+      scales: { x: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+                y: { ticks: { color: '#64748b' }, grid: { color: '#1e293b' } } } },
+  });
+}
+
+function renderUserChart(labels, trend) {
+  const ctx = document.getElementById('userChart').getContext('2d');
+  if (userChart) userChart.destroy();
+  userChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Logins',   data: trend.map(d => d.logins || 0),      backgroundColor: '#38bdf8aa' },
+        { label: 'Signups',  data: trend.map(d => d.new_signups || 0), backgroundColor: '#22c55eaa' },
+      ],
+    },
+    options: { responsive: true, plugins: { legend: { labels: { color: '#94a3b8' } } },
+      scales: { x: { stacked: true, ticks: { color: '#64748b' }, grid: { color: '#1e293b' } },
+                y: { stacked: true, ticks: { color: '#64748b' }, grid: { color: '#1e293b' } } } },
+  });
+}
+
+function renderCostChart(services, cloudRunCost) {
+  const ctx = document.getElementById('costChart').getContext('2d');
+  if (costChart) costChart.destroy();
+  const labels = [...services.map(s => s.label), 'Cloud Run'];
+  const values = [...services.map(s => s.cost_month_usd), cloudRunCost];
+  const colors = ['#38bdf8','#818cf8','#fb923c','#f472b6','#34d399','#a78bfa','#94a3b8'];
+  costChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Monthly Cost (USD)', data: values, backgroundColor: colors }] },
+    options: { indexAxis: 'y', responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { color: '#64748b', callback: v => '$' + v }, grid: { color: '#1e293b' } },
+                y: { ticks: { color: '#94a3b8' }, grid: { color: '#1e293b' } } } },
+  });
+}
+
+// Auto-boot
+if (token) { showDash(); }
+</script>
+</body>
+</html>
