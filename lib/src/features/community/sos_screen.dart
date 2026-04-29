@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gap/gap.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -55,6 +56,52 @@ class _SosScreenState extends ConsumerState<SosScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final vehicles = ref.watch(vehicleProvider);
+    final user = ref.watch(userProvider);
+
+    // Phone verification gate — backend requires is_phone_verified
+    if (user != null && !user.isPhoneVerified) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Emergency SOS'), centerTitle: true),
+        body: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Icon(
+                PhosphorIcons.shieldWarning(PhosphorIconsStyle.duotone),
+                size: 72,
+                color: theme.colorScheme.error,
+              ),
+              const Gap(20),
+              Text(
+                'Verify your phone first',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const Gap(12),
+              Text(
+                'SOS alerts go out to nearby drivers, who need a real number to reach you. Verify your phone to unlock emergency alerts.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyMedium,
+              ),
+              const Gap(28),
+              FilledButton.icon(
+                onPressed: () {
+                  context.push('/profile/edit');
+                },
+                icon: const Icon(Icons.verified_user_outlined),
+                label: const Text('Verify Phone Number'),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     // Auto-select first vehicle if available and none selected
     if (_selectedVehicleId == null && vehicles.isNotEmpty) {

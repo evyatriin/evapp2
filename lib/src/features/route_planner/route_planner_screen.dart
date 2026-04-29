@@ -899,13 +899,30 @@ class TripSummarySheet extends StatelessWidget {
                           return;
                         }
                         
-                        // Launch navigation in maps app
+                        // Launch navigation in maps app, preserving every charging
+                        // stop as a waypoint so the EV-aware multi-stop plan
+                        // survives the hand-off.
                         try {
                           final origin = route.stops.first.location;
                           final destination = route.stops.last.location;
-                          
+
+                          // Intermediate stops (everything between origin and
+                          // destination) become waypoints. Includes charging
+                          // stops the planner inserted.
+                          final intermediates = route.stops.length > 2
+                              ? route.stops.sublist(1, route.stops.length - 1)
+                              : const [];
+                          final waypoints = [
+                            for (final stop in intermediates)
+                              Waypoint(
+                                stop.location.latitude,
+                                stop.location.longitude,
+                                stop.name,
+                              ),
+                          ];
+
                           final availableMaps = await MapLauncher.installedMaps;
-                          
+
                           if (availableMaps.isEmpty) {
                             if (context.mounted) {
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -914,11 +931,11 @@ class TripSummarySheet extends StatelessWidget {
                             }
                             return;
                           }
-                          
-                          // Use first available map (usually Google Maps on Android, Apple Maps on iOS)
+
                           await availableMaps.first.showDirections(
                             destination: Coords(destination.latitude, destination.longitude),
                             origin: Coords(origin.latitude, origin.longitude),
+                            waypoints: waypoints.isEmpty ? null : waypoints,
                             directionsMode: DirectionsMode.driving,
                           );
                         } catch (e) {

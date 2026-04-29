@@ -1,3 +1,5 @@
+import 'vehicle_template_model.dart';
+
 class VehicleProfile {
   final String id;
   final String userId;
@@ -49,11 +51,11 @@ class VehicleProfile {
     );
   }
   
-  double get estimatedRange {
-    // Dummy base range for MVP
-    const baseRange = 400.0; 
-    return baseRange * rangeEfficiency;
-  }
+  double get ratedRangeKm => ratedRangeKmFor(brand, model);
+
+  /// Real-world expected range, derived from the model's rated range
+  /// scaled by the user's efficiency factor.
+  double get estimatedRange => ratedRangeKm * rangeEfficiency;
 
   // JSON serialization
   factory VehicleProfile.fromJson(Map<String, dynamic> json) {

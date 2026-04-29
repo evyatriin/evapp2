@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -36,18 +35,15 @@ class ObdSessionController extends Notifier<ObdSessionState> {
 
   @override
   ObdSessionState build() {
-    debugPrint('[OBD] Controller build() called');
     ref.onDispose(_disposeResources);
     Future<void>.microtask(_init);
     return ObdSessionState.initial();
   }
 
   Future<void> _init() async {
-    debugPrint('[OBD] _init() started');
     try {
       _service.bindDiagnostics(_recordDiagnostic);
       _recordDiagnostic('setup', 'OBD controller initialization started.');
-      debugPrint('[OBD] binding scan streams...');
       _service.bindScanStreams(
         onScanResults: (devices) {
           _recordDiagnostic(
@@ -71,11 +67,7 @@ class ObdSessionController extends Notifier<ObdSessionState> {
           );
         },
       );
-      debugPrint('[OBD] scan streams bound');
-
-      debugPrint('[OBD] listening to adapter state...');
       _adapterSubscription = FlutterBluePlus.adapterState.listen((adapterState) {
-        debugPrint('[OBD] adapter state changed: $adapterState');
         _recordDiagnostic('adapter', 'Bluetooth adapter state is $adapterState.');
         final nextStage = switch (adapterState) {
           BluetoothAdapterState.off => ObdConnectionStage.bluetoothOff,
@@ -96,11 +88,7 @@ class ObdSessionController extends Notifier<ObdSessionState> {
           statusMessage: message,
         );
       });
-      debugPrint('[OBD] adapter listener set up');
-
-      debugPrint('[OBD] requesting permissions...');
       final support = await _service.ensurePermissions();
-      debugPrint('[OBD] permissions result: granted=${support.permissionsGranted}, ble=${support.bleSupported}, classic=${support.classicSupported}');
       _recordDiagnostic(
         'permissions',
         'Permissions granted=${support.permissionsGranted}, BLE=${support.bleSupported}, classic=${support.classicSupported}.',
@@ -132,10 +120,7 @@ class ObdSessionController extends Notifier<ObdSessionState> {
                 : 'Bluetooth is not supported on this device.',
       );
       _recordDiagnostic('setup', 'OBD controller initialization finished.');
-      debugPrint('[OBD] _init() completed successfully');
-    } catch (e, stack) {
-      debugPrint('[OBD] _init() error: $e');
-      debugPrint('[OBD] Stack: $stack');
+    } catch (e) {
       _recordDiagnostic('setup', 'Initialization failed: $e');
       state = state.copyWith(
         stage: ObdConnectionStage.error,

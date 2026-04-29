@@ -14,15 +14,10 @@ class ObdTelemetryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    debugPrint('[OBD-UI] build() called');
-
     final ObdSessionState session;
     try {
       session = ref.watch(obdSessionControllerProvider);
-      debugPrint('[OBD-UI] provider watched OK, stage=${session.stage}, devices=${session.scanDevices.length}');
-    } catch (e, stack) {
-      debugPrint('[OBD-UI] provider watch FAILED: $e');
-      debugPrint('[OBD-UI] stack: $stack');
+    } catch (e) {
       return _ErrorFallback(error: e);
     }
 
@@ -30,7 +25,6 @@ class ObdTelemetryScreen extends ConsumerWidget {
     try {
       controller = ref.read(obdSessionControllerProvider.notifier);
     } catch (e) {
-      debugPrint('[OBD-UI] notifier read FAILED: $e');
       return _ErrorFallback(error: e);
     }
 
@@ -38,8 +32,6 @@ class ObdTelemetryScreen extends ConsumerWidget {
     final isConnected = session.selectedDevice != null;
     final isScanning = session.isScanning;
     final stage = session.stage;
-
-    debugPrint('[OBD-UI] rendering: isConnected=$isConnected, isScanning=$isScanning, stage=$stage');
 
     return Scaffold(
       appBar: AppBar(

@@ -4,7 +4,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:intl/intl.dart';
 import 'charging_service.dart';
 import '../community/check_in_sheet.dart';
+import '../community/moderation_service.dart';
 import '../authentication/user_provider.dart';
+import '../authentication/auth_service.dart';
 
 class ChargeScreen extends ConsumerStatefulWidget {
   const ChargeScreen({super.key});
@@ -98,6 +100,106 @@ class _ChargeScreenState extends ConsumerState<ChargeScreen>
         }
       });
     }
+  }
+
+  Future<void> _showModerationMenu({
+    String? reportedUserId,
+    required String reportedUserName,
+  }) async {
+    if (reportedUserId == null) return;
+    final me = ref.read(userProvider);
+    if (me == null) return;
+    if (me.id == reportedUserId) return; // can't report yourself
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.flag_outlined),
+              title: Text('Report $reportedUserName'),
+              onTap: () => Navigator.pop(ctx, 'report'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.block, color: Colors.red),
+              title: Text('Block $reportedUserName'),
+              onTap: () => Navigator.pop(ctx, 'block'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Cancel'),
+              onTap: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+
+    final token = AuthService().getAuthToken();
+    if (token == null) return;
+    final svc = ModerationService();
+
+    try {
+      if (action == 'report') {
+        final reason = await _promptReportReason();
+        if (reason == null || reason.isEmpty) return;
+        await svc.reportUser(
+          reporterId: me.id,
+          reportedUserId: reportedUserId,
+          reason: reason,
+          authToken: token,
+        );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Report submitted. Our team will review it.')),
+        );
+      } else {
+        await svc.blockUser(
+          blockerId: me.id,
+          blockedId: reportedUserId,
+          authToken: token,
+        );
+        if (!mounted) return;
+        setState(() {
+          _publicCheckIns.removeWhere((c) => c['user_id'] == reportedUserId);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$reportedUserName blocked.')),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Action failed: $e')),
+      );
+    }
+  }
+
+  Future<String?> _promptReportReason() async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Why are you reporting this?'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Spam, abusive content, fake review, etc.',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -215,7 +317,12 @@ class _ChargeScreenState extends ConsumerState<ChargeScreen>
 
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
-          child: Padding(
+          child: InkWell(
+            onLongPress: () => _showModerationMenu(
+              reportedUserId: item['user_id']?.toString(),
+              reportedUserName: userName.toString(),
+            ),
+            child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -359,6 +466,7 @@ class _ChargeScreenState extends ConsumerState<ChargeScreen>
                 ),
               ],
             ),
+          ),
           ),
         );
       },

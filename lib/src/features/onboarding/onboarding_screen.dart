@@ -165,14 +165,18 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   // Button
                   if (_currentPage == 1)
                     FilledButton(
-                      onPressed: _isLoading ? null : _completeOnboarding,
+                      onPressed: (_isLoading || !_locationGranted)
+                          ? null
+                          : _completeOnboarding,
                       child: _isLoading
                           ? const SizedBox(
                               height: 20,
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                             )
-                          : const Text('Get Started'),
+                          : Text(_locationGranted
+                              ? 'Get Started'
+                              : 'Allow Location First'),
                     )
                   else
                     FilledButton.tonal(

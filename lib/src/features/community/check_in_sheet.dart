@@ -881,6 +881,9 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
         driveMode: _selectedDriveMode,
       );
 
+      // Refresh user points in the app bar immediately
+      await ref.read(userProvider.notifier).refresh();
+
       if (mounted) {
         Navigator.pop(context);
         showDialog(

@@ -319,8 +319,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 helperText:
                     'Include a country code, or enter a 10-digit Indian mobile number and we will format it.',
               ),
-              onChanged: (_) {
-                if (_isPhoneVerified) {
+              onChanged: (value) {
+                // Only invalidate verification when the *normalized* number
+                // actually differs from the one we already verified. Cosmetic
+                // edits (spaces, formatting) shouldn't drop verified status.
+                if (!_isPhoneVerified) return;
+                final normalized = _authService.normalizePhoneNumber(value);
+                if (normalized != _verifiedPhoneNumber) {
                   setState(() {
                     _isPhoneVerified = false;
                     _verifiedPhoneNumber = null;

@@ -592,7 +592,9 @@ class ObdService {
         if (result.supported && result.value != null) {
           return result;
         }
-      } catch (_) {}
+      } catch (_) {
+        continue;
+      }
     }
 
     return ObdCommandResult(
