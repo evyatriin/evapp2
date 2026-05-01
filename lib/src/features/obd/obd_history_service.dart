@@ -24,12 +24,20 @@ class ObdHistoryEntry {
   final double? voltage;
   final double? batteryPowerKw;
   final double? temperatureC;
+  final double? batteryCurrentA;
+  final double? cellDeltaMv;
+  final String? evProfileName;
   final double averageSpeedKph;
   final double peakSpeedKph;
   final double tripDistanceKm;
   final double smoothDrivingScore;
   final double efficiencyScore;
   final int harshEvents;
+  final double? elevationM;
+  final double? gradePct;
+  final double? chargeThresholdPct;
+  final double? predictionRemainingKm;
+  final double? predictionRatePerKm;
 
   const ObdHistoryEntry({
     required this.sessionId,
@@ -49,6 +57,14 @@ class ObdHistoryEntry {
     this.voltage,
     this.batteryPowerKw,
     this.temperatureC,
+    this.batteryCurrentA,
+    this.cellDeltaMv,
+    this.evProfileName,
+    this.elevationM,
+    this.gradePct,
+    this.chargeThresholdPct,
+    this.predictionRemainingKm,
+    this.predictionRatePerKm,
   });
 
   factory ObdHistoryEntry.fromJson(Map<String, dynamic> json) {
@@ -66,6 +82,9 @@ class ObdHistoryEntry {
       voltage: (json['voltage'] as num?)?.toDouble(),
       batteryPowerKw: (json['battery_power_kw'] as num?)?.toDouble(),
       temperatureC: (json['temperature_c'] as num?)?.toDouble(),
+      batteryCurrentA: (json['battery_current_a'] as num?)?.toDouble(),
+      cellDeltaMv: (json['cell_delta_mv'] as num?)?.toDouble(),
+      evProfileName: json['ev_profile_name'] as String?,
       averageSpeedKph: (json['average_speed_kph'] as num?)?.toDouble() ?? 0,
       peakSpeedKph: (json['peak_speed_kph'] as num?)?.toDouble() ?? 0,
       tripDistanceKm: (json['trip_distance_km'] as num?)?.toDouble() ?? 0,
@@ -73,6 +92,13 @@ class ObdHistoryEntry {
           (json['smooth_driving_score'] as num?)?.toDouble() ?? 0,
       efficiencyScore: (json['efficiency_score'] as num?)?.toDouble() ?? 0,
       harshEvents: json['harsh_events'] as int? ?? 0,
+      elevationM: (json['elevation_m'] as num?)?.toDouble(),
+      gradePct: (json['grade_pct'] as num?)?.toDouble(),
+      chargeThresholdPct: (json['charge_threshold_pct'] as num?)?.toDouble(),
+      predictionRemainingKm:
+          (json['prediction_remaining_km'] as num?)?.toDouble(),
+      predictionRatePerKm:
+          (json['prediction_rate_per_km'] as num?)?.toDouble(),
     );
   }
 
@@ -89,12 +115,20 @@ class ObdHistoryEntry {
       'voltage': voltage,
       'battery_power_kw': batteryPowerKw,
       'temperature_c': temperatureC,
+      'battery_current_a': batteryCurrentA,
+      'cell_delta_mv': cellDeltaMv,
+      'ev_profile_name': evProfileName,
       'average_speed_kph': averageSpeedKph,
       'peak_speed_kph': peakSpeedKph,
       'trip_distance_km': tripDistanceKm,
       'smooth_driving_score': smoothDrivingScore,
       'efficiency_score': efficiencyScore,
       'harsh_events': harshEvents,
+      'elevation_m': elevationM,
+      'grade_pct': gradePct,
+      'charge_threshold_pct': chargeThresholdPct,
+      'prediction_remaining_km': predictionRemainingKm,
+      'prediction_rate_per_km': predictionRatePerKm,
       'updated_at': updatedAt.toIso8601String(),
     };
   }
@@ -180,9 +214,12 @@ class ObdHistoryService {
           .select(
             'user_id, session_id, started_at, session_updated_at, '
             'device_name, device_id, battery_percent, soh_percent, voltage, '
-            'battery_power_kw, temperature_c, average_speed_kph, '
+            'battery_power_kw, temperature_c, battery_current_a, '
+            'cell_delta_mv, ev_profile_name, average_speed_kph, '
             'peak_speed_kph, trip_distance_km, smooth_driving_score, '
-            'efficiency_score, harsh_events',
+            'efficiency_score, harsh_events, elevation_m, grade_pct, '
+            'charge_threshold_pct, prediction_remaining_km, '
+            'prediction_rate_per_km',
           )
           .eq('user_id', userId)
           .order('session_updated_at', ascending: false)
@@ -426,6 +463,8 @@ ObdHistoryEntry buildObdHistoryEntry({
   required DriverAnalytics analytics,
   required ObdScanDevice? device,
   required String userId,
+  SocPrediction? prediction,
+  double? chargeThresholdPct,
 }) {
   return ObdHistoryEntry(
     sessionId: sessionId,
@@ -439,6 +478,9 @@ ObdHistoryEntry buildObdHistoryEntry({
     voltage: telemetry.batteryPackVoltage ?? telemetry.controlModuleVoltage,
     batteryPowerKw: telemetry.batteryPowerKw,
     temperatureC: telemetry.batteryTempC ?? telemetry.coolantTempC,
+    batteryCurrentA: telemetry.batteryCurrent,
+    cellDeltaMv: telemetry.cellDeltaMv,
+    evProfileName: telemetry.evProfileName,
     averageSpeedKph: analytics.averageSpeedKph,
     peakSpeedKph: analytics.peakSpeedKph,
     tripDistanceKm: analytics.tripDistanceKm,
@@ -446,5 +488,10 @@ ObdHistoryEntry buildObdHistoryEntry({
     efficiencyScore: analytics.efficiencyScore,
     harshEvents:
         analytics.harshAccelerationEvents + analytics.harshBrakingEvents,
+    elevationM: telemetry.elevationM,
+    gradePct: telemetry.gradePct,
+    chargeThresholdPct: chargeThresholdPct,
+    predictionRemainingKm: prediction?.remainingKm,
+    predictionRatePerKm: prediction?.depletionRatePerKm,
   );
 }

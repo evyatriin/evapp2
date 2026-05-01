@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any, Dict, Optional
 
 from fastapi import Header, HTTPException
@@ -5,30 +6,40 @@ from fastapi import Header, HTTPException
 from supabase_client import supabase
 
 
-async def get_authenticated_user(
-    authorization: Optional[str] = Header(None),
-) -> Dict[str, Any]:
+async def _verify_token(token: str) -> Dict[str, Any]:
+    """Verify a Supabase JWT in a thread so we don't block the event loop."""
     if not supabase:
         raise HTTPException(status_code=503, detail="Authentication service not configured")
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
-
-    token = authorization.replace("Bearer ", "", 1).strip()
-
     try:
-        response = supabase.auth.get_user(token)
+        response = await asyncio.to_thread(lambda: supabase.auth.get_user(token))
     except Exception as error:
         raise HTTPException(status_code=401, detail=f"Invalid token: {error}") from error
-
     if not response or not response.user:
         raise HTTPException(status_code=401, detail="Invalid token")
-
     return {
         "token": token,
         "user_id": response.user.id,
         "email": response.user.email,
         "metadata": response.user.user_metadata or {},
     }
+
+
+async def get_authenticated_user(
+    authorization: Optional[str] = Header(None),
+) -> Dict[str, Any]:
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+    return await _verify_token(authorization.replace("Bearer ", "", 1).strip())
+
+
+async def require_auth(
+    authorization: Optional[str] = Header(None),
+) -> Dict[str, Any]:
+    """Same as get_authenticated_user — explicit alias used on public-facing endpoints
+    to make the security intent clear at the call site."""
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid authorization header")
+    return await _verify_token(authorization.replace("Bearer ", "", 1).strip())
 
 
 def ensure_same_user(auth_user: Dict[str, Any], user_id: str) -> None:

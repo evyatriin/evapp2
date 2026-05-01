@@ -77,12 +77,17 @@ double _calculateRadiusFromZoom(double zoom) {
   return calculatedRadius.clamp(5.0, 50.0);
 }
 
+double _round4(double v) => (v * 10000).round() / 10000;
+
 @riverpod
 Future<List<StationModel>> stations(Ref ref) async {
   final repository = ref.watch(stationsRepositoryProvider);
-  final center = ref.watch(mapCenterProvider);
+  final rawCenter = ref.watch(mapCenterProvider);
   final zoom = ref.watch(mapZoomProvider);
   final filters = ref.watch(connectorFilterProvider);
+
+  // Round to 4 decimal places (~11m) so near-identical GPS/map positions share one request
+  final center = LatLng(_round4(rawCenter.latitude), _round4(rawCenter.longitude));
 
   final radiusKm = _calculateRadiusFromZoom(zoom);
   debugPrint(

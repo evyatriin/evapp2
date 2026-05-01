@@ -157,6 +157,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
   }
 
+  String _friendlyError(Object? error) {
+    final msg = error?.toString() ?? '';
+    if (msg.contains('timed out') || msg.contains('timeout')) {
+      return 'Request timed out. Check your connection.';
+    }
+    if (msg.contains('401') || msg.contains('auth') || msg.contains('token')) {
+      return 'Session expired. Please log in again.';
+    }
+    if (msg.contains('Network') || msg.contains('SocketException')) {
+      return 'No internet connection.';
+    }
+    return 'Could not load chargers.';
+  }
+
   @override
   Widget build(BuildContext context) {
     final requestedCenter = ref.watch(mapCenterProvider);
@@ -466,13 +480,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       child: Card(
                         color: theme.colorScheme.errorContainer,
                         child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text(
-                            'Error loading stations: ${stationsAsync.error}',
-                            style: TextStyle(
-                              color: theme.colorScheme.onErrorContainer,
-                            ),
-                            textAlign: TextAlign.center,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 10,
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.wifi_off_rounded,
+                                color: theme.colorScheme.onErrorContainer,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  _friendlyError(stationsAsync.error),
+                                  style: TextStyle(
+                                    color: theme.colorScheme.onErrorContainer,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton(
+                                onPressed: () =>
+                                    ref.invalidate(stationsProvider),
+                                style: TextButton.styleFrom(
+                                  foregroundColor:
+                                      theme.colorScheme.onErrorContainer,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 4,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: const Text(
+                                  'Retry',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -603,7 +652,9 @@ class _StationDetailsSheetState extends State<_StationDetailsSheet> {
       _InfoItem(
         icon: PhosphorIcons.plug(PhosphorIconsStyle.duotone),
         label: 'Connectors',
-        value: station.connectors.join(', '),
+        value: station.connectors.isNotEmpty
+            ? station.connectors.join(', ')
+            : 'Not specified',
       ),
       _InfoItem(
         icon: PhosphorIcons.clockCounterClockwise(

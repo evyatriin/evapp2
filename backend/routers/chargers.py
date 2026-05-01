@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from supabase_client import supabase, service_supabase
 import uuid
-from auth_utils import ensure_same_user, get_authenticated_user
+from auth_utils import ensure_same_user, get_authenticated_user, require_auth
 from utils.charger_aggregation import aggregate_chargers_nearby
 
 router = APIRouter()
@@ -279,6 +279,7 @@ async def get_aggregated_stations(
     lat: float,
     lng: float,
     radius: float = 10.0,
+    _auth: Dict[str, Any] = Depends(require_auth),
 ):
     """
     Aggregate chargers from external APIs plus EVraahein-owned data sources,

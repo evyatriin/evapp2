@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'app_config.dart';
@@ -7,8 +8,8 @@ import 'app_config.dart';
 class BackendService {
   static final _client = http.Client();
 
-  // Cloud Run cold start can take ~5s; total budget 20s with one retry on 503.
-  static const _timeout = Duration(seconds: 20);
+  // Aggregate endpoint calls external APIs (Google Places, OpenChargeMap) — needs 35s.
+  static const _timeout = Duration(seconds: 35);
   static const _retryDelay = Duration(seconds: 3);
 
   static String get baseUrl => AppConfig.backendBaseUrl;
@@ -27,16 +28,20 @@ class BackendService {
     int attempt = 1,
   }) async {
     final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: queryParams);
+    debugPrint('[BackendService] GET $uri (attempt $attempt)');
     try {
       final response = await _client.get(uri, headers: headers).timeout(_timeout);
+      debugPrint('[BackendService] Response: ${response.statusCode} (${response.body.length} bytes)');
       if (response.statusCode == 503 && attempt < 2) {
         await Future<void>.delayed(_retryDelay);
         return _getWithRetry(endpoint, queryParams: queryParams, headers: headers, attempt: 2);
       }
       return _decode(response);
     } on TimeoutException {
+      debugPrint('[BackendService] TIMEOUT: $uri');
       throw Exception('Request timed out. Check your connection and try again.');
     } catch (e) {
+      debugPrint('[BackendService] ERROR: $uri => $e');
       throw Exception('Network Error: $e');
     }
   }

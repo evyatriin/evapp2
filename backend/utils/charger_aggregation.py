@@ -162,16 +162,50 @@ class NormalizedCharger:
         }
 
 
+_CACHE_SUFFICIENT_COUNT = 5  # min chargers to serve from cache without hitting external APIs
+
+
 async def aggregate_chargers_nearby(
     latitude: float,
     longitude: float,
     radius_km: float,
 ) -> list[NormalizedCharger]:
+    # Fast path: canonical DB first (~1s).  Return immediately if cache is warm.
+    try:
+        canonical = await asyncio.wait_for(
+            _fetch_canonical_db_nearby(latitude, longitude, radius_km), timeout=4.0
+        )
+    except Exception:
+        canonical = []
+
+    if len(canonical) >= _CACHE_SUFFICIENT_COUNT:
+        # Enough cached data — return now and refresh external sources in the background.
+        asyncio.create_task(
+            _refresh_from_external_sources(latitude, longitude, radius_km)
+        )
+        canonical.sort(key=lambda c: (c.distance_m is None, c.distance_m or math.inf, c.name.lower()))
+        return canonical
+
+    # Cold path: first fetch for this area — wait for all sources.
     sources = await _fetch_all_sources(latitude, longitude, radius_km)
     merged = _merge_deduped_chargers(sources)
-    await _persist_canonical_results(merged)
+    asyncio.get_event_loop().run_in_executor(None, _persist_canonical_results_sync, list(merged))
     merged.sort(key=lambda charger: (charger.distance_m is None, charger.distance_m or math.inf, charger.name.lower()))
     return merged
+
+
+async def _refresh_from_external_sources(
+    latitude: float,
+    longitude: float,
+    radius_km: float,
+) -> None:
+    """Background task: fetch external APIs and silently update the canonical cache."""
+    try:
+        sources = await _fetch_all_sources(latitude, longitude, radius_km)
+        merged = _merge_deduped_chargers(sources)
+        asyncio.get_event_loop().run_in_executor(None, _persist_canonical_results_sync, list(merged))
+    except Exception as exc:
+        logger.warning("Background external refresh failed for %.4f,%.4f: %s", latitude, longitude, exc)
 
 
 async def _fetch_all_sources(
@@ -180,11 +214,11 @@ async def _fetch_all_sources(
     radius_km: float,
 ) -> list[NormalizedCharger]:
     results = await _gather_optional(
-        _fetch_canonical_db_nearby(latitude, longitude, radius_km),
-        _fetch_legacy_db_stations(latitude, longitude, radius_km),
-        _fetch_here_ev_nearby(latitude, longitude, radius_km),
-        _fetch_google_places_nearby(latitude, longitude, radius_km),
-        _fetch_open_charge_map_nearby(latitude, longitude, radius_km),
+        asyncio.wait_for(_fetch_canonical_db_nearby(latitude, longitude, radius_km), timeout=8.0),
+        asyncio.wait_for(_fetch_legacy_db_stations(latitude, longitude, radius_km), timeout=8.0),
+        asyncio.wait_for(_fetch_here_ev_nearby(latitude, longitude, radius_km), timeout=22.0),
+        asyncio.wait_for(_fetch_google_places_nearby(latitude, longitude, radius_km), timeout=22.0),
+        asyncio.wait_for(_fetch_open_charge_map_nearby(latitude, longitude, radius_km), timeout=22.0),
     )
     chargers: list[NormalizedCharger] = []
     for batch in results:
@@ -214,14 +248,12 @@ async def _fetch_canonical_db_nearby(
         return []
 
     try:
-        response = client.rpc(
-            "nearby_canonical_chargers",
-            {
-                "lat": latitude,
-                "long": longitude,
-                "radius_km": radius_km,
-            },
-        ).execute()
+        response = await asyncio.to_thread(
+            lambda: client.rpc(
+                "nearby_canonical_chargers",
+                {"lat": latitude, "long": longitude, "radius_km": radius_km},
+            ).execute()
+        )
     except Exception as exc:
         logger.info("Canonical charger RPC unavailable: %s", exc)
         return []
@@ -273,14 +305,12 @@ async def _fetch_legacy_db_stations(
 
     rows: list[dict[str, Any]] = []
     try:
-        response = client.rpc(
-            "nearby_stations",
-            {
-                "lat": latitude,
-                "long": longitude,
-                "radius_km": radius_km,
-            },
-        ).execute()
+        response = await asyncio.to_thread(
+            lambda: client.rpc(
+                "nearby_stations",
+                {"lat": latitude, "long": longitude, "radius_km": radius_km},
+            ).execute()
+        )
         rows = response.data or []
     except Exception as rpc_error:
         logger.info("Legacy nearby_stations RPC unavailable: %s", rpc_error)
@@ -290,16 +320,18 @@ async def _fetch_legacy_db_stations(
             111.0 * abs(math.cos(math.radians(latitude))),
         )
         try:
-            response = (
-                client.table("charging_stations")
-                .select("*")
-                .eq("verification_status", "verified")
-                .gte("latitude", latitude - lat_offset)
-                .lte("latitude", latitude + lat_offset)
-                .gte("longitude", longitude - lng_offset)
-                .lte("longitude", longitude + lng_offset)
-                .limit(250)
-                .execute()
+            response = await asyncio.to_thread(
+                lambda: (
+                    client.table("charging_stations")
+                    .select("*")
+                    .eq("verification_status", "verified")
+                    .gte("latitude", latitude - lat_offset)
+                    .lte("latitude", latitude + lat_offset)
+                    .gte("longitude", longitude - lng_offset)
+                    .lte("longitude", longitude + lng_offset)
+                    .limit(250)
+                    .execute()
+                )
             )
             rows = response.data or []
         except Exception as exc:
@@ -445,52 +477,6 @@ async def _fetch_here_ev_nearby(
     longitude: float,
     radius_km: float,
 ) -> list[NormalizedCharger]:
-    if await _has_fresh_legacy_public_coverage(
-        latitude=latitude,
-        longitude=longitude,
-        radius_km=radius_km,
-        freshness_window=HERE_CACHE_MAX_AGE,
-    ):
-        logger.info(
-            "Skipping live HERE lookup for %.5f,%.5f within %.1fkm because fresh legacy public coverage exists",
-            latitude,
-            longitude,
-            radius_km,
-        )
-        return []
-
-    if await _has_fresh_canonical_source_coverage(
-        source_name="here_ev",
-        latitude=latitude,
-        longitude=longitude,
-        radius_km=radius_km,
-        freshness_window=HERE_CACHE_MAX_AGE,
-    ):
-        logger.info(
-            "Skipping live HERE lookup for %.5f,%.5f within %.1fkm because fresh canonical HERE coverage exists",
-            latitude,
-            longitude,
-            radius_km,
-        )
-        return []
-
-    cached = await _fetch_cached_source_records_nearby(
-        source_name="here_ev",
-        latitude=latitude,
-        longitude=longitude,
-        radius_km=radius_km,
-        freshness_window=HERE_CACHE_MAX_AGE,
-    )
-    if cached:
-        logger.info(
-            "Using %s cached HERE charger records for %.5f,%.5f within %.1fkm",
-            len(cached),
-            latitude,
-            longitude,
-            radius_km,
-        )
-        return cached
-
     if not settings.HERE_API_KEY:
         return []
 
@@ -889,6 +875,66 @@ def _merge_into(target: NormalizedCharger, incoming: NormalizedCharger) -> None:
         target.availability_status = incoming.availability_status
     if target.status in {"Unknown", "Operational"} and incoming.status not in {"Unknown", "Operational"}:
         target.status = incoming.status
+
+
+def _persist_canonical_results_sync(chargers: list[NormalizedCharger]) -> None:
+    """Synchronous version — call via run_in_executor so it runs in a thread pool."""
+    client = service_supabase
+    if not client or not chargers:
+        return
+
+    if not _canonical_tables_available(client):
+        _persist_legacy_results(chargers, client)
+        return
+
+    for charger in chargers:
+        try:
+            if not charger.canonical_id:
+                insert_payload = charger.to_canonical_upsert()
+                insert_payload.pop("id", None)
+                insert_result = client.table("canonical_chargers").insert(insert_payload).execute()
+                if insert_result.data:
+                    charger.canonical_id = str(insert_result.data[0]["id"])
+            else:
+                update_payload = charger.to_canonical_upsert()
+                update_payload.pop("id", None)
+                client.table("canonical_chargers").update(update_payload).eq(
+                    "id", charger.canonical_id,
+                ).execute()
+
+            if not charger.canonical_id:
+                continue
+
+            client.table("charger_source_records").upsert(
+                {
+                    "canonical_charger_id": charger.canonical_id,
+                    "source_name": charger.source_name,
+                    "source_station_id": charger.source_station_id,
+                    "name": charger.name,
+                    "normalized_name": charger.normalized_name,
+                    "address": charger.address,
+                    "latitude": charger.latitude,
+                    "longitude": charger.longitude,
+                    "provider": charger.provider,
+                    "connector_types": charger.connector_types,
+                    "power_kw": charger.power_kw,
+                    "status": charger.status,
+                    "availability_status": charger.availability_status,
+                    "amenities": charger.amenities,
+                    "access_type": charger.access_type,
+                    "access_instructions": charger.access_instructions,
+                    "is_private": charger.is_private,
+                    "freshness_score": charger.freshness_score,
+                    "last_verified_at": charger.last_verified,
+                    "raw_payload": charger.raw_payload,
+                    "distance_m": charger.distance_m,
+                    "confidence_score": round(charger.source_priority / 100.0, 2),
+                    "last_seen_at": datetime.now(timezone.utc).isoformat(),
+                },
+                on_conflict="source_name,source_station_id",
+            ).execute()
+        except Exception as exc:
+            logger.info("Skipping canonical charger writeback for %s: %s", charger.name, exc)
 
 
 async def _persist_canonical_results(chargers: list[NormalizedCharger]) -> None:

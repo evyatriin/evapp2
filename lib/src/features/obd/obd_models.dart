@@ -80,6 +80,53 @@ class ObdDiagnosticEntry {
   });
 }
 
+// ─── SOC charge-threshold prediction ─────────────────────────────────────────
+
+class SocPrediction {
+  /// km remaining before SOC drops to [thresholdPct]. null = no data / not depleting.
+  final double? remainingKm;
+
+  /// Estimated minutes remaining. null = no speed data.
+  final double? remainingMinutes;
+
+  /// Current SOC depletion rate in % per km. null = insufficient data.
+  final double? depletionRatePerKm;
+
+  /// The target SOC % the user wants to charge at.
+  final double thresholdPct;
+
+  /// False until enough samples collected.
+  final bool hasData;
+
+  const SocPrediction({
+    required this.thresholdPct,
+    required this.hasData,
+    this.remainingKm,
+    this.remainingMinutes,
+    this.depletionRatePerKm,
+  });
+
+  factory SocPrediction.noData(double threshold) =>
+      SocPrediction(thresholdPct: threshold, hasData: false);
+
+  String get summary {
+    if (!hasData) return 'Gathering SOC data… drive to begin prediction.';
+    if (remainingKm == null) {
+      return 'SOC is steady — no depletion detected while stationary.';
+    }
+    if (remainingKm! <= 0) return 'Charge now — SOC is at or below ${thresholdPct.toStringAsFixed(0)}%!';
+    final km = remainingKm!.toStringAsFixed(0);
+    final mins = remainingMinutes != null
+        ? ' (~${remainingMinutes!.toStringAsFixed(0)} min)'
+        : '';
+    return '~$km km$mins until SOC drops to ${thresholdPct.toStringAsFixed(0)}%';
+  }
+
+  bool get isUrgent => hasData && remainingKm != null && remainingKm! < 20;
+}
+
+// ─── Telemetry snapshot ───────────────────────────────────────────────────────
+
 class ObdTelemetrySnapshot {
   final double? speedKph;
   final double? rpm;
@@ -95,6 +142,10 @@ class ObdTelemetrySnapshot {
   final double? batteryTempC;
   final double? cellDeltaMv;
   final double? estimatedSohPercent;
+  // GPS-derived fields (more reliable than OBD for EVs)
+  final double? gpsSpeedKph;
+  final double? elevationM;
+  final double? gradePct; // road grade in %
   final DateTime timestamp;
   final String sourceSummary;
   final String? evProfileName;
@@ -118,8 +169,14 @@ class ObdTelemetrySnapshot {
     this.batteryTempC,
     this.cellDeltaMv,
     this.estimatedSohPercent,
+    this.gpsSpeedKph,
+    this.elevationM,
+    this.gradePct,
     this.evProfileName,
   });
+
+  /// Effective speed: GPS preferred, OBD as fallback.
+  double? get effectiveSpeedKph => gpsSpeedKph ?? speedKph;
 
   factory ObdTelemetrySnapshot.empty() => ObdTelemetrySnapshot(
     timestamp: DateTime.now(),
@@ -142,6 +199,9 @@ class ObdTelemetrySnapshot {
     double? batteryTempC,
     double? cellDeltaMv,
     double? estimatedSohPercent,
+    double? gpsSpeedKph,
+    double? elevationM,
+    double? gradePct,
     DateTime? timestamp,
     String? sourceSummary,
     String? evProfileName,
@@ -162,6 +222,9 @@ class ObdTelemetrySnapshot {
       batteryTempC: batteryTempC ?? this.batteryTempC,
       cellDeltaMv: cellDeltaMv ?? this.cellDeltaMv,
       estimatedSohPercent: estimatedSohPercent ?? this.estimatedSohPercent,
+      gpsSpeedKph: gpsSpeedKph ?? this.gpsSpeedKph,
+      elevationM: elevationM ?? this.elevationM,
+      gradePct: gradePct ?? this.gradePct,
       timestamp: timestamp ?? this.timestamp,
       sourceSummary: sourceSummary ?? this.sourceSummary,
       evProfileName: evProfileName ?? this.evProfileName,
@@ -215,6 +278,8 @@ class ObdSessionState {
   final String statusMessage;
   final String compatibilityHint;
   final List<ObdDiagnosticEntry> diagnostics;
+  final SocPrediction? socPrediction;
+  final double chargeThresholdPct; // user-set SOC % to charge at
 
   const ObdSessionState({
     required this.adapterState,
@@ -228,6 +293,8 @@ class ObdSessionState {
     required this.statusMessage,
     required this.compatibilityHint,
     required this.diagnostics,
+    this.socPrediction,
+    this.chargeThresholdPct = 20,
   });
 
   factory ObdSessionState.initial() => ObdSessionState(
@@ -258,6 +325,8 @@ class ObdSessionState {
     String? statusMessage,
     String? compatibilityHint,
     List<ObdDiagnosticEntry>? diagnostics,
+    SocPrediction? socPrediction,
+    double? chargeThresholdPct,
   }) {
     return ObdSessionState(
       adapterState: adapterState ?? this.adapterState,
@@ -272,6 +341,8 @@ class ObdSessionState {
       statusMessage: statusMessage ?? this.statusMessage,
       compatibilityHint: compatibilityHint ?? this.compatibilityHint,
       diagnostics: diagnostics ?? this.diagnostics,
+      socPrediction: socPrediction ?? this.socPrediction,
+      chargeThresholdPct: chargeThresholdPct ?? this.chargeThresholdPct,
     );
   }
 }

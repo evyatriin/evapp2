@@ -3,12 +3,15 @@ import 'dart:math' as math;
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../vehicle_profile/vehicle_provider.dart';
 import 'obd_history_service.dart';
 import 'obd_models.dart';
 import 'obd_service.dart';
+import 'soc_predictor.dart';
 
 final obdSessionControllerProvider =
     NotifierProvider<ObdSessionController, ObdSessionState>(
@@ -22,6 +25,7 @@ class ObdSessionController extends Notifier<ObdSessionState> {
   static const int _maxDiagnosticEntries = 80;
 
   StreamSubscription<BluetoothAdapterState>? _adapterSubscription;
+  StreamSubscription<Position>? _gpsSubscription;
   Timer? _pollingTimer;
 
   ObdTelemetrySnapshot _previousSnapshot = ObdTelemetrySnapshot.empty();
@@ -33,6 +37,21 @@ class ObdSessionController extends Notifier<ObdSessionState> {
   String? _sessionId;
   DateTime? _sessionStartedAt;
 
+  // GPS-derived fields updated independently of OBD polling
+  double? _gpsSpeedKph;
+  double? _elevationM;
+  double? _gradePct;
+  double? _prevGpsLat;
+  double? _prevGpsLng;
+  double? _prevElevForGrade;
+  double _gpsDistanceAccumM = 0; // accumulated since last grade sample
+
+  // SOC prediction
+  final SocPredictor _socPredictor = SocPredictor();
+  static const String _thresholdPrefKey = 'obd_charge_threshold_pct';
+
+  bool _initialized = false;
+
   @override
   ObdSessionState build() {
     ref.onDispose(_disposeResources);
@@ -41,9 +60,11 @@ class ObdSessionController extends Notifier<ObdSessionState> {
   }
 
   Future<void> _init() async {
+    if (_initialized) return;
     try {
       _service.bindDiagnostics(_recordDiagnostic);
       _recordDiagnostic('setup', 'OBD controller initialization started.');
+      _adapterSubscription?.cancel();
       _service.bindScanStreams(
         onScanResults: (devices) {
           _recordDiagnostic(
@@ -119,6 +140,11 @@ class ObdSessionController extends Notifier<ObdSessionState> {
                 ? 'Ready to scan for OBD-II adapters.'
                 : 'Bluetooth is not supported on this device.',
       );
+
+      // Load persisted charge threshold
+      await _loadChargeThreshold();
+
+      _initialized = true;
       _recordDiagnostic('setup', 'OBD controller initialization finished.');
     } catch (e) {
       _recordDiagnostic('setup', 'Initialization failed: $e');
@@ -131,7 +157,12 @@ class ObdSessionController extends Notifier<ObdSessionState> {
   }
 
   Future<void> ensureSetup() async {
-    await _init();
+    if (!_initialized) {
+      await _init();
+      return;
+    }
+    // Already initialized — just retry permissions
+    await retryPermissionSetup();
   }
 
   Future<void> retryPermissionSetup() async {
@@ -154,6 +185,86 @@ class ObdSessionController extends Notifier<ObdSessionState> {
               ? 'Permissions granted. You can scan now.'
               : 'Bluetooth permissions are still missing.',
     );
+  }
+
+  // ─── GPS ─────────────────────────────────────────────────────────────────
+
+  void _startGpsStream() {
+    _gpsSubscription?.cancel();
+    _gpsSubscription = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.bestForNavigation,
+        distanceFilter: 5, // only trigger when moved ≥5 m
+      ),
+    ).listen(_onGpsPosition, onError: (Object e) {
+      _recordDiagnostic('gps', 'GPS stream error: $e');
+    });
+    _recordDiagnostic('gps', 'GPS position stream started.');
+  }
+
+  void _onGpsPosition(Position pos) {
+    _gpsSpeedKph = (pos.speed * 3.6).clamp(0, 300); // m/s → km/h
+    _elevationM = pos.altitude;
+
+    // Compute grade over accumulated distance
+    final lat = pos.latitude;
+    final lng = pos.longitude;
+
+    if (_prevGpsLat != null && _prevGpsLng != null) {
+      final segmentM = Geolocator.distanceBetween(
+        _prevGpsLat!, _prevGpsLng!, lat, lng,
+      );
+      _gpsDistanceAccumM += segmentM;
+    }
+    _prevGpsLat = lat;
+    _prevGpsLng = lng;
+
+    // Update grade every ~50 m to smooth out noise
+    if (_gpsDistanceAccumM >= 50 &&
+        _prevElevForGrade != null &&
+        _elevationM != null) {
+      final elevDiff = _elevationM! - _prevElevForGrade!;
+      _gradePct = (elevDiff / _gpsDistanceAccumM) * 100;
+      _prevElevForGrade = _elevationM;
+      _gpsDistanceAccumM = 0;
+    } else {
+      _prevElevForGrade ??= _elevationM;
+    }
+    // GPS fields are merged into state during the next _pollOnce() cycle
+    // to avoid excessive Riverpod rebuilds (position stream fires every 5 m).
+  }
+
+  // ─── Charge threshold ────────────────────────────────────────────────────
+
+  Future<void> _loadChargeThreshold() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getDouble(_thresholdPrefKey);
+      if (saved != null) {
+        state = state.copyWith(chargeThresholdPct: saved);
+        _recordDiagnostic('soc', 'Charge threshold loaded: ${saved.toStringAsFixed(0)}%');
+      }
+    } catch (e) {
+      _recordDiagnostic('soc', 'Could not load charge threshold: $e');
+    }
+  }
+
+  /// Update threshold in state immediately (call from slider onChanged).
+  void setChargeThresholdLive(double pct) {
+    final clamped = pct.clamp(5.0, 80.0);
+    state = state.copyWith(chargeThresholdPct: clamped);
+  }
+
+  /// Persist threshold to disk (call from slider onChangeEnd).
+  Future<void> commitChargeThreshold(double pct) async {
+    final clamped = pct.clamp(5.0, 80.0);
+    state = state.copyWith(chargeThresholdPct: clamped);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_thresholdPrefKey, clamped);
+    } catch (e) {
+      _recordDiagnostic('soc', 'Could not persist charge threshold: $e');
+    }
   }
 
   Future<void> startScan() async {
@@ -231,6 +342,8 @@ class ObdSessionController extends Notifier<ObdSessionState> {
       _previousSnapshot = ObdTelemetrySnapshot.empty();
       _cachedEnhancedResults = const [];
       _pollCycle = 0;
+      _consecutiveErrors = 0;
+      _socPredictor.reset();
       _sessionStartedAt = DateTime.now();
       _sessionId = _sessionStartedAt!.millisecondsSinceEpoch.toString();
       _recordDiagnostic(
@@ -240,7 +353,10 @@ class ObdSessionController extends Notifier<ObdSessionState> {
       state = state.copyWith(
         stage: ObdConnectionStage.connected,
         statusMessage: 'Connected to ${device.name}. Polling live telemetry...',
+        analytics: DriverAnalytics.empty(),
+        socPrediction: SocPrediction.noData(state.chargeThresholdPct),
       );
+      _startGpsStream();
       _startPolling();
     } catch (e) {
       _recordDiagnostic('connect', 'Connection failed: $e');
@@ -253,17 +369,28 @@ class ObdSessionController extends Notifier<ObdSessionState> {
 
   Future<void> disconnect() async {
     _recordDiagnostic('connect', 'Disconnect requested by user.');
-    await _persistHistorySnapshot();
+    unawaited(_persistHistorySnapshot());
     _pollingTimer?.cancel();
+    _gpsSubscription?.cancel();
+    _gpsSubscription = null;
     await _service.disconnect();
     _cachedEnhancedResults = const [];
     _pollCycle = 0;
     _sessionId = null;
     _sessionStartedAt = null;
+    _socPredictor.reset();
+    _gpsSpeedKph = null;
+    _elevationM = null;
+    _gradePct = null;
+    _prevGpsLat = null;
+    _prevGpsLng = null;
+    _prevElevForGrade = null;
+    _gpsDistanceAccumM = 0;
     state = state.copyWith(
       stage: ObdConnectionStage.idle,
       clearSelectedDevice: true,
       statusMessage: 'Disconnected from adapter.',
+      socPrediction: SocPrediction.noData(state.chargeThresholdPct),
     );
   }
 
@@ -282,7 +409,6 @@ class ObdSessionController extends Notifier<ObdSessionState> {
 
   Future<void> _pollOnce() async {
     try {
-      _recordDiagnostic('poll', 'Polling live telemetry.');
       final primaryVehicle = ref.read(vehicleProvider.notifier).primaryVehicle;
       final standardResults = await _service.pollStandardTelemetry();
       final shouldRefreshEnhanced =
@@ -296,7 +422,17 @@ class ObdSessionController extends Notifier<ObdSessionState> {
       _pollCycle += 1;
       _consecutiveErrors = 0;
       final results = [...standardResults, ..._cachedEnhancedResults];
-      final nextSnapshot = _buildSnapshot(results);
+      final rawSnapshot = _buildSnapshot(results);
+
+      // Merge GPS fields BEFORE analytics so trip distance uses GPS speed
+      // when OBD speed PID is unavailable (common on Indian EVs).
+      final nextSnapshot = rawSnapshot.copyWith(
+        speedKph: rawSnapshot.speedKph ?? _gpsSpeedKph,
+        gpsSpeedKph: _gpsSpeedKph,
+        elevationM: _elevationM,
+        gradePct: _gradePct,
+      );
+
       final analytics = _analyticsCalculator.update(
         current: state.analytics,
         previous: _previousSnapshot,
@@ -304,25 +440,43 @@ class ObdSessionController extends Notifier<ObdSessionState> {
       );
 
       _previousSnapshot = nextSnapshot;
-      _recordDiagnostic(
-        'poll',
-        'Polling succeeded with $enhancedMetricCountLabel',
+
+      // Add SOH estimate after analytics (needs both snapshot + analytics)
+      final snapshotWithSoh = nextSnapshot.copyWith(
+        estimatedSohPercent: _estimateSoh(
+          snapshot: nextSnapshot,
+          analytics: analytics,
+        ),
       );
+
+      // Feed SOC predictor
+      final soc = snapshotWithSoh.batteryPercent;
+      final tripKm = analytics.tripDistanceKm;
+      if (soc != null) {
+        _socPredictor.addSample(socPct: soc, tripDistanceKm: tripKm);
+      }
+      final prediction = _socPredictor.predict(
+        thresholdPct: state.chargeThresholdPct,
+        currentSpeedKph: snapshotWithSoh.effectiveSpeedKph,
+      );
+
+      if (_pollCycle <= 1 || _pollCycle % 10 == 0) {
+        _recordDiagnostic(
+          'poll',
+          'Polling succeeded with $enhancedMetricCountLabel',
+        );
+      }
       state = state.copyWith(
         stage: ObdConnectionStage.connected,
-        telemetry: nextSnapshot.copyWith(
-          estimatedSohPercent: _estimateSoh(
-            snapshot: nextSnapshot,
-            analytics: analytics,
-          ),
-        ),
+        telemetry: snapshotWithSoh,
         analytics: analytics,
+        socPrediction: prediction,
         statusMessage:
             'Streaming live OBD telemetry from ${state.selectedDevice?.name ?? 'adapter'}.',
       );
 
       if (_pollCycle % _historyCheckpointFrequency == 0) {
-        await _persistHistorySnapshot();
+        unawaited(_persistHistorySnapshot());
       }
     } catch (e) {
       _consecutiveErrors += 1;
@@ -443,6 +597,7 @@ class ObdSessionController extends Notifier<ObdSessionState> {
     unawaited(_persistHistorySnapshot());
     _pollingTimer?.cancel();
     _adapterSubscription?.cancel();
+    _gpsSubscription?.cancel();
     _service.dispose();
   }
 
@@ -473,6 +628,8 @@ class ObdSessionController extends Notifier<ObdSessionState> {
       analytics: state.analytics,
       device: state.selectedDevice,
       userId: userId,
+      prediction: state.socPrediction,
+      chargeThresholdPct: state.chargeThresholdPct,
     );
 
     await ObdHistoryService().upsertCurrentUserEntry(entry);

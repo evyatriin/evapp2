@@ -32,14 +32,14 @@ class ObdCommandRequest {
   final String command;
   final ObdResponseParser parser;
   final Duration timeout;
-  final String? header;
+  final ObdEcuConfig? ecuConfig;
 
   const ObdCommandRequest({
     required this.key,
     required this.command,
     required this.parser,
     this.timeout = const Duration(seconds: 2),
-    this.header,
+    this.ecuConfig,
   });
 }
 
@@ -50,18 +50,66 @@ class ObdEnhancedProbe {
   const ObdEnhancedProbe({required this.key, required this.requests});
 }
 
+/// Per-ECU CAN configuration: request header + ISO-TP flow control settings.
+class ObdEcuConfig {
+  final String txHeader;     // ATSH value, e.g. '7E4'
+  final String? fcHeader;   // ATFCSH value for multi-frame ISO-TP responses
+  final String? fcData;     // ATFCSD value (flow control data, e.g. '300000')
+  final bool fcMode1;       // whether to send ATFCSM1
+
+  const ObdEcuConfig({
+    required this.txHeader,
+    this.fcHeader,
+    this.fcData,
+    this.fcMode1 = false,
+  });
+
+  /// Standard 7E4 BMS ECU (Hyundai/Kia/generic)
+  static const standard = ObdEcuConfig(
+    txHeader: '7E4',
+    fcHeader: '7EC',
+    fcData: '300000',
+    fcMode1: true,
+  );
+
+  /// MG ZS EV – BMS ECU (0x781 → 0x789)
+  static const mgBms = ObdEcuConfig(
+    txHeader: '781',
+    fcHeader: '789',
+    fcData: '300000',
+    fcMode1: true,
+  );
+
+  /// MG ZS EV – Instrument cluster / odometer (0x760 → 0x768)
+  static const mgIpk = ObdEcuConfig(
+    txHeader: '760',
+    fcHeader: '768',
+    fcData: '300000',
+    fcMode1: true,
+  );
+
+  /// BYD Atto 3 – BMS ECU
+  static const bydBms = ObdEcuConfig(
+    txHeader: '7E7',
+    fcHeader: '7EF',
+    fcData: '300000',
+    fcMode1: true,
+  );
+
+  /// Generic fallback – broadcast (no FC needed)
+  static const generic = ObdEcuConfig(txHeader: '7DF');
+}
+
 class ObdEnhancedProfile {
   final String name;
   final List<String> brandMatchers;
   final List<String> modelMatchers;
-  final List<String> headers;
   final List<ObdEnhancedProbe> probes;
 
   const ObdEnhancedProfile({
     required this.name,
     required this.brandMatchers,
     this.modelMatchers = const [],
-    required this.headers,
     required this.probes,
   });
 
@@ -154,58 +202,73 @@ class ObdService {
   ];
   static const String _serialPortProfileUuid =
       '00001101-0000-1000-8000-00805F9B34FB';
-  static const List<String> _commonEvHeaders = ['7E4', '7E2', '7E7'];
+  // ─── Confirmed EV profiles (source: JejuSoul/OBD-PIDs-for-HKMC-EVs,
+  //     peternixon/MG-EV-OBD-PID, loryanstrant/BYD-PID-list) ──────────────
+
   static final List<ObdEnhancedProfile> _enhancedProfiles = [
+    // ── Hyundai / Kia family ─────────────────────────────────────────────
+    // Covers: Ioniq 5, Ioniq 6, Kona EV, EV6, Niro EV, Soul EV, e-Niro
+    // All use 7E4 (BMS) with ISO-TP flow control.
     ObdEnhancedProfile(
-      name: 'Tata EV Battery UDS',
-      brandMatchers: ['tata'],
-      headers: ['7E4', '7E2', '7E7'],
-      probes: _buildCommonEnhancedProbes(['7E4', '7E2', '7E7']),
-    ),
-    ObdEnhancedProfile(
-      name: 'MG EV Battery UDS',
-      brandMatchers: ['mg'],
-      headers: ['7E2', '7E4', '7E7'],
-      probes: _buildCommonEnhancedProbes(['7E2', '7E4', '7E7']),
-    ),
-    ObdEnhancedProfile(
-      name: 'Hyundai/Kia EV Battery UDS',
+      name: 'Hyundai/Kia EV (Ioniq5/6, Kona, EV6, Niro)',
       brandMatchers: ['hyundai', 'kia'],
-      headers: ['7E4', '7E7', '7E2'],
-      probes: _buildCommonEnhancedProbes(['7E4', '7E7', '7E2']),
+      probes: [
+        ObdEnhancedProbe(key: 'batteryPercent',    requests: [ObdCommandRequest(key: 'batteryPercent',    command: '220101', ecuConfig: ObdEcuConfig.standard, timeout: const Duration(seconds: 5), parser: _parseHkSoc)]),
+        ObdEnhancedProbe(key: 'stateOfHealth',     requests: [ObdCommandRequest(key: 'stateOfHealth',     command: '220105', ecuConfig: ObdEcuConfig.standard, timeout: const Duration(seconds: 5), parser: _parseHkSoh)]),
+        ObdEnhancedProbe(key: 'batteryPackVoltage',requests: [ObdCommandRequest(key: 'batteryPackVoltage',command: '220101', ecuConfig: ObdEcuConfig.standard, timeout: const Duration(seconds: 5), parser: _parseHkVoltage)]),
+        ObdEnhancedProbe(key: 'batteryCurrent',    requests: [ObdCommandRequest(key: 'batteryCurrent',    command: '220101', ecuConfig: ObdEcuConfig.standard, timeout: const Duration(seconds: 5), parser: _parseHkCurrent)]),
+        ObdEnhancedProbe(key: 'batteryTempC',      requests: [ObdCommandRequest(key: 'batteryTempC',      command: '220101', ecuConfig: ObdEcuConfig.standard, timeout: const Duration(seconds: 5), parser: _parseHkTemp)]),
+        ObdEnhancedProbe(key: 'cellDeltaMv',       requests: [ObdCommandRequest(key: 'cellDeltaMv',       command: '220102', ecuConfig: ObdEcuConfig.standard, timeout: const Duration(seconds: 5), parser: _parseHkCellDelta)]),
+      ],
     ),
+
+    // ── MG ZS EV ─────────────────────────────────────────────────────────
+    // Source: peternixon/MG-EV-OBD-PID, MGEVs.com community reverse engineering
     ObdEnhancedProfile(
-      name: 'Mahindra EV Battery UDS',
-      brandMatchers: ['mahindra'],
-      headers: ['7E2', '7E7', '7E4'],
-      probes: _buildCommonEnhancedProbes(['7E2', '7E7', '7E4']),
+      name: 'MG ZS EV / MG Comet',
+      brandMatchers: ['mg'],
+      probes: [
+        ObdEnhancedProbe(key: 'batteryPercent',    requests: [ObdCommandRequest(key: 'batteryPercent',    command: '22B046', ecuConfig: ObdEcuConfig.mgBms, timeout: const Duration(seconds: 5), parser: _parseMgSoc)]),
+        ObdEnhancedProbe(key: 'stateOfHealth',     requests: [ObdCommandRequest(key: 'stateOfHealth',     command: '22B061', ecuConfig: ObdEcuConfig.mgBms, timeout: const Duration(seconds: 5), parser: _parseMgSoh)]),
+        ObdEnhancedProbe(key: 'batteryPackVoltage',requests: [ObdCommandRequest(key: 'batteryPackVoltage',command: '22B042', ecuConfig: ObdEcuConfig.mgBms, timeout: const Duration(seconds: 5), parser: _parseMgVoltage)]),
+        ObdEnhancedProbe(key: 'batteryCurrent',    requests: [ObdCommandRequest(key: 'batteryCurrent',    command: '22B043', ecuConfig: ObdEcuConfig.mgBms, timeout: const Duration(seconds: 5), parser: _parseMgCurrent)]),
+        ObdEnhancedProbe(key: 'batteryTempC',      requests: [ObdCommandRequest(key: 'batteryTempC',      command: '22B05C', ecuConfig: ObdEcuConfig.mgBms, timeout: const Duration(seconds: 5), parser: _parseMgTemp)]),
+      ],
     ),
+
+    // ── BYD Atto 3 / Dolphin / Seal ─────────────────────────────────────
+    // Source: loryanstrant/BYD-PID-list, Open Vehicles BYD Atto 3 docs
     ObdEnhancedProfile(
-      name: 'BYD EV Battery UDS',
+      name: 'BYD Atto 3 / Dolphin / Seal',
       brandMatchers: ['byd'],
-      headers: ['7E7', '7E4', '7E2'],
-      probes: _buildCommonEnhancedProbes(['7E7', '7E4', '7E2']),
+      probes: [
+        ObdEnhancedProbe(key: 'batteryPercent', requests: [ObdCommandRequest(key: 'batteryPercent', command: '221FFC', ecuConfig: ObdEcuConfig.bydBms, timeout: const Duration(seconds: 5), parser: _parseBydSoc)]),
+        ObdEnhancedProbe(key: 'batteryTempC',   requests: [ObdCommandRequest(key: 'batteryTempC',   command: '220032', ecuConfig: ObdEcuConfig.bydBms, timeout: const Duration(seconds: 5), parser: _parseBydTemp)]),
+      ],
     ),
+
+    // ── Tata EVs (Nexon EV, Tigor EV, Punch EV) ─────────────────────────
+    // No confirmed public PIDs — tries common UDS headers with generic parsers.
+    // Will discover working PIDs and log them for the user.
     ObdEnhancedProfile(
-      name: 'Nissan Leaf Battery UDS',
+      name: 'Tata EV (Nexon/Tigor/Punch) — auto-discovery',
+      brandMatchers: ['tata'],
+      probes: _buildGenericEvProbes(),
+    ),
+
+    // ── Mahindra EVs (XUV400, BE6, XEV9e) ───────────────────────────────
+    ObdEnhancedProfile(
+      name: 'Mahindra EV (XUV400/BE6) — auto-discovery',
+      brandMatchers: ['mahindra'],
+      probes: _buildGenericEvProbes(),
+    ),
+
+    // ── Nissan Leaf ───────────────────────────────────────────────────────
+    ObdEnhancedProfile(
+      name: 'Nissan Leaf',
       brandMatchers: ['nissan'],
       modelMatchers: ['leaf'],
-      headers: ['7E2', '7E4', '7E7'],
-      probes: _buildCommonEnhancedProbes(['7E2', '7E4', '7E7']),
-    ),
-    ObdEnhancedProfile(
-      name: 'Experimental EV Battery UDS',
-      brandMatchers: [
-        'tata',
-        'mg',
-        'mahindra',
-        'hyundai',
-        'kia',
-        'byd',
-        'nissan',
-      ],
-      headers: _commonEvHeaders,
-      probes: _buildCommonEnhancedProbes(_commonEvHeaders),
+      probes: _buildGenericEvProbes(),
     ),
   ];
 
@@ -239,76 +302,146 @@ class ObdService {
     _onDiagnosticEvent?.call(phase, message);
   }
 
-  static List<ObdEnhancedProbe> _buildCommonEnhancedProbes(
-    List<String> headers,
-  ) {
-    List<ObdCommandRequest> buildRequests(
-      String key,
-      String command,
-      ObdResponseParser parser,
-    ) {
-      return [
-        for (final header in headers)
-          ObdCommandRequest(
-            key: key,
-            command: command,
-            header: header,
-            timeout: const Duration(seconds: 3),
-            parser: parser,
-          ),
-      ];
-    }
+  /// Generic UDS probes — tries multiple CAN headers (7E4 → 7E2 → 7E7).
+  /// Used for Tata/Mahindra where no confirmed PIDs are published.
+  static List<ObdEnhancedProbe> _buildGenericEvProbes() {
+    ObdCommandRequest req(String key, String cmd, ObdResponseParser parser, String header) =>
+        ObdCommandRequest(
+          key: key,
+          command: cmd,
+          ecuConfig: ObdEcuConfig(txHeader: header, fcHeader: null),
+          timeout: const Duration(seconds: 3),
+          parser: parser,
+        );
+
+    probe(String key, String cmd, ObdResponseParser parser) =>
+        ObdEnhancedProbe(key: key, requests: [
+          req(key, cmd, parser, '7E4'),
+          req(key, cmd, parser, '7E2'),
+          req(key, cmd, parser, '7E7'),
+        ]);
 
     return [
-      ObdEnhancedProbe(
-        key: 'batteryPercent',
-        requests: buildRequests(
-          'batteryPercent',
-          '220101',
-          _parseExperimentalPercent,
-        ),
-      ),
-      ObdEnhancedProbe(
-        key: 'batteryPackVoltage',
-        requests: buildRequests(
-          'batteryPackVoltage',
-          '220102',
-          _parseExperimentalVoltage,
-        ),
-      ),
-      ObdEnhancedProbe(
-        key: 'batteryCurrent',
-        requests: buildRequests(
-          'batteryCurrent',
-          '220103',
-          _parseExperimentalCurrent,
-        ),
-      ),
-      ObdEnhancedProbe(
-        key: 'batteryTempC',
-        requests: buildRequests(
-          'batteryTempC',
-          '220104',
-          _parseExperimentalTemperature,
-        ),
-      ),
-      ObdEnhancedProbe(
-        key: 'stateOfHealth',
-        requests: buildRequests(
-          'stateOfHealth',
-          '220105',
-          _parseExperimentalPercent,
-        ),
-      ),
-      ObdEnhancedProbe(
-        key: 'cellDeltaMv',
-        requests: buildRequests(
-          'cellDeltaMv',
-          '220106',
-          _parseExperimentalCellDelta,
-        ),
-      ),
+      probe('batteryPercent',     '220101', _parseExperimentalPercent),
+      probe('batteryPackVoltage', '220102', _parseExperimentalVoltage),
+      probe('batteryCurrent',     '220103', _parseExperimentalCurrent),
+      probe('batteryTempC',       '220104', _parseExperimentalTemperature),
+      probe('stateOfHealth',      '220105', _parseExperimentalPercent),
+      probe('cellDeltaMv',        '220106', _parseExperimentalCellDelta),
     ];
+  }
+
+  // ─── Hyundai / Kia parsers (JejuSoul/OBD-PIDs-for-HKMC-EVs) ─────────────
+  // After _extractDiagnosticBytes strips the "62 DID_HI DID_LO" echo,
+  // byte A = index 0, B = index 1 … Z = index 25, AA = index 26, etc.
+
+  static double? _parseHkSoc(String response) {
+    final b = _extractDiagnosticBytes(response);
+    if (b.length <= 4) return null;
+    final v = b[4] / 2.0; // Byte E / 2
+    return (v >= 0 && v <= 100) ? v : null;
+  }
+
+  static double? _parseHkSoh(String response) {
+    final b = _extractDiagnosticBytes(response);
+    if (b.length <= 26) return null;
+    final v = ((b[25] << 8) + b[26]) / 10.0; // Bytes Z, AA
+    return (v >= 0 && v <= 100) ? v : null;
+  }
+
+  static double? _parseHkVoltage(String response) {
+    final b = _extractDiagnosticBytes(response);
+    if (b.length <= 13) return null;
+    final v = ((b[12] << 8) + b[13]) / 10.0; // Bytes M, N
+    return (v >= 150 && v <= 1000) ? v : null;
+  }
+
+  static double? _parseHkCurrent(String response) {
+    final b = _extractDiagnosticBytes(response);
+    if (b.length <= 11) return null;
+    final raw = (b[10] << 8) + b[11]; // Bytes K, L — signed
+    final signed = raw >= 0x8000 ? raw - 0x10000 : raw;
+    return (signed.abs() <= 600) ? signed / 10.0 : null;
+  }
+
+  static double? _parseHkTemp(String response) {
+    final b = _extractDiagnosticBytes(response);
+    // Module temps start around byte N (index 13); take first plausible one
+    for (int i = 13; i < b.length; i++) {
+      final t = b[i].toDouble() - 40;
+      if (t >= -20 && t <= 70) return t;
+    }
+    return null;
+  }
+
+  static double? _parseHkCellDelta(String response) {
+    // 220102 response has 10 cell voltages × 2 bytes each (÷50 → V)
+    final b = _extractDiagnosticBytes(response);
+    if (b.length < 4) return null;
+    final voltages = <double>[];
+    for (int i = 0; i + 1 < b.length; i += 2) {
+      final v = ((b[i] << 8) + b[i + 1]) / 50.0;
+      if (v >= 2.5 && v <= 4.5) voltages.add(v);
+    }
+    if (voltages.isEmpty) return null;
+    voltages.sort();
+    return (voltages.last - voltages.first) * 1000; // mV
+  }
+
+  // ─── MG ZS EV parsers (peternixon/MG-EV-OBD-PID, MGEVs.com) ─────────────
+  // ECU 0x781→0x789; response: 62 B0 XX [data]
+
+  static double? _parseMgSoc(String response) {
+    final b = _extractDiagnosticBytes(response);
+    if (b.length < 2) return null;
+    final v = ((b[0] << 8) + b[1]) / 10.0; // e.g. 0x0268 = 616 / 10 = 61.6%
+    return (v >= 0 && v <= 100) ? v : null;
+  }
+
+  static double? _parseMgSoh(String response) {
+    final b = _extractDiagnosticBytes(response);
+    if (b.length < 2) return null;
+    final v = ((b[0] << 8) + b[1]) / 100.0;
+    return (v >= 0 && v <= 100) ? v : null;
+  }
+
+  static double? _parseMgVoltage(String response) {
+    final b = _extractDiagnosticBytes(response);
+    if (b.length < 2) return null;
+    final v = ((b[0] << 8) + b[1]) / 4.0;
+    return (v >= 150 && v <= 800) ? v : null;
+  }
+
+  static double? _parseMgCurrent(String response) {
+    final b = _extractDiagnosticBytes(response);
+    if (b.length < 2) return null;
+    final raw = (b[0] << 8) + b[1];
+    final signed = raw >= 0x8000 ? raw - 0x10000 : raw;
+    return (signed.abs() <= 600) ? signed.toDouble() : null;
+  }
+
+  static double? _parseMgTemp(String response) {
+    final b = _extractDiagnosticBytes(response);
+    if (b.isEmpty) return null;
+    final t = b[0].toDouble();
+    return (t >= 0 && t <= 80) ? t : null; // direct Celsius
+  }
+
+  // ─── BYD Atto 3 parsers (loryanstrant/BYD-PID-list) ─────────────────────
+
+  static double? _parseBydSoc(String response) {
+    final b = _extractDiagnosticBytes(response);
+    if (b.length < 2) return null;
+    // Little-endian: (B5*256 + B4) / 100  — index 1 is B5, index 0 is B4
+    final v = ((b[1] << 8) + b[0]) / 100.0;
+    return (v >= 0 && v <= 100) ? v : null;
+  }
+
+  static double? _parseBydTemp(String response) {
+    final b = _extractDiagnosticBytes(response);
+    if (b.isEmpty) return null;
+    final t = b[0] - 40.0;
+    return (t >= -40 && t <= 120) ? t : null;
   }
 
   void bindScanStreams({
@@ -415,6 +548,8 @@ class ObdService {
     );
     _pendingResponse = null;
     _responseBuffer.clear();
+    _activeHeader = null;
+    _activeFcHeader = null;
 
     await _valueSubscription?.cancel();
     await _connectionSubscription?.cancel();
@@ -917,8 +1052,8 @@ class ObdService {
   }
 
   Future<ObdCommandResult> _executeRequest(ObdCommandRequest request) async {
-    if (request.header != null) {
-      await _setHeader(request.header!);
+    if (request.ecuConfig != null) {
+      await _configureEcu(request.ecuConfig!);
     } else {
       await _applyDefaultHeader();
     }
@@ -956,14 +1091,34 @@ class ObdService {
   }
 
   Future<void> _applyDefaultHeader() async {
-    await _setHeader('7DF');
+    await _configureEcu(ObdEcuConfig.generic);
   }
 
-  Future<void> _setHeader(String header) async {
-    if (_activeHeader == header) return;
-    _emitDiagnostic('elm', 'Switching CAN header to $header.');
-    await _sendCommand('ATSH$header', timeout: const Duration(seconds: 1));
-    _activeHeader = header;
+  String? _activeFcHeader;
+
+  Future<void> _configureEcu(ObdEcuConfig config) async {
+    final needHeader = _activeHeader != config.txHeader;
+    final needFc = config.fcHeader != null && _activeFcHeader != config.fcHeader;
+
+    if (!needHeader && !needFc) return;
+
+    if (needHeader) {
+      _emitDiagnostic('elm', 'Switching CAN header to ${config.txHeader}.');
+      await _sendCommand('ATSH${config.txHeader}', timeout: const Duration(seconds: 1));
+      _activeHeader = config.txHeader;
+    }
+
+    if (config.fcHeader != null && needFc) {
+      _emitDiagnostic('elm', 'Setting ISO-TP flow control to ${config.fcHeader}.');
+      await _sendCommand('ATFCSH${config.fcHeader}', timeout: const Duration(seconds: 1));
+      if (config.fcData != null) {
+        await _sendCommand('ATFCSD${config.fcData}', timeout: const Duration(seconds: 1));
+      }
+      if (config.fcMode1) {
+        await _sendCommand('ATFCSM1', timeout: const Duration(seconds: 1));
+      }
+      _activeFcHeader = config.fcHeader;
+    }
   }
 
   double? _parsePidValue(
