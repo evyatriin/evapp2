@@ -1,10 +1,13 @@
-from fastapi import APIRouter, HTTPException, Header
+from fastapi import APIRouter, HTTPException, Header, Request
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from supabase_client import supabase
 from metrics_tracker import track_user_event
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 class SignUpRequest(BaseModel):
     email: EmailStr
@@ -20,7 +23,8 @@ class AuthResponse(BaseModel):
     session: dict
 
 @router.post("/signup", response_model=AuthResponse)
-async def signup(request: SignUpRequest):
+@limiter.limit("3/minute")  # SECURITY FIX: Prevent signup spam
+async def signup(request: Request, signup_req: SignUpRequest):
     """Register a new user"""
     if not supabase:
         raise HTTPException(status_code=503, detail="Authentication service not configured")
@@ -28,22 +32,22 @@ async def signup(request: SignUpRequest):
     try:
         # Sign up user with Supabase Auth
         response = supabase.auth.sign_up({
-            "email": request.email,
-            "password": request.password,
+            "email": signup_req.email,
+            "password": signup_req.password,
             "options": {
                 "data": {
-                    "name": request.name
+                    "name": signup_req.name
                 }
             }
         })
-        
+
         if response.user:
             track_user_event("signup")
             return {
                 "user": {
                     "id": response.user.id,
                     "email": response.user.email,
-                    "name": request.name,
+                    "name": signup_req.name,
                 },
                 "session": {
                     "access_token": response.session.access_token if response.session else None,
@@ -56,16 +60,17 @@ async def signup(request: SignUpRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.post("/login", response_model=AuthResponse)
-async def login(request: SignInRequest):
+@limiter.limit("5/minute")  # SECURITY FIX: Prevent brute force attacks
+async def login(request: Request, signin_req: SignInRequest):
     """Login user"""
     if not supabase:
         raise HTTPException(status_code=503, detail="Authentication service not configured")
-    
+
     try:
         # Sign in user with Supabase Auth
         response = supabase.auth.sign_in_with_password({
-            "email": request.email,
-            "password": request.password
+            "email": signin_req.email,
+            "password": signin_req.password
         })
         
         if response.user and response.session:

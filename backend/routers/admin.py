@@ -2,13 +2,16 @@ import os
 from datetime import date, timedelta
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from supabase_client import supabase, service_supabase
 from auth_utils import ensure_admin_user, get_authenticated_user
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 router = APIRouter()
+limiter = Limiter(key_func=get_remote_address)
 
 # ---------------------------------------------------------------------------
 # Cost tables (USD per 1 000 calls, monthly free-tier ceiling)
@@ -53,7 +56,9 @@ async def get_reports(auth_user: Dict[str, Any] = Depends(get_authenticated_user
 
 
 @router.post("/moderate/content")
+@limiter.limit("30/minute")  # SECURITY FIX: Prevent spam moderation
 async def moderate_content(
+    http_request: Request,
     request: ModerationRequest,
     auth_user: Dict[str, Any] = Depends(get_authenticated_user),
 ):
@@ -77,7 +82,9 @@ async def moderate_content(
 
 
 @router.post("/ban")
+@limiter.limit("10/minute")  # SECURITY FIX: Prevent spam bans
 async def ban_user(
+    http_request: Request,
     request: BanRequest,
     auth_user: Dict[str, Any] = Depends(get_authenticated_user),
 ):
@@ -263,10 +270,12 @@ async def get_metrics(days: int = 30, auth_user: Dict[str, Any] = Depends(get_au
 
 
 # ---------------------------------------------------------------------------
-# Dashboard HTML (no auth — auth handled by the page itself)
+# Dashboard HTML (requires admin authentication)
 # ---------------------------------------------------------------------------
 @router.get("/dashboard", response_class=HTMLResponse)
-async def admin_dashboard():
+async def admin_dashboard(auth_user: Dict[str, Any] = Depends(get_authenticated_user)):
+    # CRITICAL FIX: Add authentication requirement
+    ensure_admin_user(auth_user)
     html_path = os.path.join(os.path.dirname(__file__), "..", "templates", "admin_dashboard.html")
     try:
         with open(html_path, encoding="utf-8") as f:
