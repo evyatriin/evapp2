@@ -1,5 +1,86 @@
 import 'package:latlong2/latlong.dart';
 
+class ElevationPoint {
+  final double latitude;
+  final double longitude;
+  final double elevationM;
+  final double distanceFromOriginKm;
+
+  const ElevationPoint({
+    required this.latitude,
+    required this.longitude,
+    required this.elevationM,
+    required this.distanceFromOriginKm,
+  });
+
+  factory ElevationPoint.fromJson(Map<String, dynamic> json) {
+    return ElevationPoint(
+      latitude: json['latitude'].toDouble(),
+      longitude: json['longitude'].toDouble(),
+      elevationM: json['elevation_m'].toDouble(),
+      distanceFromOriginKm: json['distance_from_origin_km'].toDouble(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'latitude': latitude,
+      'longitude': longitude,
+      'elevation_m': elevationM,
+      'distance_from_origin_km': distanceFromOriginKm,
+    };
+  }
+}
+
+class ElevationProfile {
+  final double elevationGainM;
+  final double elevationLossM;
+  final double maxElevationM;
+  final double minElevationM;
+  final double averageGradientPct;
+  final List<ElevationPoint> points;
+
+  const ElevationProfile({
+    required this.elevationGainM,
+    required this.elevationLossM,
+    required this.maxElevationM,
+    required this.minElevationM,
+    required this.averageGradientPct,
+    required this.points,
+  });
+
+  factory ElevationProfile.fromJson(Map<String, dynamic> json) {
+    return ElevationProfile(
+      elevationGainM: json['elevation_gain_m'].toDouble(),
+      elevationLossM: json['elevation_loss_m'].toDouble(),
+      maxElevationM: json['max_elevation_m'].toDouble(),
+      minElevationM: json['min_elevation_m'].toDouble(),
+      averageGradientPct: json['average_gradient_pct'].toDouble(),
+      points: (json['points'] as List)
+          .map((point) => ElevationPoint.fromJson(point))
+          .toList(),
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'elevation_gain_m': elevationGainM,
+      'elevation_loss_m': elevationLossM,
+      'max_elevation_m': maxElevationM,
+      'min_elevation_m': minElevationM,
+      'average_gradient_pct': averageGradientPct,
+      'points': points.map((p) => p.toJson()).toList(),
+    };
+  }
+
+  String get elevationSummary {
+    if (elevationGainM == 0 && elevationLossM == 0) {
+      return 'No elevation data';
+    }
+    return '↑ ${elevationGainM.toStringAsFixed(0)}m / ↓ ${elevationLossM.toStringAsFixed(0)}m';
+  }
+}
+
 class RouteModel {
   final String id;
   final String name; // "Plan A", "Plan B", etc.
@@ -9,6 +90,7 @@ class RouteModel {
   final List<RouteStop> stops;
   final double estimatedCost;
   final List<String> guidance;
+  final ElevationProfile? elevationProfile;
 
   const RouteModel({
     required this.id,
@@ -19,7 +101,15 @@ class RouteModel {
     required this.stops,
     required this.estimatedCost,
     this.guidance = const [],
+    this.elevationProfile,
   });
+
+  int get totalChargeDurationMin => stops
+      .where((stop) => stop.type == StopType.charging)
+      .fold<int>(0, (total, stop) => total + (stop.chargeDurationMin ?? 0));
+
+  String get elevationSummary =>
+      elevationProfile?.elevationSummary ?? 'No elevation data';
 
   factory RouteModel.fromJson(Map<String, dynamic> json) {
     return RouteModel(
@@ -38,6 +128,9 @@ class RouteModel {
               ?.map((item) => item as String)
               .toList() ??
           const [],
+      elevationProfile: json['elevationProfile'] != null
+          ? ElevationProfile.fromJson(json['elevationProfile'])
+          : null,
     );
   }
 
@@ -51,6 +144,7 @@ class RouteModel {
       'stops': stops.map((s) => s.toJson()).toList(),
       'estimatedCost': estimatedCost,
       'guidance': guidance,
+      'elevationProfile': elevationProfile?.toJson(),
     };
   }
 }
@@ -68,6 +162,9 @@ class RouteStop {
   final int? chargeDurationMin;
   final int? targetSoc;
   final String? advice;
+  final double? distanceFromOriginKm;
+  final double? distanceFromPreviousStopKm;
+  final double? distanceFromPreviousChargingStopKm;
 
   const RouteStop({
     required this.name,
@@ -80,6 +177,9 @@ class RouteStop {
     this.departureSoc,
     this.cost,
     this.advice,
+    this.distanceFromOriginKm,
+    this.distanceFromPreviousStopKm,
+    this.distanceFromPreviousChargingStopKm,
   });
 
   factory RouteStop.fromJson(Map<String, dynamic> json) {
@@ -94,6 +194,9 @@ class RouteStop {
       departureSoc: json['departureSoc'],
       cost: json['cost']?.toDouble(),
       advice: json['advice'] as String?,
+      distanceFromOriginKm: (json['distanceFromOriginKm'] as num?)?.toDouble(),
+      distanceFromPreviousStopKm: (json['distanceFromPreviousStopKm'] as num?)?.toDouble(),
+      distanceFromPreviousChargingStopKm: (json['distanceFromPreviousChargingStopKm'] as num?)?.toDouble(),
     );
   }
 
@@ -109,6 +212,9 @@ class RouteStop {
       'departureSoc': departureSoc,
       'cost': cost,
       'advice': advice,
+      'distanceFromOriginKm': distanceFromOriginKm,
+      'distanceFromPreviousStopKm': distanceFromPreviousStopKm,
+      'distanceFromPreviousChargingStopKm': distanceFromPreviousChargingStopKm,
     };
   }
 }

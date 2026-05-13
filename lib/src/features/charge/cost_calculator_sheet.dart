@@ -4,13 +4,17 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../vehicle_profile/vehicle_provider.dart';
 
 class CostCalculatorSheet extends ConsumerStatefulWidget {
-  final String stationCost; // e.g., "₹15-25 / kWh" or "₹18 / kWh"
   final String stationName;
+  /// Structured per-kWh rate from the station (preferred).
+  final double? pricePerKwh;
+  /// Fallback cost string (e.g. "₹15-25 / kWh") for stations without structured pricing.
+  final String? stationCost;
 
   const CostCalculatorSheet({
     super.key,
-    required this.stationCost,
     required this.stationName,
+    this.pricePerKwh,
+    this.stationCost,
   });
 
   @override
@@ -32,14 +36,15 @@ class _CostCalculatorSheetState extends ConsumerState<CostCalculatorSheet> {
   }
 
   double get _tariffRate {
-    // Parse tariff from station cost string
-    final costStr = widget.stationCost;
-    final regex = RegExp(r'₹(\d+)');
-    final match = regex.firstMatch(costStr);
+    // Use structured rate when available.
+    if (widget.pricePerKwh != null) return widget.pricePerKwh!;
+    // Fall back to parsing cost string (e.g. "₹15-25 / kWh").
+    final costStr = widget.stationCost ?? '';
+    final match = RegExp(r'₹(\d+)').firstMatch(costStr);
     if (match != null) {
       return double.tryParse(match.group(1)!) ?? 18.0;
     }
-    return 18.0; // Default ₹18/kWh
+    return 18.0;
   }
 
   double get _kWhRequired {
@@ -205,7 +210,7 @@ class _CostCalculatorSheetState extends ConsumerState<CostCalculatorSheet> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Tariff: ${widget.stationCost} • Battery: ${_batteryCapacity.toStringAsFixed(0)} kWh',
+                    'Tariff: ₹${_tariffRate.toStringAsFixed(2)}/kWh • Battery: ${_batteryCapacity.toStringAsFixed(0)} kWh',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.secondary,
                     ),

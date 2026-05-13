@@ -43,6 +43,22 @@ class RouteRequest(BaseModel):
     vehicle: Optional[VehicleRoutingProfile] = None
 
 
+class ElevationPoint(BaseModel):
+    latitude: float
+    longitude: float
+    elevation_m: float
+    distance_from_origin_km: float
+
+
+class ElevationProfile(BaseModel):
+    elevation_gain_m: float
+    elevation_loss_m: float
+    max_elevation_m: float
+    min_elevation_m: float
+    average_gradient_pct: float
+    points: list[ElevationPoint]
+
+
 VEHICLE_LIBRARY: dict[tuple[str, str, str], dict[str, Any]] = {
     ("tata", "nexon ev", "max"): {
         "battery_capacity_kwh": 40.5,
@@ -107,6 +123,202 @@ async def _fetch_here_route(params: dict[str, str]) -> dict[str, Any]:
             raise
 
 
+async def _fetch_elevation_data(polyline_points: list[dict[str, float]]) -> Optional[ElevationProfile]:
+    """
+    Fetch elevation data from Open Elevation API for a polyline.
+    Samples the polyline to reduce API calls and interpolates missing points.
+    """
+    import logging
+    logging.info(f"_fetch_elevation_data called: ELEVATION_ENABLED={settings.ELEVATION_ENABLED}, points={len(polyline_points) if polyline_points else 0}")
+
+    if not polyline_points or len(polyline_points) < 2:
+        logging.warning("Not enough polyline points for elevation data")
+        return None
+
+    if not settings.ELEVATION_ENABLED:
+        logging.info("Elevation is disabled in settings")
+        return None
+
+    try:
+        # Sample polyline to reduce API calls (target 100-150 points, max 512 per API call)
+        sampled_indices = _sample_polyline(len(polyline_points))
+        sampled_points = [polyline_points[i] for i in sampled_indices]
+
+        # Prepare API request
+        locations = [
+            {"latitude": p["latitude"], "longitude": p["longitude"]}
+            for p in sampled_points
+        ]
+
+        # Fetch elevations from Open Elevation API
+        async with httpx.AsyncClient(timeout=settings.ELEVATION_API_TIMEOUT_SECONDS) as client:
+            response = await client.post(
+                settings.OPEN_ELEVATION_API_URL,
+                json={"locations": locations}
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        if not data.get("results"):
+            return None
+
+        # Map sampled elevations back to original indices
+        elevation_map = {
+            sampled_indices[i]: data["results"][i]["elevation"]
+            for i in range(len(sampled_indices))
+        }
+
+        # Interpolate elevations for all points
+        elevation_points = _interpolate_elevations(polyline_points, elevation_map)
+
+        # Calculate statistics
+        elevation_profile = _calculate_elevation_stats(elevation_points)
+        return elevation_profile
+
+    except Exception as e:
+        # Graceful degradation: log error but don't block route calculation
+        import logging
+        import traceback
+        logging.error(f"Failed to fetch elevation data: {type(e).__name__}: {e}")
+        logging.debug(f"Elevation fetch traceback: {traceback.format_exc()}")
+        return None
+
+
+def _sample_polyline(total_points: int, target_samples: int = 150) -> list[int]:
+    """
+    Sample polyline indices to reduce API calls.
+    Always includes first and last points.
+    """
+    if total_points <= target_samples:
+        return list(range(total_points))
+
+    indices = [0]  # Always include start
+    step = (total_points - 1) / (target_samples - 1)
+    for i in range(1, target_samples - 1):
+        indices.append(int(i * step))
+    indices.append(total_points - 1)  # Always include end
+
+    return sorted(list(set(indices)))
+
+
+def _interpolate_elevations(
+    polyline_points: list[dict[str, float]],
+    elevation_map: dict[int, float]
+) -> list[dict[str, float]]:
+    """
+    Interpolate elevations for all polyline points using linear interpolation
+    between sampled points.
+    """
+    elevations_with_coords = []
+
+    for i, point in enumerate(polyline_points):
+        if i in elevation_map:
+            elevation_m = elevation_map[i]
+        else:
+            # Find surrounding sampled points for interpolation
+            before_idx = max(j for j in elevation_map.keys() if j < i) if any(j < i for j in elevation_map.keys()) else 0
+            after_idx = min(j for j in elevation_map.keys() if j > i) if any(j > i for j in elevation_map.keys()) else len(polyline_points) - 1
+
+            if before_idx == after_idx:
+                elevation_m = elevation_map.get(before_idx, 0)
+            else:
+                # Linear interpolation
+                before_elev = elevation_map.get(before_idx, 0)
+                after_elev = elevation_map.get(after_idx, 0)
+                ratio = (i - before_idx) / (after_idx - before_idx) if after_idx > before_idx else 0
+                elevation_m = before_elev + (after_elev - before_elev) * ratio
+
+        elevations_with_coords.append({
+            **point,
+            "elevation_m": elevation_m
+        })
+
+    return elevations_with_coords
+
+
+def _calculate_elevation_stats(elevation_points: list[dict[str, float]]) -> ElevationProfile:
+    """
+    Calculate elevation gain, loss, max, min, and average gradient from elevation points.
+    """
+    if not elevation_points or len(elevation_points) < 2:
+        return ElevationProfile(
+            elevation_gain_m=0,
+            elevation_loss_m=0,
+            max_elevation_m=0,
+            min_elevation_m=0,
+            average_gradient_pct=0,
+            points=[]
+        )
+
+    elevation_profile_points: list[ElevationPoint] = []
+    elevation_gain = 0.0
+    elevation_loss = 0.0
+    cumulative_distance = 0.0
+
+    min_elevation = elevation_points[0]["elevation_m"]
+    max_elevation = elevation_points[0]["elevation_m"]
+
+    for i, point in enumerate(elevation_points):
+        elev = point["elevation_m"]
+        min_elevation = min(min_elevation, elev)
+        max_elevation = max(max_elevation, elev)
+
+        if i > 0:
+            prev_point = elevation_points[i - 1]
+            elevation_change = elev - prev_point["elevation_m"]
+
+            # Calculate distance between points (Haversine approximation)
+            lat1, lon1 = prev_point["latitude"], prev_point["longitude"]
+            lat2, lon2 = point["latitude"], point["longitude"]
+            distance_km = _haversine_distance(lat1, lon1, lat2, lon2)
+            cumulative_distance += distance_km
+
+            if elevation_change > 0:
+                elevation_gain += elevation_change
+            else:
+                elevation_loss += abs(elevation_change)
+
+        elevation_profile_points.append(
+            ElevationPoint(
+                latitude=point["latitude"],
+                longitude=point["longitude"],
+                elevation_m=round(elev, 1),
+                distance_from_origin_km=round(cumulative_distance, 2)
+            )
+        )
+
+    # Calculate average gradient
+    total_elevation_change = elevation_gain - elevation_loss
+    total_distance_km = cumulative_distance or 1
+    average_gradient_pct = (total_elevation_change / (total_distance_km * 1000)) * 100 if total_distance_km > 0 else 0
+
+    return ElevationProfile(
+        elevation_gain_m=round(elevation_gain, 1),
+        elevation_loss_m=round(elevation_loss, 1),
+        max_elevation_m=round(max_elevation, 1),
+        min_elevation_m=round(min_elevation, 1),
+        average_gradient_pct=round(average_gradient_pct, 2),
+        points=elevation_profile_points
+    )
+
+
+def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """
+    Calculate distance between two points in km using Haversine formula.
+    """
+    from math import radians, sin, cos, sqrt, atan2
+
+    R = 6371  # Earth radius in km
+
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+
+    a = sin(dlat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    return R * c
+
+
 @router.post("/")
 @limiter.limit("20/minute")
 async def calculate_route(request: Request, route_req: RouteRequest):
@@ -120,7 +332,7 @@ async def calculate_route(request: Request, route_req: RouteRequest):
     try:
         ev_data = await _fetch_here_route(ev_params)
         if ev_data.get("routes"):
-            parsed_routes = _parse_here_routes(
+            parsed_routes = await _parse_here_routes(
                 ev_data,
                 route_req,
                 vehicle_profile,
@@ -134,7 +346,7 @@ async def calculate_route(request: Request, route_req: RouteRequest):
             message = notices[0].get("title") if notices else "No reachable route was found"
             raise HTTPException(status_code=422, detail=message)
 
-        parsed_routes = _parse_here_routes(
+        parsed_routes = await _parse_here_routes(
             basic_data,
             route_req,
             vehicle_profile,
@@ -265,7 +477,7 @@ def _resolve_vehicle_profile(request: RouteRequest) -> dict[str, Any]:
     return profile
 
 
-def _parse_here_routes(
+async def _parse_here_routes(
     data: dict[str, Any],
     request: RouteRequest,
     vehicle_profile: dict[str, Any],
@@ -337,6 +549,9 @@ def _parse_here_routes(
             }
         )
 
+        # Fetch elevation data for the route
+        elevation_profile = await _fetch_elevation_data(points)
+
         parsed_routes.append(
             {
                 "id": f"{route_source}_{index}",
@@ -345,6 +560,7 @@ def _parse_here_routes(
                 "totalDistanceKm": round(total_distance_km, 1),
                 "totalDurationMin": round(total_duration_min, 1),
                 "stops": stops,
+                "elevationProfile": elevation_profile.model_dump() if elevation_profile else None,
                 "estimatedCost": round(
                     sum(stop.get("cost", 0) or 0 for stop in stops if stop["type"] == "charging"),
                     0,
@@ -352,6 +568,7 @@ def _parse_here_routes(
                 "guidance": route_guidance,
             }
         )
+        _annotate_stop_distances(parsed_routes[-1])
 
     return parsed_routes
 
@@ -634,6 +851,7 @@ def _apply_suggested_stops(route: dict[str, Any], suggestions: list[dict[str, An
         sum(stop.get("cost", 0) or 0 for stop in suggestions),
         0,
     )
+    _annotate_stop_distances(route)
 
 
 def _append_route_guidance(route: dict[str, Any], request: RouteRequest) -> None:
@@ -735,6 +953,108 @@ def _distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
         * math.sin(d_lon / 2) ** 2
     )
     return 2 * radius_km * math.asin(math.sqrt(a))
+
+
+def _annotate_stop_distances(route: dict[str, Any]) -> None:
+    polyline = route.get("polyline") or []
+    stops = route.get("stops") or []
+    if len(polyline) < 2 or not stops:
+        return
+
+    last_charge_anchor_km = 0.0
+    previous_stop_km = 0.0
+
+    for stop in stops:
+        location = stop.get("location") or {}
+        cumulative_km = _distance_along_polyline_to_location(
+            polyline,
+            location.get("latitude"),
+            location.get("longitude"),
+        )
+        stop["distanceFromOriginKm"] = round(cumulative_km, 1)
+        stop["distanceFromPreviousStopKm"] = round(
+            max(0.0, cumulative_km - previous_stop_km),
+            1,
+        )
+
+        if stop.get("type") == "charging":
+            stop["distanceFromPreviousChargingStopKm"] = round(
+                max(0.0, cumulative_km - last_charge_anchor_km),
+                1,
+            )
+            last_charge_anchor_km = cumulative_km
+
+        if stop.get("type") != "origin":
+            previous_stop_km = cumulative_km
+
+
+def _distance_along_polyline_to_location(
+    polyline: list[dict[str, float]],
+    latitude: float | None,
+    longitude: float | None,
+) -> float:
+    if latitude is None or longitude is None or len(polyline) < 2:
+        return 0.0
+
+    cumulative_lengths = [0.0]
+    total = 0.0
+    for start, end in zip(polyline, polyline[1:]):
+        total += _distance_km(
+            start["latitude"],
+            start["longitude"],
+            end["latitude"],
+            end["longitude"],
+        )
+        cumulative_lengths.append(total)
+
+    best_distance_along = 0.0
+    best_perpendicular = float("inf")
+    target_x, target_y = _project_to_plane(latitude, longitude, latitude)
+
+    for index, (start, end) in enumerate(zip(polyline, polyline[1:])):
+        reference_lat = (start["latitude"] + end["latitude"] + latitude) / 3
+        start_x, start_y = _project_to_plane(
+            start["latitude"],
+            start["longitude"],
+            reference_lat,
+        )
+        end_x, end_y = _project_to_plane(
+            end["latitude"],
+            end["longitude"],
+            reference_lat,
+        )
+        point_x, point_y = _project_to_plane(latitude, longitude, reference_lat)
+
+        segment_dx = end_x - start_x
+        segment_dy = end_y - start_y
+        segment_length_sq = segment_dx * segment_dx + segment_dy * segment_dy
+
+        if segment_length_sq == 0:
+            ratio = 0.0
+            projected_x = start_x
+            projected_y = start_y
+        else:
+            ratio = (
+                (point_x - start_x) * segment_dx + (point_y - start_y) * segment_dy
+            ) / segment_length_sq
+            ratio = max(0.0, min(1.0, ratio))
+            projected_x = start_x + segment_dx * ratio
+            projected_y = start_y + segment_dy * ratio
+
+        perpendicular = math.hypot(point_x - projected_x, point_y - projected_y)
+        if perpendicular < best_perpendicular:
+            segment_length_km = cumulative_lengths[index + 1] - cumulative_lengths[index]
+            best_perpendicular = perpendicular
+            best_distance_along = cumulative_lengths[index] + segment_length_km * ratio
+
+    return best_distance_along
+
+
+def _project_to_plane(latitude: float, longitude: float, reference_latitude: float) -> tuple[float, float]:
+    lat_rad = math.radians(reference_latitude)
+    x = longitude * math.cos(lat_rad) * 111.32
+    y = latitude * 110.57
+    return x, y
 
 
 def _format_number(value: float) -> str:

@@ -16,6 +16,8 @@ class SavedRoute {
   final int chargingStops;
   final bool isFavorite;
   final DateTime createdAt;
+  final double? elevationGainM;
+  final double? elevationLossM;
 
   const SavedRoute({
     required this.id,
@@ -32,6 +34,8 @@ class SavedRoute {
     required this.chargingStops,
     this.isFavorite = false,
     required this.createdAt,
+    this.elevationGainM,
+    this.elevationLossM,
   });
 
   SavedRoute copyWith({
@@ -49,6 +53,8 @@ class SavedRoute {
     int? chargingStops,
     bool? isFavorite,
     DateTime? createdAt,
+    double? elevationGainM,
+    double? elevationLossM,
   }) {
     return SavedRoute(
       id: id ?? this.id,
@@ -65,6 +71,8 @@ class SavedRoute {
       chargingStops: chargingStops ?? this.chargingStops,
       isFavorite: isFavorite ?? this.isFavorite,
       createdAt: createdAt ?? this.createdAt,
+      elevationGainM: elevationGainM ?? this.elevationGainM,
+      elevationLossM: elevationLossM ?? this.elevationLossM,
     );
   }
 
@@ -94,6 +102,8 @@ class SavedRoute {
       chargingStops: json['charging_stops'] as int,
       isFavorite: json['is_favorite'] as bool? ?? false,
       createdAt: DateTime.parse(json['created_at'] as String),
+      elevationGainM: (json['elevation_gain_m'] as num?)?.toDouble(),
+      elevationLossM: (json['elevation_loss_m'] as num?)?.toDouble(),
     );
   }
 
@@ -119,6 +129,8 @@ class SavedRoute {
       'charging_stops': chargingStops,
       'is_favorite': isFavorite,
       'created_at': createdAt.toIso8601String(),
+      'elevation_gain_m': elevationGainM,
+      'elevation_loss_m': elevationLossM,
     };
   }
 }

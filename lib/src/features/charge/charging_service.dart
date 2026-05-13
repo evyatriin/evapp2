@@ -1,4 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../../core/backend_service.dart';
 import '../authentication/auth_service.dart';
@@ -14,6 +17,8 @@ class HostChargerListing {
   final String hostName;
   final String hostPhone;
   final String? hostUpiId;
+  final double? electricityCostPerKwh;
+  final double? hostMarginPerKwh;
   final double? pricePerKwh;
   final double? pricePerSession;
   final String? availableFrom;
@@ -23,6 +28,19 @@ class HostChargerListing {
   final String? accessInstructions;
   final String? parkingNotes;
   final String? houseRules;
+  final List<String> chargerPhotos;
+  final List<String> parkingPhotos;
+  final String? propertyType;
+  final String? visitorAccessType;
+  final String? availableHours;
+  final List<String> vehicleSizeSupport;
+  final Map<String, bool> locationAccessChecks;
+  final Map<String, bool> safetyChecks;
+  final Map<String, bool> hostDeclarations;
+  final String? declarationVersion;
+  final String? declarationsCompletedAt;
+  final List<String> moderationFlags;
+  final Map<String, bool> verificationBadges;
 
   const HostChargerListing({
     required this.id,
@@ -35,6 +53,8 @@ class HostChargerListing {
     this.powerKw,
     this.address,
     this.hostUpiId,
+    this.electricityCostPerKwh,
+    this.hostMarginPerKwh,
     this.pricePerKwh,
     this.pricePerSession,
     this.availableFrom,
@@ -44,6 +64,19 @@ class HostChargerListing {
     this.accessInstructions,
     this.parkingNotes,
     this.houseRules,
+    this.chargerPhotos = const [],
+    this.parkingPhotos = const [],
+    this.propertyType,
+    this.visitorAccessType,
+    this.availableHours,
+    this.vehicleSizeSupport = const [],
+    this.locationAccessChecks = const {},
+    this.safetyChecks = const {},
+    this.hostDeclarations = const {},
+    this.declarationVersion,
+    this.declarationsCompletedAt,
+    this.moderationFlags = const [],
+    this.verificationBadges = const {},
   });
 
   factory HostChargerListing.fromJson(Map<String, dynamic> json) {
@@ -58,6 +91,8 @@ class HostChargerListing {
       hostName: json['host_name'] as String? ?? '',
       hostPhone: json['host_phone'] as String? ?? '',
       hostUpiId: json['host_upi_id'] as String?,
+      electricityCostPerKwh: (json['electricity_cost_per_kwh'] as num?)?.toDouble(),
+      hostMarginPerKwh: (json['host_margin_per_kwh'] as num?)?.toDouble(),
       pricePerKwh: (json['price_per_kwh'] as num?)?.toDouble(),
       pricePerSession: (json['price_per_session'] as num?)?.toDouble(),
       availableFrom: json['available_from'] as String?,
@@ -67,6 +102,27 @@ class HostChargerListing {
       accessInstructions: json['access_instructions'] as String?,
       parkingNotes: json['parking_notes'] as String?,
       houseRules: json['house_rules'] as String?,
+      chargerPhotos: List<String>.from(json['charger_photos'] ?? const []),
+      parkingPhotos: List<String>.from(json['parking_photos'] ?? const []),
+      propertyType: json['property_type'] as String?,
+      visitorAccessType: json['visitor_access_type'] as String?,
+      availableHours: json['available_hours'] as String?,
+      vehicleSizeSupport: List<String>.from(
+        json['vehicle_size_support'] ?? const [],
+      ),
+      locationAccessChecks: Map<String, bool>.from(
+        json['location_access_checks'] ?? const {},
+      ),
+      safetyChecks: Map<String, bool>.from(json['safety_checks'] ?? const {}),
+      hostDeclarations: Map<String, bool>.from(
+        json['host_declarations'] ?? const {},
+      ),
+      declarationVersion: json['declaration_version'] as String?,
+      declarationsCompletedAt: json['declarations_completed_at'] as String?,
+      moderationFlags: List<String>.from(json['moderation_flags'] ?? const []),
+      verificationBadges: Map<String, bool>.from(
+        json['verification_badges'] ?? const {},
+      ),
     );
   }
 }
@@ -86,6 +142,12 @@ class ChargerRequestItem {
   final String? hostResponse;
   final Map<String, dynamic>? station;
   final Map<String, dynamic>? hostContact;
+  // Settlement fields — populated after host enters actual kWh
+  final double? kwhDelivered;
+  final double? energyCost;
+  final double? platformFee;
+  final double? finalAmount;
+  final DateTime? settledAt;
 
   const ChargerRequestItem({
     required this.id,
@@ -102,9 +164,21 @@ class ChargerRequestItem {
     this.hostResponse,
     this.station,
     this.hostContact,
+    this.kwhDelivered,
+    this.energyCost,
+    this.platformFee,
+    this.finalAmount,
+    this.settledAt,
   });
 
+  bool get isSettled => finalAmount != null;
+
+  double? get stationPricePerKwh =>
+      (station?['price_per_kwh'] as num?)?.toDouble();
+
   factory ChargerRequestItem.fromJson(Map<String, dynamic> json) {
+    // settlement may come as a nested map or as flat fields
+    final settlement = json['settlement'] as Map<String, dynamic>?;
     return ChargerRequestItem(
       id: json['id']?.toString() ?? '',
       stationId: json['station_id']?.toString() ?? '',
@@ -131,6 +205,13 @@ class ChargerRequestItem {
           ? json['host_contact'] as Map<String, dynamic>
           : json['host_contact'] is Map
           ? Map<String, dynamic>.from(json['host_contact'] as Map)
+          : null,
+      kwhDelivered: ((settlement?['kwh_delivered'] ?? json['kwh_delivered']) as num?)?.toDouble(),
+      energyCost: ((settlement?['energy_cost'] ?? json['energy_cost']) as num?)?.toDouble(),
+      platformFee: ((settlement?['platform_fee'] ?? json['platform_fee']) as num?)?.toDouble(),
+      finalAmount: ((settlement?['final_amount'] ?? json['final_amount']) as num?)?.toDouble(),
+      settledAt: json['settled_at'] != null
+          ? DateTime.tryParse(json['settled_at'] as String)
           : null,
     );
   }
@@ -397,6 +478,8 @@ class ChargingService {
     String? provider,
     List<String> connectorTypes = const [],
     double? powerKw,
+    double? electricityCostPerKwh,
+    double? hostMarginPerKwh,
     double? pricePerKwh,
     double? pricePerSession,
     required String hostName,
@@ -409,6 +492,15 @@ class ChargingService {
     String? parkingNotes,
     String? houseRules,
     bool isAcceptingRequests = true,
+    List<String> chargerPhotos = const [],
+    List<String> parkingPhotos = const [],
+    String? propertyType,
+    String? visitorAccessType,
+    String? availableHours,
+    List<String> vehicleSizeSupport = const [],
+    Map<String, bool> locationAccessChecks = const {},
+    Map<String, bool> safetyChecks = const {},
+    Map<String, bool> hostDeclarations = const {},
   }) async {
     final token = _authService.getAuthToken();
     if (token == null) {
@@ -428,6 +520,8 @@ class ChargingService {
           'provider': provider,
           'connector_types': connectorTypes,
           'power_kw': powerKw,
+          'electricity_cost_per_kwh': electricityCostPerKwh,
+          'host_margin_per_kwh': hostMarginPerKwh,
           'price_per_kwh': pricePerKwh,
           'price_per_session': pricePerSession,
           'host_name': hostName,
@@ -437,15 +531,72 @@ class ChargingService {
           'available_from': availableFrom,
           'available_to': availableTo,
           'available_days': availableDays,
+          'available_hours': availableHours,
           'parking_notes': parkingNotes,
           'house_rules': houseRules,
           'is_accepting_requests': isAcceptingRequests,
+          'charger_photos': chargerPhotos,
+          'parking_photos': parkingPhotos,
+          'property_type': propertyType,
+          'visitor_access_type': visitorAccessType,
+          'vehicle_size_support': vehicleSizeSupport,
+          'location_access_checks': locationAccessChecks,
+          'safety_checks': safetyChecks,
+          'host_declarations': hostDeclarations,
         },
         headers: {'Authorization': 'Bearer $token'},
       );
       return HostChargerListing.fromJson(Map<String, dynamic>.from(response));
     } catch (e) {
       debugPrint('Error saving hosted charger: $e');
+      rethrow;
+    }
+  }
+
+  Future<String?> uploadHostedChargerImage(String filePath) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse(
+          '${BackendService.baseUrl}/api/chargers/upload-hosted-charger-image',
+        ),
+      );
+
+      request.files.add(await http.MultipartFile.fromPath('file', filePath));
+      final response = await request.send();
+      if (response.statusCode == 200) {
+        final responseData = await response.stream.bytesToString();
+        final jsonData = json.decode(responseData) as Map<String, dynamic>;
+        return jsonData['image_url'] as String?;
+      }
+    } catch (e) {
+      debugPrint('Error uploading hosted charger image: $e');
+    }
+    return null;
+  }
+
+  Future<ChargerRequestItem?> settleChargerRequest({
+    required String requestId,
+    required String hostUserId,
+    required double kwhDelivered,
+  }) async {
+    final token = _authService.getAuthToken();
+    if (token == null) {
+      throw Exception('You must be signed in to settle charger requests.');
+    }
+
+    try {
+      final response = await BackendService.post(
+        '/api/chargers/request/$requestId/settle',
+        body: {
+          'host_user_id': hostUserId,
+          'kwh_delivered': kwhDelivered,
+        },
+        headers: {'Authorization': 'Bearer $token'},
+      );
+      return ChargerRequestItem.fromJson(Map<String, dynamic>.from(response));
+    } catch (e) {
+      debugPrint('Error settling charger request: $e');
       rethrow;
     }
   }

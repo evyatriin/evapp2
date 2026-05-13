@@ -35,4 +35,10 @@ class Settings:
     ALLOWED_ORIGINS = _parse_allowed_origins(os.getenv("ALLOWED_ORIGINS", "*"))
     PORT = int(_clean_env(os.getenv("PORT", "8080")))
 
+    # Elevation API settings
+    OPEN_ELEVATION_API_URL = "https://api.open-elevation.com/api/v1/lookup"
+    ELEVATION_SAMPLE_INTERVAL_KM = float(_clean_env(os.getenv("ELEVATION_SAMPLE_INTERVAL_KM", "0.5")))
+    ELEVATION_API_TIMEOUT_SECONDS = int(_clean_env(os.getenv("ELEVATION_API_TIMEOUT_SECONDS", "30")))
+    ELEVATION_ENABLED = _clean_env(os.getenv("ELEVATION_ENABLED", "true")).lower() == "true"
+
 settings = Settings()

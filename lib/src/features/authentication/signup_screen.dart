@@ -25,17 +25,26 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   bool _obscureConfirmPassword = true;
 
   String _formatSignupError(Object error) {
-    final raw = error.toString();
-    if (raw.contains('Failed host lookup') || raw.contains('SocketException')) {
+    final raw = error.toString().toLowerCase();
+    debugPrint('Signup error details: $error');
+
+    if (raw.contains('failed host lookup') || raw.contains('socketexception')) {
       return 'Could not reach the authentication server. Please update the app or try again on a stable network.';
     }
-    if (raw.contains('email_address_invalid')) {
+    if (raw.contains('email') && (raw.contains('invalid') || raw.contains('format'))) {
       return 'Please enter a valid email address.';
     }
-    if (raw.contains('User already registered')) {
+    if (raw.contains('already registered') || raw.contains('already exists')) {
       return 'An account with this email already exists.';
     }
-    return 'Signup failed. Please try again.';
+    if (raw.contains('email confirmation') || raw.contains('verify email')) {
+      return 'Please check your email to verify your account before logging in.';
+    }
+    if (raw.contains('password') && (raw.contains('weak') || raw.contains('length'))) {
+      return 'Password must be at least 6 characters.';
+    }
+    // Return the actual error message for debugging
+    return 'Signup error: $error';
   }
 
   @override

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart' hide Badge;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
-import '../../core/navigation_helpers.dart';
 import '../authentication/user_provider.dart';
 import '../community/gamification_widgets.dart';
 import '../community/gamification_service.dart';
@@ -103,7 +102,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
 
                           // Stats Row
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Column(
                                 children: [
@@ -115,16 +114,16 @@ class ProfileSettingsScreen extends ConsumerWidget {
                                   ),
                                 ],
                               ),
-                              Column(
-                                children: [
-                                  StreakWidget(streak: user.streak),
-                                  const Gap(4),
-                                  Text(
-                                    'Current Streak',
-                                    style: theme.textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
+                              // Column(
+                              //   children: [
+                              //     StreakWidget(streak: user.streak),
+                              //     const Gap(4),
+                              //     Text(
+                              //       'Current Streak',
+                              //       style: theme.textTheme.bodySmall,
+                              //     ),
+                              //   ],
+                              // ),
                             ],
                           ),
 
@@ -260,7 +259,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
                           ),
                           const Gap(8),
                           Text(
-                            'List your home or community charger, accept local charging requests, and track the requests you send.',
+                            'Share a private EV charger, accept temporary charging requests, and manage hosted sessions with simple manual payment coordination.',
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
@@ -280,27 +279,6 @@ class ProfileSettingsScreen extends ConsumerWidget {
                   ),
                   const Gap(16),
 
-                  // Security Section
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Security', style: theme.textTheme.titleLarge),
-                          const Gap(8),
-                          ListTile(
-                            leading: const Icon(Icons.lock_outline),
-                            title: const Text('Change Password'),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap:
-                                () => context.push('/profile/change-password'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const Gap(16),
                   // Account Settings
                   Card(
                     child: Padding(
@@ -314,16 +292,11 @@ class ProfileSettingsScreen extends ConsumerWidget {
                           ),
                           const Gap(16),
                           ListTile(
-                            leading: const Icon(Icons.map),
-                            title: const Text('Saved Routes'),
+                            leading: const Icon(Icons.lock_outline),
+                            title: const Text('Change Password'),
                             trailing: const Icon(Icons.chevron_right),
-                            onTap: () => context.push('/saved-routes'),
-                          ),
-                          ListTile(
-                            leading: const Icon(Icons.battery_charging_full),
-                            title: const Text('OBD Scanner'),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () => openObdScanner(context),
+                            onTap:
+                                () => context.push('/profile/change-password'),
                           ),
                           ListTile(
                             leading: const Icon(Icons.logout),

@@ -73,7 +73,7 @@ def _cleanup_user_storage(user_id: str, admin_client) -> None:
         ("vehicles", "user_id", ["photo_url"]),
         ("station_checkins", "user_id", ["image_url", "charging_slip_url"]),
         ("community_posts", "user_id", ["image_url"]),
-        ("charging_stations", "owner_id", ["charger_photos"]),
+        ("charging_stations", "owner_id", ["charger_photos", "parking_photos"]),
     ]
 
     for table_name, filter_column, columns in sources:

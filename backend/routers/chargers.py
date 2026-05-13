@@ -1,4 +1,5 @@
 import logging
+from math import cos, radians
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
@@ -12,8 +13,55 @@ from utils.charger_aggregation import aggregate_chargers_nearby
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Supabase Setup
-# Supabase Setup - using centralized client
+PLATFORM_FEE_PERCENT = 5.0   # 5% of energy cost
+PLATFORM_FEE_MINIMUM_INR = 2.0  # floor so micro-sessions aren't free for the platform
+HOST_DECLARATION_VERSION = "private_charger_hosting_v1"
+
+LOCATION_ACCESS_CHECK_KEYS = [
+    "accessible_without_gated_approval",
+    "parking_available_for_visiting_evs",
+    "above_ground_and_well_ventilated",
+    "reachable_by_standard_ev_cars",
+    "cable_does_not_block_public_roads",
+    "safe_access_after_sunset",
+]
+
+SAFETY_CHECK_KEYS = [
+    "properly_earthed",
+    "mcb_or_rccb_installed",
+    "no_loose_extension_wiring",
+    "protected_from_rain_or_water",
+    "fire_extinguisher_available",
+]
+
+HOST_DECLARATION_KEYS = [
+    "complies_with_local_rules_and_safe_for_temporary_access",
+    "host_responsible_for_safety_access_and_electrical_compliance",
+    "platform_only_facilitates_discovery_and_coordination",
+]
+
+
+def _normalize_checkbox_object(
+    value: Optional[Dict[str, Any]],
+    keys: List[str],
+) -> Dict[str, bool]:
+    source = value or {}
+    return {key: bool(source.get(key)) for key in keys}
+
+
+def _normalize_badges(value: Optional[Dict[str, Any]]) -> Dict[str, bool]:
+    source = value or {}
+    return {
+        "phone_verified": bool(source.get("phone_verified")),
+        "charger_photo_uploaded": bool(source.get("charger_photo_uploaded")),
+        "parking_photo_uploaded": bool(source.get("parking_photo_uploaded")),
+        "responsive_host": bool(source.get("responsive_host")),
+        "repeat_host": bool(source.get("repeat_host")),
+    }
+
+
+def _normalize_text_list(value: Any) -> List[str]:
+    return [str(item).strip() for item in list(value or []) if str(item).strip()]
 
 # --- Models ---
 class ChargingStation(BaseModel):
@@ -50,6 +98,18 @@ class ChargingStation(BaseModel):
     parking_notes: Optional[str] = None
     house_rules: Optional[str] = None
     charger_photos: List[str] = []
+    parking_photos: List[str] = []
+    property_type: Optional[str] = None
+    visitor_access_type: Optional[str] = None
+    available_hours: Optional[str] = None
+    vehicle_size_support: List[str] = []
+    location_access_checks: Dict[str, bool] = {}
+    safety_checks: Dict[str, bool] = {}
+    host_declarations: Dict[str, bool] = {}
+    declaration_version: Optional[str] = None
+    declarations_completed_at: Optional[datetime] = None
+    moderation_flags: List[str] = []
+    verification_badges: Dict[str, bool] = {}
     
     # Aggregates
     average_rating: float = 0.0
@@ -85,6 +145,11 @@ class HostChargerRequest(BaseModel):
     provider: Optional[str] = "Community Host"
     connector_types: List[str] = []
     power_kw: Optional[float] = None
+    # Pricing — two paths:
+    #   1. Structured: electricity_cost_per_kwh + host_margin_per_kwh → price_per_kwh computed
+    #   2. Direct:     price_per_kwh set explicitly (backwards-compatible)
+    electricity_cost_per_kwh: Optional[float] = None
+    host_margin_per_kwh: Optional[float] = None
     price_per_kwh: Optional[float] = None
     price_per_session: Optional[float] = None
     host_name: str
@@ -98,6 +163,16 @@ class HostChargerRequest(BaseModel):
     house_rules: Optional[str] = None
     is_accepting_requests: bool = True
     amenities: List[str] = []
+    charger_photos: List[str] = []
+    parking_photos: List[str] = []
+    property_type: Optional[str] = None
+    visitor_access_type: Optional[str] = None
+    available_hours: Optional[str] = None
+    vehicle_size_support: List[str] = []
+    location_access_checks: Dict[str, bool] = {}
+    safety_checks: Dict[str, bool] = {}
+    host_declarations: Dict[str, bool] = {}
+    declaration_version: Optional[str] = HOST_DECLARATION_VERSION
 
 
 class CreateChargerRequest(BaseModel):
@@ -120,6 +195,11 @@ class ChargerRequestDecisionRequest(BaseModel):
 
 class ChargerRequestCompleteRequest(BaseModel):
     host_user_id: str
+
+
+class ChargerRequestSettleRequest(BaseModel):
+    host_user_id: str
+    kwh_delivered: float  # actual kWh measured by host
 
 class CreateSessionRequest(BaseModel):
     user_id: str
@@ -207,6 +287,19 @@ class AggregatedChargingStation(BaseModel):
     is_accepting_requests: bool = False
     parking_notes: Optional[str] = None
     house_rules: Optional[str] = None
+    charger_photos: List[str] = []
+    parking_photos: List[str] = []
+    property_type: Optional[str] = None
+    visitor_access_type: Optional[str] = None
+    available_hours: Optional[str] = None
+    vehicle_size_support: List[str] = []
+    location_access_checks: Dict[str, bool] = {}
+    safety_checks: Dict[str, bool] = {}
+    host_declarations: Dict[str, bool] = {}
+    declaration_version: Optional[str] = None
+    declarations_completed_at: Optional[str] = None
+    moderation_flags: List[str] = []
+    verification_badges: Dict[str, bool] = {}
 
 
 def _station_is_publicly_visible(row: Dict[str, Any]) -> bool:
@@ -221,13 +314,96 @@ def _normalize_station_row(row: Dict[str, Any]) -> Dict[str, Any]:
     normalized = dict(row)
     normalized["available_days"] = list(normalized.get("available_days") or [])
     normalized["charger_photos"] = list(normalized.get("charger_photos") or [])
+    normalized["parking_photos"] = list(normalized.get("parking_photos") or [])
     normalized["connector_types"] = list(normalized.get("connector_types") or [])
     normalized["amenities"] = list(normalized.get("amenities") or [])
+    normalized["vehicle_size_support"] = list(normalized.get("vehicle_size_support") or [])
+    normalized["moderation_flags"] = list(normalized.get("moderation_flags") or [])
+    normalized["location_access_checks"] = _normalize_checkbox_object(
+        normalized.get("location_access_checks"),
+        LOCATION_ACCESS_CHECK_KEYS,
+    )
+    normalized["safety_checks"] = _normalize_checkbox_object(
+        normalized.get("safety_checks"),
+        SAFETY_CHECK_KEYS,
+    )
+    normalized["host_declarations"] = _normalize_checkbox_object(
+        normalized.get("host_declarations"),
+        HOST_DECLARATION_KEYS,
+    )
+    normalized["verification_badges"] = _normalize_badges(
+        normalized.get("verification_badges"),
+    )
     if normalized.get("available_from") is not None:
         normalized["available_from"] = str(normalized["available_from"])
     if normalized.get("available_to") is not None:
         normalized["available_to"] = str(normalized["available_to"])
+    if normalized.get("declarations_completed_at") is not None:
+        normalized["declarations_completed_at"] = str(
+            normalized["declarations_completed_at"]
+        )
     return normalized
+
+
+def _load_host_profile_flags(user_id: str) -> Dict[str, bool]:
+    try:
+        response = (
+            supabase.table("profiles")
+            .select("preferences")
+            .eq("id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        prefs = (response.data or {}).get("preferences") or {}
+        return {
+            "phone_verified": bool(prefs.get("is_phone_verified")),
+        }
+    except Exception as exc:
+        logger.info("Could not load host profile flags for %s: %s", user_id, exc)
+        return {"phone_verified": False}
+
+
+def _build_host_verification_badges(
+    *,
+    owner_id: str,
+    charger_photos: List[str],
+    parking_photos: List[str],
+) -> Dict[str, bool]:
+    profile_flags = _load_host_profile_flags(owner_id)
+
+    repeat_host = False
+    responsive_host = False
+    try:
+        hosted = (
+            supabase.table("charging_stations")
+            .select("id", count="exact")
+            .eq("owner_id", owner_id)
+            .eq("is_private", True)
+            .execute()
+        )
+        repeat_host = (hosted.count or 0) >= 2
+    except Exception as exc:
+        logger.info("Could not compute repeat_host for %s: %s", owner_id, exc)
+
+    try:
+        handled = (
+            supabase.table("charger_requests")
+            .select("id", count="exact")
+            .eq("host_user_id", owner_id)
+            .in_("status", ["accepted", "completed", "rejected"])
+            .execute()
+        )
+        responsive_host = (handled.count or 0) >= 3
+    except Exception as exc:
+        logger.info("Could not compute responsive_host for %s: %s", owner_id, exc)
+
+    return {
+        "phone_verified": bool(profile_flags.get("phone_verified")),
+        "charger_photo_uploaded": bool(charger_photos),
+        "parking_photo_uploaded": bool(parking_photos),
+        "responsive_host": responsive_host,
+        "repeat_host": repeat_host,
+    }
 
 
 def _hydrate_request_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -248,8 +424,13 @@ def _hydrate_request_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             .select(
                 "id, name, address, latitude, longitude, owner_id, host_name, "
                 "host_phone, host_upi_id, price_per_kwh, price_per_session, "
+                "electricity_cost_per_kwh, host_margin_per_kwh, "
                 "available_from, available_to, available_days, "
-                "access_instructions, parking_notes, house_rules"
+                "available_hours, access_instructions, parking_notes, house_rules, "
+                "property_type, visitor_access_type, vehicle_size_support, "
+                "charger_photos, parking_photos, location_access_checks, "
+                "safety_checks, host_declarations, declaration_version, "
+                "declarations_completed_at, moderation_flags, verification_badges"
             )
             .in_("id", station_ids)
             .execute()
@@ -382,7 +563,7 @@ async def get_my_stations(
     try:
         ensure_same_user(auth_user, user_id)
         response = supabase.table("charging_stations").select("*").eq("owner_id", user_id).execute()
-        return response.data
+        return [_normalize_station_row(row) for row in (response.data or [])]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -412,6 +593,51 @@ async def create_or_update_host_station(
     try:
         ensure_same_user(auth_user, request.owner_id)
 
+        location_access_checks = _normalize_checkbox_object(
+            request.location_access_checks,
+            LOCATION_ACCESS_CHECK_KEYS,
+        )
+        safety_checks = _normalize_checkbox_object(
+            request.safety_checks,
+            SAFETY_CHECK_KEYS,
+        )
+        host_declarations = _normalize_checkbox_object(
+            request.host_declarations,
+            HOST_DECLARATION_KEYS,
+        )
+        if not all(host_declarations.values()):
+            raise HTTPException(
+                status_code=400,
+                detail="All host declarations must be accepted before listing a private charger.",
+            )
+
+        charger_photos = _normalize_text_list(request.charger_photos)
+        parking_photos = _normalize_text_list(request.parking_photos)
+        moderation_flags = _normalize_text_list([])
+        if not all(location_access_checks.values()):
+            moderation_flags.append("location_access_incomplete")
+        if not all(safety_checks.values()):
+            moderation_flags.append("safety_check_incomplete")
+
+        verification_badges = _build_host_verification_badges(
+            owner_id=request.owner_id,
+            charger_photos=charger_photos,
+            parking_photos=parking_photos,
+        )
+
+        # Compute a suggested energy-based access amount when the host enters
+        # recovery cost + convenience margin.
+        computed_price_per_kwh = request.price_per_kwh
+        if (
+            request.electricity_cost_per_kwh is not None
+            and request.host_margin_per_kwh is not None
+        ):
+            computed_price_per_kwh = round(
+                request.electricity_cost_per_kwh + request.host_margin_per_kwh, 2
+            )
+        elif request.electricity_cost_per_kwh is not None and computed_price_per_kwh is None:
+            computed_price_per_kwh = request.electricity_cost_per_kwh
+
         payload = {
             "name": request.name,
             "address": request.address,
@@ -429,15 +655,30 @@ async def create_or_update_host_station(
             "host_name": request.host_name,
             "host_phone": request.host_phone,
             "host_upi_id": request.host_upi_id,
-            "price_per_kwh": request.price_per_kwh,
+            "electricity_cost_per_kwh": request.electricity_cost_per_kwh,
+            "host_margin_per_kwh": request.host_margin_per_kwh,
+            "price_per_kwh": computed_price_per_kwh,
             "price_per_session": request.price_per_session,
             "available_from": request.available_from,
             "available_to": request.available_to,
             "available_days": request.available_days,
+            "available_hours": request.available_hours,
             "is_accepting_requests": request.is_accepting_requests,
             "parking_notes": request.parking_notes,
             "house_rules": request.house_rules,
             "amenities": request.amenities,
+            "charger_photos": charger_photos,
+            "parking_photos": parking_photos,
+            "property_type": request.property_type,
+            "visitor_access_type": request.visitor_access_type,
+            "vehicle_size_support": request.vehicle_size_support,
+            "location_access_checks": location_access_checks,
+            "safety_checks": safety_checks,
+            "host_declarations": host_declarations,
+            "declaration_version": request.declaration_version or HOST_DECLARATION_VERSION,
+            "declarations_completed_at": datetime.now().isoformat(),
+            "moderation_flags": moderation_flags,
+            "verification_badges": verification_badges,
         }
 
         if request.station_id:
@@ -542,7 +783,22 @@ async def create_charger_request(
 
         estimated_amount = None
         if station.get("price_per_session") is not None:
-            estimated_amount = station.get("price_per_session")
+            session_cost = float(station["price_per_session"])
+            platform_fee = max(
+                PLATFORM_FEE_MINIMUM_INR,
+                session_cost * PLATFORM_FEE_PERCENT / 100,
+            )
+            estimated_amount = round(session_cost + platform_fee, 2)
+        elif station.get("price_per_kwh") is not None:
+            # Estimate using SOC gap and a 40 kWh reference battery.
+            # This is rough; the final settlement uses the host-confirmed session amount.
+            soc_gap = max(0, 100 - (request.current_soc or 50)) / 100
+            estimated_kwh = round(soc_gap * 40.0, 1)
+            energy_cost = round(estimated_kwh * float(station["price_per_kwh"]), 2)
+            platform_fee = round(
+                max(PLATFORM_FEE_MINIMUM_INR, energy_cost * PLATFORM_FEE_PERCENT / 100), 2
+            )
+            estimated_amount = round(energy_cost + platform_fee, 2)
 
         payload = {
             "station_id": request.station_id,
@@ -695,6 +951,96 @@ async def complete_charger_request(
     except Exception as e:
         logger.exception("Error completing charger request %s", request_id)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/request/{request_id}/settle")
+async def settle_charger_request(
+    request_id: str,
+    body: ChargerRequestSettleRequest,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    """
+    Host enters the actual kWh delivered. Backend computes:
+      energy_cost   = kwh_delivered × price_per_kwh
+      convenience_fee = max(₹2, 5% of energy_cost)
+      final_amount  = energy_cost + convenience_fee
+    Status is moved to 'completed' atomically with the settlement.
+    """
+    try:
+        ensure_same_user(auth_user, body.host_user_id)
+
+        if body.kwh_delivered <= 0:
+            raise HTTPException(status_code=400, detail="kwh_delivered must be greater than 0")
+
+        existing = (
+            supabase.table("charger_requests")
+            .select("*, charging_stations(price_per_kwh, price_per_session)")
+            .eq("id", request_id)
+            .maybe_single()
+            .execute()
+        )
+        if not existing.data:
+            raise HTTPException(status_code=404, detail="Charge request not found")
+
+        row = existing.data
+        if row.get("host_user_id") != body.host_user_id:
+            raise HTTPException(status_code=403, detail="You can only settle requests for your own hosted chargers")
+        if row.get("status") not in ("accepted", "completed"):
+            raise HTTPException(status_code=409, detail="Only accepted or completed requests can be settled")
+
+        station = row.get("charging_stations") or {}
+        price_per_kwh = station.get("price_per_kwh")
+        price_per_session = station.get("price_per_session")
+
+        if price_per_kwh is not None:
+            energy_cost = round(body.kwh_delivered * float(price_per_kwh), 2)
+        elif price_per_session is not None:
+            energy_cost = round(float(price_per_session), 2)
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="This charger has no access pricing set. Add an energy-based or session amount before settling.",
+            )
+
+        platform_fee = round(
+            max(PLATFORM_FEE_MINIMUM_INR, energy_cost * PLATFORM_FEE_PERCENT / 100), 2
+        )
+        final_amount = round(energy_cost + platform_fee, 2)
+
+        update_payload = {
+            "status": "completed",
+            "completed_at": datetime.now().isoformat(),
+            "kwh_delivered": body.kwh_delivered,
+            "energy_cost": energy_cost,
+            "platform_fee": platform_fee,
+            "final_amount": final_amount,
+            "settled_at": datetime.now().isoformat(),
+        }
+
+        response = (
+            supabase.table("charger_requests")
+            .update(update_payload)
+            .eq("id", request_id)
+            .execute()
+        )
+        if not response.data:
+            raise HTTPException(status_code=500, detail="Settlement could not be saved")
+
+        result = _hydrate_request_rows(response.data)[0]
+        result["settlement"] = {
+            "kwh_delivered": body.kwh_delivered,
+            "price_per_kwh": price_per_kwh,
+            "energy_cost": energy_cost,
+            "platform_fee": platform_fee,
+            "final_amount": final_amount,
+        }
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error settling charger request %s", request_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.get("/history/{user_id}", response_model=List[ChargingSession])
 async def get_charging_history(
@@ -873,11 +1219,234 @@ async def upload_checkin_image(file: UploadFile = File(...)):
         logger.exception("Error uploading checkin image")
         raise HTTPException(status_code=500, detail=f"Error uploading image: {str(e)}")
 
+
+@router.post("/upload-hosted-charger-image")
+async def upload_hosted_charger_image(file: UploadFile = File(...)):
+    """Upload a hosted charger or parking/access image to Supabase Storage."""
+    try:
+        allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
+        if file.content_type not in allowed_types:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid file type. Only JPEG, PNG, and WebP are allowed.",
+            )
+
+        file_ext = file.filename.split(".")[-1]
+        unique_filename = f"hosted_charger_{uuid.uuid4()}.{file_ext}"
+        file_content = await file.read()
+
+        supabase.storage.from_("hosted-charger-images").upload(
+            unique_filename,
+            file_content,
+            {"content-type": file.content_type},
+        )
+
+        public_url = supabase.storage.from_("hosted-charger-images").get_public_url(
+            unique_filename
+        )
+        return {"image_url": public_url}
+    except Exception as e:
+        logger.exception("Error uploading hosted charger image")
+        raise HTTPException(status_code=500, detail=f"Error uploading image: {str(e)}")
+
 # --- Saved Chargers Endpoints ---
+
+class ChargerAlongRoute(BaseModel):
+    """Charger with distance information along a route"""
+    id: str
+    name: str
+    latitude: float
+    longitude: float
+    address: Optional[str]
+    provider: Optional[str]
+    connector_types: List[str]
+    power_kw: Optional[float]
+    distance_from_origin_km: float
+    is_optimal: bool  # True if on optimal route, False if alternative nearby
+    charger_type: str  # "optimal", "alternative", or "far"
+
+
+class ChargerOnRouteRequest(BaseModel):
+    origin_lat: float
+    origin_lng: float
+    destination_lat: float
+    destination_lng: float
+    polyline: Optional[List[dict]] = None  # List of {latitude, longitude}
+    radius_km: float = 20.0  # Search radius around route
+
 
 class SaveChargerRequest(BaseModel):
     user_id: str
     station_id: str
+
+@router.post("/along-route", response_model=List[ChargerAlongRoute])
+async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
+    """
+    Get chargers along a route corridor.
+    - Creates a 4-5km buffer zone around the actual route
+    - Only returns chargers within 5km perpendicular distance to the route
+    - Searches along the full route direction (not just from origin)
+    """
+    try:
+        from math import radians, cos, sin, asin, sqrt, atan2, degrees
+
+        def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+            """Calculate distance between two points in km"""
+            lon1, lat1, lon2, lat2 = map(radians, [lon1, lat1, lon2, lat2])
+            dlon = lon2 - lon1
+            dlat = lat2 - lat1
+            a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+            c = 2 * asin(sqrt(a))
+            r = 6371
+            return c * r
+
+        def get_route_bounds(polyline: List[dict], buffer_km: float = 5.0) -> tuple:
+            """Get bounding box that encompasses route with buffer"""
+            if not polyline:
+                return None
+
+            lats = [p['latitude'] for p in polyline]
+            lngs = [p['longitude'] for p in polyline]
+
+            min_lat, max_lat = min(lats), max(lats)
+            min_lng, max_lng = min(lngs), max(lngs)
+
+            # Add buffer (roughly 5km = 0.045 degrees)
+            lat_buffer = buffer_km / 111.0
+            lng_buffer = buffer_km / (111.0 * cos(radians((min_lat + max_lat) / 2)) if (min_lat + max_lat) / 2 != 0 else 111.0)
+
+            return (min_lat - lat_buffer, max_lat + lat_buffer,
+                    min_lng - lng_buffer, max_lng + lng_buffer)
+
+        def sample_polyline(polyline: List[dict], max_samples: int = 100) -> List[dict]:
+            """Sample polyline to reduce computation. Always includes start and end."""
+            if len(polyline) <= max_samples:
+                return polyline
+
+            sampled = [polyline[0]]  # Always include start
+            step = len(polyline) / max_samples
+            for i in range(1, max_samples - 1):
+                sampled.append(polyline[int(i * step)])
+            sampled.append(polyline[-1])  # Always include end
+            return sampled
+
+        def perpendicular_distance_to_polyline(lat: float, lng: float, polyline: List[dict]) -> float:
+            """Calculate perpendicular distance from point to nearest segment in polyline (sampled)"""
+            if not polyline or len(polyline) < 2:
+                return float('inf')
+
+            # Sample polyline to reduce computation (100 points max instead of potentially 1000+)
+            sampled = sample_polyline(polyline, max_samples=100)
+            min_dist = float('inf')
+
+            for i in range(len(sampled) - 1):
+                p1 = sampled[i]
+                p2 = sampled[i + 1]
+
+                lat1, lng1 = p1['latitude'], p1['longitude']
+                lat2, lng2 = p2['latitude'], p2['longitude']
+
+                # Calculate segment length
+                segment_dist = haversine_distance(lat1, lng1, lat2, lng2)
+
+                if segment_dist < 0.01:  # Points too close, use direct distance
+                    dist = haversine_distance(lat, lng, lat1, lng1)
+                    min_dist = min(min_dist, dist)
+                    continue
+
+                # Distance from point to endpoints
+                dist_to_p1 = haversine_distance(lat, lng, lat1, lng1)
+                dist_to_p2 = haversine_distance(lat, lng, lat2, lng2)
+
+                # Use perpendicular distance approximation via cross product
+                # This is faster than full cross-track distance formula
+                cross_dist = abs((lng2 - lng1) * (lat1 - lat) - (lat2 - lat1) * (lng1 - lng))
+                perp_dist = cross_dist / max(0.001, segment_dist * 111.0)  # Convert to km
+
+                min_dist = min(min_dist, perp_dist, dist_to_p1, dist_to_p2)
+
+            return min_dist
+
+        # Use polyline if provided, otherwise create one from origin/destination
+        if request_data.polyline and len(request_data.polyline) > 0:
+            route_polyline = request_data.polyline
+        else:
+            route_polyline = [
+                {"latitude": request_data.origin_lat, "longitude": request_data.origin_lng},
+                {"latitude": request_data.destination_lat, "longitude": request_data.destination_lng},
+            ]
+
+        # Get bounding box of route with 5km buffer
+        bounds = get_route_bounds(route_polyline, buffer_km=5.0)
+        if not bounds:
+            return []
+
+        min_lat, max_lat, min_lng, max_lng = bounds
+
+        # Query chargers within the route corridor bounds
+        response = supabase.table("charging_stations").select("*").eq("verification_status", "verified") \
+            .gte("latitude", min_lat) \
+            .lte("latitude", max_lat) \
+            .gte("longitude", min_lng) \
+            .lte("longitude", max_lng) \
+            .limit(500) \
+            .execute()
+
+        all_stations = [row for row in (response.data or []) if _station_is_publicly_visible(row)]
+
+        # Process each charger - ONLY include if within 5km of route
+        chargers_along_route: List[ChargerAlongRoute] = []
+        ROUTE_BUFFER_KM = 5.0  # Only chargers within 5km of the route corridor
+
+        for station in all_stations:
+            lat, lng = station.get('latitude'), station.get('longitude')
+            if lat is None or lng is None:
+                continue
+
+            # Calculate perpendicular distance to route
+            dist_to_route = perpendicular_distance_to_polyline(lat, lng, route_polyline)
+
+            # SKIP if too far from the actual route
+            if dist_to_route > ROUTE_BUFFER_KM:
+                continue
+
+            # Distance from origin (for sorting)
+            dist_from_origin = haversine_distance(
+                request_data.origin_lat,
+                request_data.origin_lng,
+                lat,
+                lng
+            )
+
+            # Determine if optimal (very close to route, <2km)
+            is_optimal = dist_to_route <= 2.0
+
+            charger_type = "optimal" if is_optimal else "alternative"
+
+            chargers_along_route.append(ChargerAlongRoute(
+                id=station.get('id'),
+                name=station.get('name'),
+                latitude=lat,
+                longitude=lng,
+                address=station.get('address'),
+                provider=station.get('provider'),
+                connector_types=station.get('connector_types', []),
+                power_kw=station.get('power_kw'),
+                distance_from_origin_km=round(dist_from_origin, 1),
+                is_optimal=is_optimal,
+                charger_type=charger_type
+            ))
+
+        # Sort by distance from origin
+        chargers_along_route.sort(key=lambda c: c.distance_from_origin_km)
+
+        logger.info(f"Found {len(chargers_along_route)} chargers within 5km of route")
+        return chargers_along_route
+
+    except Exception as e:
+        logger.exception("Error fetching chargers along route")
+        raise HTTPException(status_code=500, detail=f"Error fetching chargers: {str(e)}")
+
 
 @router.post("/save")
 def save_charger(

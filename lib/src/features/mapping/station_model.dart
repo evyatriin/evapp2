@@ -31,6 +31,20 @@ class StationModel {
   final bool isAcceptingRequests;
   final String? parkingNotes;
   final String? houseRules;
+  final String? phoneNumber;
+  final List<String> chargerPhotos;
+  final List<String> parkingPhotos;
+  final String? propertyType;
+  final String? visitorAccessType;
+  final String? availableHours;
+  final List<String> vehicleSizeSupport;
+  final Map<String, bool> locationAccessChecks;
+  final Map<String, bool> safetyChecks;
+  final Map<String, bool> hostDeclarations;
+  final String? declarationVersion;
+  final String? declarationsCompletedAt;
+  final List<String> moderationFlags;
+  final Map<String, bool> verificationBadges;
 
   const StationModel({
     required this.id,
@@ -63,6 +77,20 @@ class StationModel {
     this.isAcceptingRequests = false,
     this.parkingNotes,
     this.houseRules,
+    this.phoneNumber,
+    this.chargerPhotos = const [],
+    this.parkingPhotos = const [],
+    this.propertyType,
+    this.visitorAccessType,
+    this.availableHours,
+    this.vehicleSizeSupport = const [],
+    this.locationAccessChecks = const {},
+    this.safetyChecks = const {},
+    this.hostDeclarations = const {},
+    this.declarationVersion,
+    this.declarationsCompletedAt,
+    this.moderationFlags = const [],
+    this.verificationBadges = const {},
   });
 
   factory StationModel.fromJson(Map<String, dynamic> json) {
@@ -109,6 +137,28 @@ class StationModel {
       isAcceptingRequests: json['is_accepting_requests'] == true,
       parkingNotes: json['parking_notes'] as String?,
       houseRules: json['house_rules'] as String?,
+      phoneNumber: json['phone_number'] as String?,
+      chargerPhotos: List<String>.from(json['charger_photos'] ?? const []),
+      parkingPhotos: List<String>.from(json['parking_photos'] ?? const []),
+      propertyType: json['property_type'] as String?,
+      visitorAccessType: json['visitor_access_type'] as String?,
+      availableHours: json['available_hours'] as String?,
+      vehicleSizeSupport: List<String>.from(
+        json['vehicle_size_support'] ?? const [],
+      ),
+      locationAccessChecks: Map<String, bool>.from(
+        json['location_access_checks'] ?? const {},
+      ),
+      safetyChecks: Map<String, bool>.from(json['safety_checks'] ?? const {}),
+      hostDeclarations: Map<String, bool>.from(
+        json['host_declarations'] ?? const {},
+      ),
+      declarationVersion: json['declaration_version'] as String?,
+      declarationsCompletedAt: json['declarations_completed_at'] as String?,
+      moderationFlags: List<String>.from(json['moderation_flags'] ?? const []),
+      verificationBadges: Map<String, bool>.from(
+        json['verification_badges'] ?? const {},
+      ),
     );
   }
 
@@ -169,6 +219,20 @@ class StationModel {
       isAcceptingRequests: false,
       parkingNotes: null,
       houseRules: null,
+      phoneNumber: json['nationalPhoneNumber'] as String?,
+      chargerPhotos: const [],
+      parkingPhotos: const [],
+      propertyType: null,
+      visitorAccessType: null,
+      availableHours: null,
+      vehicleSizeSupport: const [],
+      locationAccessChecks: const {},
+      safetyChecks: const {},
+      hostDeclarations: const {},
+      declarationVersion: null,
+      declarationsCompletedAt: null,
+      moderationFlags: const [],
+      verificationBadges: const {},
     );
   }
 

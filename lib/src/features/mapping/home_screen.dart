@@ -157,6 +157,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     });
   }
 
+  void _showFilterSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const _StationFilterSheet(),
+    );
+  }
+
   String _friendlyError(Object? error) {
     final msg = error?.toString() ?? '';
     if (msg.contains('timed out') || msg.contains('timeout')) {
@@ -178,7 +189,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final stationsAsync = ref.watch(stationsProvider);
     final stations = stationsAsync.asData?.value ?? [];
     final theme = Theme.of(context);
-    final activeFilterCount = ref.watch(connectorFilterProvider).length;
+    final activeFilterCount = totalActiveFilters(
+      connectors: ref.watch(connectorFilterProvider),
+      speed: ref.watch(speedFilterProvider),
+      price: ref.watch(priceFilterProvider),
+      availableNow: ref.watch(availableNowFilterProvider),
+      access: ref.watch(accessFilterProvider),
+    );
     final availableCount = stations.where((s) => s.status == 'working').length;
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -290,18 +307,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     myLocationButtonEnabled: false,
                   ),
 
-                  // My Location Button
+                  // Search + My Location Controls
                   Positioned(
                     bottom: 90,
                     right: 12,
-                    child: FloatingActionButton.small(
-                      heroTag: 'map_my_location',
-                      tooltip: 'Center on my location',
-                      backgroundColor: Theme.of(context).colorScheme.surface,
-                      foregroundColor: Theme.of(context).colorScheme.primary,
-                      elevation: 2,
-                      onPressed: () => _bootstrapMapLocation(showErrors: true),
-                      child: const Icon(Icons.my_location, size: 20),
+                    child: Column(
+                      children: [
+                        FloatingActionButton.small(
+                          heroTag: 'map_search',
+                          tooltip: 'Search chargers by location',
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer,
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.onPrimaryContainer,
+                          elevation: 2,
+                          onPressed: () => context.push('/search'),
+                          child: Icon(
+                            PhosphorIcons.magnifyingGlass(
+                              PhosphorIconsStyle.bold,
+                            ),
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        FloatingActionButton.small(
+                          heroTag: 'map_my_location',
+                          tooltip: 'Center on my location',
+                          backgroundColor: Theme.of(context).colorScheme.surface,
+                          foregroundColor: Theme.of(context).colorScheme.primary,
+                          elevation: 2,
+                          onPressed: () => _bootstrapMapLocation(showErrors: true),
+                          child: const Icon(Icons.my_location, size: 20),
+                        ),
+                      ],
                     ),
                   ),
 
@@ -320,7 +360,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                   ),
 
-                  // Search Bar
+                  // Top bar: charger count pill + filter pill
                   Positioned(
                     top: 8,
                     left: 12,
@@ -336,109 +376,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               ),
                             ),
                             const SizedBox(width: 8),
-                            _MapStatPill(
-                              icon: Icons.tune,
-                              label: activeFilterCount == 0 ? 'All plugs' : '$activeFilterCount filters',
+                            // Tappable filter icon button with badge
+                            _FilterIconButton(
+                              activeCount: activeFilterCount,
+                              onTap: () => _showFilterSheet(context),
                             ),
                           ],
-                        ),
-                        const SizedBox(height: 6),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Consumer(
-                            builder: (context, ref, child) {
-                              final selectedFilters = ref.watch(
-                                connectorFilterProvider,
-                              );
-                              const connectors = [
-                                'CCS2',
-                                'Type 2',
-                                'CHAdeMO',
-                                'GB/T',
-                              ];
-                              return SizedBox(
-                                height: 34,
-                                child: ListView(
-                                  scrollDirection: Axis.horizontal,
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.only(right: 6),
-                                      child: FilterChip(
-                                        label: const Text('All'),
-                                        selected: selectedFilters.isEmpty,
-                                        avatar: const Icon(
-                                          Icons.tune,
-                                          size: 14,
-                                        ),
-                                        materialTapTargetSize:
-                                            MaterialTapTargetSize.shrinkWrap,
-                                        visualDensity: const VisualDensity(
-                                          horizontal: -2,
-                                          vertical: -2,
-                                        ),
-                                        onSelected:
-                                            (_) => ref
-                                                .read(
-                                                  connectorFilterProvider
-                                                      .notifier,
-                                                )
-                                                .clear(),
-                                      ),
-                                    ),
-                                    ...connectors.map(
-                                      (connector) => Padding(
-                                        padding: const EdgeInsets.only(
-                                          right: 6,
-                                        ),
-                                        child: FilterChip(
-                                          label: Text(connector),
-                                          selected: selectedFilters.contains(
-                                            connector,
-                                          ),
-                                          materialTapTargetSize:
-                                              MaterialTapTargetSize.shrinkWrap,
-                                          visualDensity: const VisualDensity(
-                                            horizontal: -2,
-                                            vertical: -2,
-                                          ),
-                                          onSelected:
-                                              (_) => ref
-                                                  .read(
-                                                    connectorFilterProvider
-                                                        .notifier,
-                                                  )
-                                                  .toggle(connector),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
-                          ),
                         ),
                       ],
                     ),
                   ),
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 18,
-                    child: Center(
-                      child: FloatingActionButton(
-                        heroTag: 'map_search',
-                        onPressed: () => context.push('/search'),
-                        tooltip: 'Search chargers by location',
-                        child: Icon(
-                          PhosphorIcons.magnifyingGlass(
-                            PhosphorIconsStyle.bold,
-                          ),
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-
                   // Loading Indicator Overlay
                   if (stationsAsync.isLoading)
                     Positioned(
@@ -940,19 +887,93 @@ class _StationDetailsSheetState extends State<_StationDetailsSheet> {
   }
 }
 
-class _MapStatPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
+class _FilterIconButton extends StatelessWidget {
+  final int activeCount;
+  final VoidCallback onTap;
 
-  const _MapStatPill({required this.icon, required this.label});
+  const _FilterIconButton({required this.activeCount, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isActive = activeCount > 0;
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: isActive
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.surface.withValues(alpha: 0.94),
+              borderRadius: BorderRadius.circular(999),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.10),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.tune,
+              size: 20,
+              color: isActive
+                  ? theme.colorScheme.onPrimary
+                  : theme.colorScheme.primary,
+            ),
+          ),
+          if (isActive)
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.error,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+                child: Text(
+                  '$activeCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    height: 1,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapStatPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+
+  const _MapStatPill({required this.icon, required this.label, this.active = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final bg = active
+        ? theme.colorScheme.primaryContainer.withValues(alpha: 0.97)
+        : theme.colorScheme.surface.withValues(alpha: 0.94);
+    final fg = active ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.primary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.94),
+        color: bg,
         borderRadius: BorderRadius.circular(999),
         boxShadow: [
           BoxShadow(
@@ -965,7 +986,7 @@ class _MapStatPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: theme.colorScheme.primary),
+          Icon(icon, size: 16, color: fg),
           const SizedBox(width: 6),
           Flexible(
             child: Text(
@@ -973,11 +994,201 @@ class _MapStatPill extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.labelMedium?.copyWith(
                 fontWeight: FontWeight.w600,
+                color: fg,
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Station Filter Sheet
+// ---------------------------------------------------------------------------
+
+class _StationFilterSheet extends ConsumerWidget {
+  const _StationFilterSheet();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final connectors = ref.watch(connectorFilterProvider);
+    final speed = ref.watch(speedFilterProvider);
+    final price = ref.watch(priceFilterProvider);
+    final availableNow = ref.watch(availableNowFilterProvider);
+    final access = ref.watch(accessFilterProvider);
+
+    final totalActive = totalActiveFilters(
+      connectors: connectors,
+      speed: speed,
+      price: price,
+      availableNow: availableNow,
+      access: access,
+    );
+
+    void resetAll() {
+      ref.read(connectorFilterProvider.notifier).clear();
+      ref.read(speedFilterProvider.notifier).clear();
+      ref.read(priceFilterProvider.notifier).clear();
+      ref.read(availableNowFilterProvider.notifier).clear();
+      ref.read(accessFilterProvider.notifier).clear();
+    }
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              children: [
+                Icon(Icons.tune, color: theme.colorScheme.primary),
+                const SizedBox(width: 10),
+                Text('Filter Chargers',
+                    style: theme.textTheme.titleLarge
+                        ?.copyWith(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                if (totalActive > 0)
+                  TextButton(
+                    onPressed: resetAll,
+                    child: const Text('Reset all'),
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+            const Divider(height: 16),
+
+            // ── Connector Type ──────────────────────────────────────────────
+            _FilterSection(
+              label: 'Connector Type',
+              chips: const ['CCS2', 'Type 2', 'CHAdeMO', 'GB/T'],
+              selected: connectors,
+              onToggle: (v) =>
+                  ref.read(connectorFilterProvider.notifier).toggle(v),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Charging Speed ──────────────────────────────────────────────
+            _FilterSection(
+              label: 'Charging Speed',
+              chips: const ['DC Fast (50+ kW)', 'AC (up to 22 kW)'],
+              selected: speed,
+              onToggle: (v) {
+                // Normalise to short keys used in repository
+                final key = v.startsWith('DC') ? 'DC Fast' : 'AC';
+                ref.read(speedFilterProvider.notifier).toggle(key);
+              },
+              chipLabel: (chip) => chip, // already descriptive
+              isSelected: (chip) =>
+                  chip.startsWith('DC')
+                      ? speed.contains('DC Fast')
+                      : speed.contains('AC'),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Price ───────────────────────────────────────────────────────
+            _FilterSection(
+              label: 'Price',
+              chips: const ['Free', 'Paid', 'Community'],
+              selected: price,
+              onToggle: (v) =>
+                  ref.read(priceFilterProvider.notifier).toggle(v),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Access Type ─────────────────────────────────────────────────
+            _FilterSection(
+              label: 'Access',
+              chips: const ['Public', 'Community Hosted'],
+              selected: access,
+              onToggle: (v) =>
+                  ref.read(accessFilterProvider.notifier).toggle(v),
+            ),
+            const SizedBox(height: 16),
+
+            // ── Availability toggle ─────────────────────────────────────────
+            Container(
+              decoration: BoxDecoration(
+                color: availableNow
+                    ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
+                    : theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: SwitchListTile(
+                value: availableNow,
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                title: const Text('Available now only',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: const Text('Hide busy and offline stations'),
+                secondary: Icon(Icons.bolt,
+                    color: availableNow
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.outline),
+                onChanged: (_) =>
+                    ref.read(availableNowFilterProvider.notifier).toggle(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterSection extends StatelessWidget {
+  final String label;
+  final List<String> chips;
+  final Set<String> selected;
+  final ValueChanged<String> onToggle;
+  final String Function(String)? chipLabel;
+  final bool Function(String)? isSelected;
+
+  const _FilterSection({
+    required this.label,
+    required this.chips,
+    required this.selected,
+    required this.onToggle,
+    this.chipLabel,
+    this.isSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: theme.textTheme.labelLarge
+                ?.copyWith(color: theme.colorScheme.secondary)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: chips.map((chip) {
+            final sel = isSelected != null
+                ? isSelected!(chip)
+                : selected.contains(chip);
+            final display = chipLabel != null ? chipLabel!(chip) : chip;
+            return FilterChip(
+              label: Text(display),
+              selected: sel,
+              onSelected: (_) => onToggle(chip),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              visualDensity:
+                  const VisualDensity(horizontal: -1, vertical: -1),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }

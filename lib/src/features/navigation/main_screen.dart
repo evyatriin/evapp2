@@ -27,6 +27,7 @@ class MainScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(userProvider);
     final vehicles = ref.watch(vehicleProvider);
+    final showVehicleSetupBadge = user != null && vehicles.isEmpty;
     
     return Scaffold(
       appBar: AppBar(
@@ -65,9 +66,43 @@ class MainScreen extends ConsumerWidget {
           //   tooltip: 'Wallet',
           // ),
           IconButton(
-            icon: Icon(PhosphorIcons.userCircle(PhosphorIconsStyle.duotone)),
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(PhosphorIcons.userCircle(PhosphorIconsStyle.duotone)),
+                if (showVehicleSetupBadge)
+                  Positioned(
+                    right: -2,
+                    top: -3,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFC857),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Theme.of(context).colorScheme.surface,
+                          width: 1.5,
+                        ),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '!',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Colors.black87,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             onPressed: () => context.push('/profile'),
-            tooltip: 'Profile',
+            tooltip:
+                showVehicleSetupBadge
+                    ? 'Profile - add your vehicle'
+                    : 'Profile',
             visualDensity: VisualDensity.compact,
           ),
           const SizedBox(width: 4),
@@ -76,19 +111,6 @@ class MainScreen extends ConsumerWidget {
       drawer: const AppDrawer(),
       body: Column(
         children: [
-          if (user != null && vehicles.isEmpty)
-            MaterialBanner(
-              content: const Text(
-                'Add your vehicle once so route planning, charging estimates, and OBD insights stay personalized.',
-              ),
-              leading: const Icon(Icons.directions_car_outlined),
-              actions: [
-                TextButton(
-                  onPressed: () => context.push('/setup/vehicle/add'),
-                  child: const Text('Add Vehicle'),
-                ),
-              ],
-            ),
           Expanded(child: navigationShell),
           const AdBannerWidget(),
         ],

@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EVraahein — Architecture Diagram</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0D1117;
+    --panel: #161B22;
+    --border: #30363D;
+    --mg-red: #C8102E;
+    --blue: #58A6FF;
+    --green: #3FB950;
+    --gold: #D29922;
+    --purple: #BC8CFF;
+    --orange: #F0883E;
+    --cyan: #39C5CF;
+    --text: #E6EDF3;
+    --muted: #8B949E;
+    --white: #FFFFFF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 48px;
+    min-height: 100vh;
+  }
+
+  /* ── Page header ── */
+  .page-header {
+    text-align: center;
+    margin-bottom: 48px;
+  }
+  .page-header h1 {
+    font-size: 36px; font-weight: 900;
+    background: linear-gradient(90deg, #fff 0%, #8B949E 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .page-header p {
+    font-size: 16px; color: var(--muted);
+  }
+  .page-header .badge {
+    display: inline-block; margin-top: 12px;
+    background: rgba(200,16,46,0.15); border: 1px solid var(--mg-red);
+    border-radius: 6px; padding: 6px 16px;
+    font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--mg-red);
+  }
+
+  /* ── Main diagram grid ── */
+  .diagram {
+    display: grid;
+    grid-template-columns: 200px 1fr 200px;
+    grid-template-rows: auto auto auto auto;
+    gap: 0;
+    max-width: 1200px;
+    margin: 0 auto;
+    position: relative;
+  }
+
+  /* ── Layer labels ── */
+  .layer-label {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    font-size: 11px; font-weight: 700; letter-spacing: 3px;
+    text-transform: uppercase; color: var(--muted);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px 0;
+  }
+
+  /* ── Layer containers ── */
+  .layer {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin: 8px;
+    position: relative;
+  }
+
+  .layer-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .layer-device { border-color: rgba(200,16,46,0.5); background: rgba(200,16,46,0.04); }
+  .layer-api    { border-color: rgba(210,153,34,0.5); background: rgba(210,153,34,0.04); }
+  .layer-db     { border-color: rgba(63,185,80,0.5);  background: rgba(63,185,80,0.04); }
+  .layer-ext    { border-color: rgba(88,166,255,0.4); background: rgba(88,166,255,0.04); }
+
+  /* ── Box grid inside a layer ── */
+  .box-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  /* ── Individual component boxes ── */
+  .box {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: var(--panel);
+    min-width: 140px;
+    flex: 1;
+  }
+  .box-icon { font-size: 22px; margin-bottom: 8px; }
+  .box-name { font-size: 13px; font-weight: 700; margin-bottom: 4px; color: var(--white); }
+  .box-detail { font-size: 11px; color: var(--muted); line-height: 1.6; font-family: 'JetBrains Mono', monospace; }
+
+  .box-red    { border-color: rgba(200,16,46,0.6);   background: rgba(200,16,46,0.1); }
+  .box-gold   { border-color: rgba(210,153,34,0.6);  background: rgba(210,153,34,0.1); }
+  .box-green  { border-color: rgba(63,185,80,0.6);   background: rgba(63,185,80,0.1); }
+  .box-blue   { border-color: rgba(88,166,255,0.6);  background: rgba(88,166,255,0.1); }
+  .box-purple { border-color: rgba(188,140,255,0.6); background: rgba(188,140,255,0.1); }
+  .box-cyan   { border-color: rgba(57,197,207,0.6);  background: rgba(57,197,207,0.1); }
+  .box-orange { border-color: rgba(240,136,62,0.6);  background: rgba(240,136,62,0.1); }
+
+  /* ── Arrow connectors ── */
+  .arrows {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 0;
+    position: relative;
+  }
+  .arrow-line {
+    width: 2px;
+    height: 40px;
+    background: linear-gradient(to bottom, rgba(88,166,255,0.5), rgba(88,166,255,0.1));
+    position: relative;
+  }
+  .arrow-label {
+    font-size: 11px; font-weight: 700; color: var(--blue);
+    background: var(--bg); padding: 2px 8px; border-radius: 4px;
+    border: 1px solid rgba(88,166,255,0.3);
+    white-space: nowrap;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Side panels (inputs / outputs) ── */
+  .side-panel { display: flex; flex-direction: column; gap: 10px; padding: 8px; }
+  .side-box {
+    border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px;
+    background: var(--panel);
+    font-size: 12px;
+  }
+  .side-box-name { font-size: 12px; font-weight: 700; color: var(--white); margin-bottom: 4px; }
+  .side-box-detail { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  /* ── Full-width layers ── */
+  .full-layer {
+    grid-column: 1 / -1;
+  }
+
+  /* ── Data flow legend ── */
+  .legend {
+    max-width: 1200px; margin: 32px auto 0;
+    display: flex; flex-wrap: wrap; gap: 20px;
+    padding: 20px 24px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px;
+  }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+  .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+
+  /* ── Security badges ── */
+  .sec-row {
+    max-width: 1200px; margin: 20px auto 0;
+    display: flex; gap: 12px; flex-wrap: wrap;
+  }
+  .sec-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(63,185,80,0.1); border: 1px solid rgba(63,185,80,0.3);
+    border-radius: 8px; padding: 8px 14px; font-size: 12px; color: #3FB950;
+    font-weight: 600;
+  }
+
+  /* ── Data flow table ── */
+  .flow-section {
+    max-width: 1200px; margin: 32px auto 0;
+  }
+  .flow-section h2 {
+    font-size: 20px; font-weight: 800; margin-bottom: 20px;
+    color: var(--white);
+  }
+  .flow-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .flow-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px;
+  }
+  .flow-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; color: var(--white); }
+  .flow-step {
+    display: flex; align-items: flex-start; gap: 10px;
+    margin-bottom: 10px; font-size: 13px; color: var(--muted); line-height: 1.5;
+  }
+  .step-num {
+    min-width: 22px; height: 22px; border-radius: 50%;
+    background: var(--mg-red); display: flex; align-items: center;
+    justify-content: center; font-size: 11px; font-weight: 700;
+    color: white;
+  }
+
+  /* ── Connector arrows between layers ── */
+  .connector {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    padding: 4px 0;
+  }
+  .conn-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .conn-line {
+    width: 2px; height: 32px;
+    background: linear-gradient(to bottom, var(--blue), transparent);
+  }
+  .conn-label {
+    font-size: 11px; color: var(--blue); font-weight: 600;
+    background: var(--bg); border: 1px solid rgba(88,166,255,0.3);
+    padding: 3px 10px; border-radius: 4px; white-space: nowrap;
+  }
+
+  @media print {
+    body { padding: 20px; background: #000; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Page Header -->
+<div class="page-header">
+  <h1>EVraahein — System Architecture</h1>
+  <p>End-to-end data flow: OBD device → Flutter app → Cloud API → Supabase database</p>
+  <div class="badge">MG Developer Program — Grant Season 6.0 Submission</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- ROW 1: PHYSICAL INPUTS                          -->
+<!-- ═══════════════════════════════════════════════ -->
+<div style="max-width:1200px; margin:0 auto 8px; display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;">
+
+  <div class="layer layer-device" style="grid-column:1;">
+    <div class="layer-title" style="color:#C8102E;">📡 Hardware Inputs</div>
+    <div class="box-grid" style="flex-direction:column;">
+      <div class="box box-red">
+        <div class="box-icon">🔌</div>
+        <div class="box-name">ELM327 OBD-II Adapter</div>
+        <div class="box-detail">
+          BLE (UUID: FFE0/FFE1)<br>
+          Classic BT SPP (RFCOMM)<br>
+          AT commands + ISO-TP<br>
+          UDS 0x22 ReadDataByID
+        </div>
+      </div>
+      <div class="box box-purple">
+        <div class="box-icon">🛰️</div>
+        <div class="box-name">GPS Module (Phone)</div>
+        <div class="box-detail">
+          Android LocationManager<br>
+          bestForNavigation accuracy<br>
+          5m distance filter<br>
+          Speed · Altitude · Bearing
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer layer-device" style="grid-column:2; position:relative;">
+    <div class="layer-title" style="color:#C8102E;">📱 Flutter App (Android)</div>
+    <div class="box-grid">
+      <div class="box box-red" style="min-width:auto; flex:1;">
+        <div class="box-icon">⚡</div>
+        <div class="box-name">OBD Controller</div>
+        <div class="box-detail">
+          Riverpod Notifier<br>
+          Poll cycle: 2s<br>
+          ISO-TP reassembly<br>
+          EV profile matching<br>
+          GPS-OBD speed fusion<br>
+          SOC Predictor
+        </div>
+      </div>
+      <div class="box box-purple" style="min-width:auto; flex:1;">
+        <div class="box-icon">🗺️</div>
+        <div class="box-name">Maps & Chargers</div>
+        <div class="box-detail">
+          FlutterMap (Leaflet)<br>
+          HERE Maps tiles<br>
+          Station clusters<br>
+          Route planner<br>
+          Real-time markers<br>
+          Offline tile cache
+        </div>
+      </div>
+      <div class="box box-cyan" style="min-width:auto; flex:1;">
+        <div class="box-icon">🧠</div>
+        <div class="box-name">State Management</div>
+        <div class="box-detail">
+          Riverpod 3 providers<br>
+          AsyncValue streams<br>
+          SharedPreferences<br>
+          Hive local cache<br>
+          JWT token store<br>
+          Supabase client SDK
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer layer-device" style="grid-column:3;">
+    <div class="layer-title" style="color:#C8102E;">🔋 EV ECU (Vehicle)</div>
+    <div class="box-grid" style="flex-direction:column;">
+      <div class="box box-orange">
+        <div class="box-icon">🏎️</div>
+        <div class="box-name">MG ZS EV BMS</div>
+        <div class="box-detail">
+          TX: 0x781 · RX: 0x789<br>
+          SOC · SOH · Voltage<br>
+          Current · Cell delta<br>
+          Temperature
+        </div>
+      </div>
+      <div class="box box-orange">
+        <div class="box-icon">🚗</div>
+        <div class="box-name">Other EV Profiles</div>
+        <div class="box-detail">
+          Hyundai/Kia: 7E4/7EC<br>
+          BYD: 7E7/7EF<br>
+          Tata Nexon: generic<br>
+          OBD mode 01 fallback
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Connector 1 -->
+<div class="connector" style="max-width:1200px; margin:0 auto;">
+  <div class="conn-arrow">
+    <div class="conn-line"></div>
+    <div class="conn-label">↕ HTTPS / JWT Bearer · TLS 1.3</div>
+    <div class="conn-line" style="background:linear-gradient(to bottom, transparent, var(--gold));"></div>
+  </div>
+  <div class="conn-arrow">
+    <div class="conn-line"></div>
+    <div class="conn-label">↕ Supabase PostgREST · JWT</div>
+    <div class="conn-line" style="background:linear-gradient(to bottom, transparent, var(--green));"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- ROW 2: CLOUD API                                -->
+<!-- ═══════════════════════════════════════════════ -->
+<div style="max-width:1200px; margin:8px auto; display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+
+  <div class="layer layer-api">
+    <div class="layer-title" style="color:var(--gold);">⚙️ Backend API — Google Cloud Run (asia-south1)</div>
+    <div class="box-grid">
+      <div class="box box-gold" style="flex:1;">
+        <div class="box-icon">🔐</div>
+        <div class="box-name">Auth Middleware</div>
+        <div class="box-detail">
+          Supabase JWT validation<br>
+          Bearer token extraction<br>
+          user_id from payload<br>
+          401 on invalid token
+        </div>
+      </div>
+      <div class="box box-gold" style="flex:2;">
+        <div class="box-icon">🗂️</div>
+        <div class="box-name">Charger Aggregation Router</div>
+        <div class="box-detail">
+          /api/v1/chargers?lat&lng&radius<br>
+          Async multi-source fetch (asyncio)<br>
+          Stale-while-revalidate cache (5min TTL)<br>
+          OpenChargeMap · OCPI · HERE EV Search<br>
+          Dedup + normalize to GeoJSON<br>
+          35s client timeout
+        </div>
+      </div>
+      <div class="box box-gold" style="flex:1;">
+        <div class="box-icon">📊</div>
+        <div class="box-name">Telemetry Router</div>
+        <div class="box-detail">
+          POST /api/v1/sessions<br>
+          Upsert OBD session rows<br>
+          asyncio.to_thread (non-blocking)<br>
+          Fire-and-forget pattern
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="layer layer-db">
+    <div class="layer-title" style="color:var(--green);">🗄️ Supabase (PostgreSQL)</div>
+    <div class="box-grid">
+      <div class="box box-green" style="flex:1;">
+        <div class="box-icon">👤</div>
+        <div class="box-name">Auth</div>
+        <div class="box-detail">
+          auth.users table<br>
+          Email + password<br>
+          JWT signing<br>
+          Session refresh
+        </div>
+      </div>
+      <div class="box box-green" style="flex:2;">
+        <div class="box-icon">🔋</div>
+        <div class="box-name">obd_sessions Table</div>
+        <div class="box-detail">
+          27 columns per session<br>
+          battery_percent · soh_percent<br>
+          voltage · current · cell_delta_mv<br>
+          elevation_m · grade_pct<br>
+          prediction_remaining_km<br>
+          smooth_driving_score<br>
+          UNIQUE(user_id, session_id)<br>
+          RLS: user sees only own rows
+        </div>
+      </div>
+      <div class="box box-green" style="flex:1;">
+        <div class="box-icon">🔒</div>
+        <div class="box-name">Row-Level Security</div>
+        <div class="box-detail">
+          SELECT own rows only<br>
+          INSERT own rows only<br>
+          UPDATE own rows only<br>
+          service_role bypass<br>
+          Authenticated GRANT
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Connector 2 -->
+<div class="connector" style="max-width:1200px; margin:0 auto;">
+  <div class="conn-arrow">
+    <div class="conn-line"></div>
+    <div class="conn-label">↕ REST API · API Keys</div>
+    <div class="conn-line" style="background:linear-gradient(to bottom, transparent, var(--blue));"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- ROW 3: EXTERNAL DATA SOURCES                    -->
+<!-- ═══════════════════════════════════════════════ -->
+<div style="max-width:1200px; margin:8px auto;">
+  <div class="layer layer-ext">
+    <div class="layer-title" style="color:var(--blue);">🌐 External Data Sources & APIs</div>
+    <div class="box-grid" style="justify-content:space-between;">
+      <div class="box box-blue" style="flex:1;">
+        <div class="box-icon">🗺️</div>
+        <div class="box-name">HERE Maps</div>
+        <div class="box-detail">
+          Map tiles (raster)<br>
+          EV charging search<br>
+          Routing / directions<br>
+          Geocoding / reverse geo<br>
+          Traffic-aware ETAs
+        </div>
+      </div>
+      <div class="box box-blue" style="flex:1;">
+        <div class="box-icon">⚡</div>
+        <div class="box-name">OpenChargeMap</div>
+        <div class="box-detail">
+          Global charger DB<br>
+          India: 8,000+ stations<br>
+          Connector types<br>
+          Network operator tags<br>
+          Community updates
+        </div>
+      </div>
+      <div class="box box-blue" style="flex:1;">
+        <div class="box-icon">🔌</div>
+        <div class="box-name">OCPI Networks</div>
+        <div class="box-detail">
+          Tata Power EZ Charge<br>
+          Charge+Zone<br>
+          Ather Grid (planned)<br>
+          Real-time availability<br>
+          OCPI 2.2 protocol
+        </div>
+      </div>
+      <div class="box box-blue" style="flex:1;">
+        <div class="box-icon">🌍</div>
+        <div class="box-name">Google APIs</div>
+        <div class="box-detail">
+          Directions API<br>
+          Places Autocomplete<br>
+          Elevation API (planned)<br>
+          Maps Static (fallback)<br>
+          Firebase (analytics)
+        </div>
+      </div>
+      <div class="box" style="flex:1; border-color:rgba(240,136,62,0.4); background:rgba(240,136,62,0.08);">
+        <div class="box-icon">🏭</div>
+        <div class="box-name">OEM APIs (Planned)</div>
+        <div class="box-detail">
+          MG iSMART data feed<br>
+          Tata Connected Cars<br>
+          Hyundai BlueLink<br>
+          OEM-validated PIDs<br>
+          Warranty data exchange
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- KEY DATA FLOWS                                  -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="flow-section">
+  <h2>Key Data Flows</h2>
+  <div class="flow-grid">
+
+    <div class="flow-card">
+      <h3 style="color:#C8102E;">🔋 OBD Telemetry Pipeline</h3>
+      <div class="flow-step">
+        <div class="step-num">1</div>
+        <div>ELM327 adapter connects via BLE/BT. AT commands configure ISO-TP headers for target ECU (e.g. ATSH 781 for MG ZS EV BMS).</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">2</div>
+        <div>UDS 0x22 queries (ReadDataByIdentifier) sent every 2s. Multi-frame ISO-TP responses reassembled into raw bytes.</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">3</div>
+        <div>EV profile parser decodes raw bytes → typed metrics: SOC %, voltage, current, cell delta mV, SOH %, temperature.</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">4</div>
+        <div>GPS position merged: elevation, road grade computed from altitude delta over 50m. GPS speed fills in when OBD speed PID unavailable.</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">5</div>
+        <div>Analytics calculator updates trip distance, average speed, peak speed, driving score, efficiency score, harsh events.</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">6</div>
+        <div>SOC Predictor (20-sample rolling window) computes %-per-km depletion rate → predicted km to user's charge threshold.</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">7</div>
+        <div>Snapshot upserted to Supabase obd_sessions (fire-and-forget, non-blocking) and rendered in UI.</div>
+      </div>
+    </div>
+
+    <div class="flow-card">
+      <h3 style="color:#D29922;">⚡ Charging Map Pipeline</h3>
+      <div class="flow-step">
+        <div class="step-num">1</div>
+        <div>User pans map or searches location. Flutter app captures GPS coordinates, rounded to 4 decimal places (~11m) to prevent duplicate API calls.</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">2</div>
+        <div>Request sent to Cloud Run API: GET /api/v1/chargers?lat=&lng=&radius=. JWT Bearer token from Supabase auth included.</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">3</div>
+        <div>API middleware validates JWT. Extracts user_id. Checks stale-while-revalidate cache (5-min TTL per lat/lng bucket).</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">4</div>
+        <div>On cache miss: parallel async fetch from HERE EV Search + OpenChargeMap + OCPI operators. 8s timeout per source.</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">5</div>
+        <div>Results deduplicated by location (100m radius), normalized to GeoJSON feature collection, cached, returned.</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">6</div>
+        <div>Flutter renders charger markers on FlutterMap. Cluster markers at zoom < 12. Detail sheet on tap with connector types, availability.</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">7</div>
+        <div>Route planner filters chargers reachable within current SOC range prediction before rendering.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- SECURITY & COMPLIANCE BADGES                    -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="sec-row">
+  <div class="sec-badge">🔐 JWT RS256 — All API calls authenticated</div>
+  <div class="sec-badge">🛡️ Row-Level Security — Users see only own data</div>
+  <div class="sec-badge">🔒 TLS 1.3 — All transport encrypted</div>
+  <div class="sec-badge">📍 GPS — User permission required (Android runtime)</div>
+  <div class="sec-badge">📊 Anonymised — Fleet analytics stripped of PII</div>
+  <div class="sec-badge">☁️ Cloud Run — Auto-scale, zero cold-start SLA</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════ -->
+<!-- LEGEND                                          -->
+<!-- ═══════════════════════════════════════════════ -->
+<div class="legend">
+  <div style="font-size:13px; font-weight:700; color:var(--text); margin-right:12px;">Legend:</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#C8102E;"></div>Device / App Layer</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#D29922;"></div>Cloud API (Google Cloud Run)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3FB950;"></div>Database (Supabase PostgreSQL)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#58A6FF;"></div>External APIs</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#BC8CFF;"></div>GPS / Sensors</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#F0883E;"></div>Vehicle ECU</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#39C5CF;"></div>State Management</div>
+  <div style="margin-left:auto; font-size:12px; color:var(--muted);">EVraahein · MGDP Season 6 · May 2026 · CONFIDENTIAL</div>
+</div>
+
+</body>
+</html>

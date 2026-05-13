@@ -37,9 +37,19 @@ class RouteService {
     if (token == null) return null;
 
     try {
+      // Extract elevation data from route model if available
+      final elevationGainM = route.routeData.elevationProfile?.elevationGainM;
+      final elevationLossM = route.routeData.elevationProfile?.elevationLossM;
+
+      // Create route with elevation data for storage
+      final routeWithElevation = route.copyWith(
+        elevationGainM: elevationGainM,
+        elevationLossM: elevationLossM,
+      );
+
       final response = await BackendService.post(
         '/api/routes/',
-        body: route.toJson(),
+        body: routeWithElevation.toJson(),
         headers: {'Authorization': 'Bearer $token'},
       );
       return SavedRoute.fromJson(response);

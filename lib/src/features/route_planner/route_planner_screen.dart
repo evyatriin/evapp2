@@ -1,15 +1,42 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 import 'package:go_router/go_router.dart';
 import 'package:gap/gap.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:map_launcher/map_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'here_routing_service.dart';
 import 'route_model.dart';
 import '../mapping/places_service.dart';
+import '../mapping/station_model.dart';
 import '../vehicle_profile/vehicle_provider.dart';
 import '../vehicle_profile/vehicle_model.dart';
 import 'saved_routes_screen.dart';
+import 'widgets/elevation_profile_chart.dart';
+
+Widget _buildRouteMetaChip(
+  BuildContext context, {
+  required IconData icon,
+  required String text,
+}) {
+  final theme = Theme.of(context);
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+    decoration: BoxDecoration(
+      color: theme.colorScheme.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: theme.colorScheme.primary),
+        const Gap(4),
+        Text(text, style: theme.textTheme.labelMedium),
+      ],
+    ),
+  );
+}
 
 class RoutePlannerScreen extends StatefulWidget {
   const RoutePlannerScreen({super.key});
@@ -202,48 +229,84 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
                               children: [
                                 // Inputs
                                 Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Column(
-                                      children: [
-                                        Icon(
-                                          PhosphorIcons.circle(
-                                            PhosphorIconsStyle.fill,
+                                    SizedBox(
+                                      height: 118,
+                                      child: Column(
+                                        children: [
+                                          Padding(
+                                            padding: const EdgeInsets.only(top: 20),
+                                            child: Icon(
+                                              PhosphorIcons.circle(
+                                                PhosphorIconsStyle.fill,
+                                              ),
+                                              size: 12,
+                                              color: theme.colorScheme.primary,
+                                            ),
                                           ),
-                                          size: 12,
-                                          color: theme.colorScheme.primary,
-                                        ),
-                                  Container(width: 2, height: 24, color: theme.colorScheme.outlineVariant),
-                                  Icon(
-                                    PhosphorIcons.mapPin(
-                                      PhosphorIconsStyle.fill,
-                                    ),
-                                    size: 16,
-                                    color: theme.colorScheme.error,
-                                  ),
-                                      ],
+                                          Expanded(
+                                            child: Container(
+                                              width: 2,
+                                              margin: const EdgeInsets.symmetric(vertical: 6),
+                                              color: theme.colorScheme.outlineVariant,
+                                            ),
+                                          ),
+                                          Padding(
+                                            padding: const EdgeInsets.only(bottom: 18),
+                                            child: Icon(
+                                              PhosphorIcons.mapPin(
+                                                PhosphorIconsStyle.fill,
+                                              ),
+                                              size: 16,
+                                              color: theme.colorScheme.error,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                     const Gap(12),
                                     Expanded(
                                       child: Column(
                                         children: [
-                                          _LocationAutocomplete(
+                                          _buildLocationFieldShell(
+                                            context,
+                                            child: _LocationAutocomplete(
                                             controller: _startController,
                                             label: 'Start Location',
+                                            onChanged: () {
+                                              if (_startPlaceId != null) {
+                                                setState(() {
+                                                  _startPlaceId = null;
+                                                });
+                                              }
+                                            },
                                             onSelected: (selection) {
                                               setState(() {
                                                 _startPlaceId = selection['place_id'];
-                                              });
-                                            },
+                                                });
+                                              },
+                                            ),
                                           ),
-                                          Divider(height: 1, color: theme.colorScheme.outlineVariant),
-                                          _LocationAutocomplete(
+                                          const Gap(10),
+                                          _buildLocationFieldShell(
+                                            context,
+                                            child: _LocationAutocomplete(
                                             controller: _destController,
                                             label: 'Destination',
+                                            onChanged: () {
+                                              if (_destPlaceId != null) {
+                                                setState(() {
+                                                  _destPlaceId = null;
+                                                });
+                                              }
+                                            },
                                             onSelected: (selection) {
                                               setState(() {
                                                 _destPlaceId = selection['place_id'];
-                                              });
-                                            },
+                                                });
+                                              },
+                                            ),
                                           ),
                                         ],
                                       ),
@@ -500,18 +563,39 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(
-                      Icons.directions_car_outlined,
-                      size: 22,
-                      color: theme.colorScheme.primary,
-                    ),
-                    const Gap(10),
-                    Text(
-                      'Vehicle',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.directions_car_outlined,
+                            size: 22,
+                            color: theme.colorScheme.primary,
+                          ),
+                          const Gap(10),
+                          Text(
+                            'Vehicle',
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
                       ),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () => context.push('/setup/vehicle/add'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Add'),
                     ),
                   ],
                 ),
@@ -521,17 +605,6 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
-                ),
-                const Gap(12),
-                FilledButton.icon(
-                  onPressed: () => context.push('/setup/vehicle/add'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Add Vehicle'),
                 ),
               ],
             ),
@@ -724,6 +797,24 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
       ),
     );
   }
+
+  Widget _buildLocationFieldShell(
+    BuildContext context, {
+    required Widget child,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 54,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      alignment: Alignment.center,
+      child: child,
+    );
+  }
 }
 
 String _routeHighlightTag(RouteModel route) {
@@ -741,17 +832,24 @@ String _routeHighlightTag(RouteModel route) {
   return 'Balanced';
 }
 
-class TripSummarySheet extends StatelessWidget {
+class TripSummarySheet extends StatefulWidget {
   final RouteModel route;
   final VoidCallback? onSave;
   final bool isSaving;
 
   const TripSummarySheet({
-    super.key, 
+    super.key,
     required this.route,
     this.onSave,
     this.isSaving = false,
   });
+
+  @override
+  State<TripSummarySheet> createState() => _TripSummarySheetState();
+}
+
+class _TripSummarySheetState extends State<TripSummarySheet> {
+  bool _showElevationChart = false;
 
   @override
   Widget build(BuildContext context) {
@@ -759,7 +857,7 @@ class TripSummarySheet extends StatelessWidget {
     return DraggableScrollableSheet(
       initialChildSize: 0.14,
       minChildSize: 0.09,
-      maxChildSize: 0.42,
+      maxChildSize: widget.route.elevationProfile != null ? 0.75 : 0.42,
       expand: false,
       builder: (context, scrollController) {
         return Container(
@@ -794,7 +892,7 @@ class TripSummarySheet extends StatelessWidget {
                 children: [
                   Expanded(
                     child: Text(
-                      route.name,
+                      widget.route.name,
                       style: theme.textTheme.titleMedium,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -807,21 +905,64 @@ class TripSummarySheet extends StatelessWidget {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      _routeHighlightTag(route),
+                      _routeHighlightTag(widget.route),
                       style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onPrimaryContainer),
                     ),
                   ),
                 ],
               ),
               const Gap(6),
-              _buildInfoRow(context, 'Total Distance', '${route.totalDistanceKm.toStringAsFixed(1)} km'),
-              _buildInfoRow(context, 'Est. Time', '${(route.totalDurationMin / 60).toStringAsFixed(1)} hrs'),
-              _buildInfoRow(context, 'Est. Cost', '₹${route.estimatedCost.toStringAsFixed(0)}'),
+              _buildInfoRow(context, 'Total Distance', '${widget.route.totalDistanceKm.toStringAsFixed(1)} km'),
+              _buildInfoRow(context, 'Est. Time', '${(widget.route.totalDurationMin / 60).toStringAsFixed(1)} hrs'),
+              _buildInfoRow(context, 'Charge Time', '${widget.route.totalChargeDurationMin} min'),
+              _buildInfoRow(context, 'Est. Cost', '₹${widget.route.estimatedCost.toStringAsFixed(0)}'),
+              if (widget.route.elevationProfile != null) ...[
+                const Gap(4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: _buildInfoRow(context, 'Elevation', widget.route.elevationSummary),
+                    ),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _showElevationChart = !_showElevationChart;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Icon(
+                          _showElevationChart
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                          size: 18,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (_showElevationChart && widget.route.elevationProfile != null) ...[
+                const Gap(12),
+                ElevationProfileChart(
+                  elevationProfile: widget.route.elevationProfile!,
+                  stops: widget.route.stops,
+                ),
+              ],
               const Divider(height: 18),
-              if (route.guidance.isNotEmpty) ...[
+              if (widget.route.guidance.isNotEmpty) ...[
                 Text('Trip Guidance', style: theme.textTheme.titleSmall),
                 const Gap(8),
-                ...route.guidance.map(
+                ...widget.route.guidance.map(
                   (item) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: Row(
@@ -846,7 +987,7 @@ class TripSummarySheet extends StatelessWidget {
               ],
               Text('Charging Stops', style: theme.textTheme.titleSmall),
               const Gap(8),
-              ...route.stops
+              ...widget.route.stops
                   .where((s) => s.type == StopType.charging)
                   .toList()
                   .asMap()
@@ -861,7 +1002,7 @@ class TripSummarySheet extends StatelessWidget {
                       ),
                     ),
                   ),
-              if (route.stops.where((s) => s.type == StopType.charging).isEmpty)
+              if (widget.route.stops.where((s) => s.type == StopType.charging).isEmpty)
                 Text(
                   'No charging stops needed for this trip!',
                   style: theme.textTheme.bodySmall,
@@ -875,11 +1016,11 @@ class TripSummarySheet extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
-                      onPressed: isSaving ? null : onSave,
-                      icon: isSaving 
-                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) 
+                      onPressed: widget.isSaving ? null : widget.onSave,
+                      icon: widget.isSaving
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.save_alt, size: 18),
-                      label: Text(isSaving ? 'Saving...' : 'Save'),
+                      label: Text(widget.isSaving ? 'Saving...' : 'Save'),
                     ),
                   ),
                   const Gap(10),
@@ -890,7 +1031,7 @@ class TripSummarySheet extends StatelessWidget {
                       ),
                       onPressed: () async {
                         // Safety check: ensure route has stops
-                        if (route.stops.isEmpty) {
+                        if (widget.route.stops.isEmpty) {
                           if (context.mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(content: Text('No route stops available for navigation')),
@@ -898,19 +1039,19 @@ class TripSummarySheet extends StatelessWidget {
                           }
                           return;
                         }
-                        
+
                         // Launch navigation in maps app, preserving every charging
                         // stop as a waypoint so the EV-aware multi-stop plan
                         // survives the hand-off.
                         try {
-                          final origin = route.stops.first.location;
-                          final destination = route.stops.last.location;
+                          final origin = widget.route.stops.first.location;
+                          final destination = widget.route.stops.last.location;
 
                           // Intermediate stops (everything between origin and
                           // destination) become waypoints. Includes charging
                           // stops the planner inserted.
-                          final intermediates = route.stops.length > 2
-                              ? route.stops.sublist(1, route.stops.length - 1)
+                          final intermediates = widget.route.stops.length > 2
+                              ? widget.route.stops.sublist(1, widget.route.stops.length - 1)
                               : const [];
                           final waypoints = [
                             for (final stop in intermediates)
@@ -978,6 +1119,7 @@ class TripSummarySheet extends StatelessWidget {
     required int stepIndex,
   }) {
     final theme = Theme.of(context);
+    final distanceLabel = _chargingDistanceLabel(stop);
     return InkWell(
       onTap: () => _showChargingStopActions(context, stop),
       borderRadius: BorderRadius.circular(18),
@@ -1063,6 +1205,12 @@ class TripSummarySheet extends StatelessWidget {
                     icon: Icons.currency_rupee,
                     text: '₹${stop.cost!.toStringAsFixed(0)} est.',
                   ),
+                if (distanceLabel != null)
+                  _buildStopMetaChip(
+                    context,
+                    icon: Icons.route,
+                    text: distanceLabel,
+                  ),
               ],
             ),
           ],
@@ -1072,95 +1220,22 @@ class TripSummarySheet extends StatelessWidget {
   }
 
   Future<void> _showChargingStopActions(BuildContext context, RouteStop stop) async {
-    final theme = Theme.of(context);
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(stop.name, style: theme.textTheme.titleMedium),
-                const Gap(6),
-                if (stop.advice != null && stop.advice!.isNotEmpty)
-                  Text(
-                    stop.advice!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                const Gap(10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    if (stop.chargeDurationMin != null)
-                      _buildStopMetaChip(
-                        context,
-                        icon: Icons.bolt,
-                        text: '${stop.chargeDurationMin} min',
-                      ),
-                    if (stop.targetSoc != null)
-                      _buildStopMetaChip(
-                        context,
-                        icon: Icons.battery_charging_full,
-                        text: 'To ${stop.targetSoc}%',
-                      ),
-                    if (stop.arrivalSoc != null)
-                      _buildStopMetaChip(
-                        context,
-                        icon: Icons.battery_3_bar,
-                        text: 'Arrive ${stop.arrivalSoc}%',
-                      ),
-                    if (stop.departureSoc != null)
-                      _buildStopMetaChip(
-                        context,
-                        icon: Icons.battery_full,
-                        text: 'Leave ${stop.departureSoc}%',
-                      ),
-                  ],
-                ),
-                const Gap(14),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () async {
-                      Navigator.of(sheetContext).pop();
-                      await _openChargingStopInMaps(context, stop);
-                    },
-                    icon: const Icon(Icons.navigation, size: 18),
-                    label: const Text('Open in Maps'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      isScrollControlled: true,
+      builder: (sheetContext) => ChargingStopDetailsSheet(
+        stop: stop,
+        onOpenInMaps: () async {
+          Navigator.of(sheetContext).pop();
+          await _openChargingStopInMaps(context, stop);
+        },
+      ),
     );
   }
 
   Widget _buildStopMetaChip(BuildContext context, {required IconData icon, required String text}) {
-    final theme = Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: theme.colorScheme.primary),
-          const Gap(4),
-          Text(text, style: theme.textTheme.labelMedium),
-        ],
-      ),
-    );
+    return _buildRouteMetaChip(context, icon: icon, text: text);
   }
 
   Future<void> _openChargingStopInMaps(BuildContext context, RouteStop stop) async {
@@ -1186,6 +1261,315 @@ class TripSummarySheet extends StatelessWidget {
         );
       }
     }
+  }
+
+  String? _chargingDistanceLabel(RouteStop stop) {
+    final fromPreviousCharge = stop.distanceFromPreviousChargingStopKm;
+    final fromOrigin = stop.distanceFromOriginKm;
+
+    if (fromPreviousCharge == null && fromOrigin == null) {
+      return null;
+    }
+    if (fromPreviousCharge != null && fromOrigin != null) {
+      final sameLeg = (fromPreviousCharge - fromOrigin).abs() < 0.2;
+      if (sameLeg) {
+        return '${fromOrigin.toStringAsFixed(1)} km from start';
+      }
+      return '${fromPreviousCharge.toStringAsFixed(1)} km since last charge';
+    }
+    final fallback = fromPreviousCharge ?? fromOrigin!;
+    return '${fallback.toStringAsFixed(1)} km from start';
+  }
+}
+
+class ChargingStopDetailsSheet extends StatefulWidget {
+  final RouteStop stop;
+  final Future<void> Function() onOpenInMaps;
+
+  const ChargingStopDetailsSheet({
+    super.key,
+    required this.stop,
+    required this.onOpenInMaps,
+  });
+
+  @override
+  State<ChargingStopDetailsSheet> createState() => _ChargingStopDetailsSheetState();
+}
+
+class _ChargingStopDetailsSheetState extends State<ChargingStopDetailsSheet> {
+  late final Future<List<NearbyFoodPlace>> _nearbyFoodFuture;
+  late final Future<StationModel?> _chargerDetailsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _nearbyFoodFuture = PlacesService().fetchNearbyFoodPlaces(
+      widget.stop.location,
+      radiusKm: 10,
+      maxResults: 5,
+    );
+    _chargerDetailsFuture = _loadNearestChargerDetails();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final stop = widget.stop;
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.5,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  stop.name,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Gap(6),
+                if (stop.advice != null && stop.advice!.isNotEmpty)
+                  Text(
+                    stop.advice!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                const Gap(10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (stop.chargeDurationMin != null)
+                      _buildRouteMetaChip(
+                        context,
+                        icon: Icons.bolt,
+                        text: '${stop.chargeDurationMin} min charge',
+                      ),
+                    if (stop.targetSoc != null)
+                      _buildRouteMetaChip(
+                        context,
+                        icon: Icons.battery_charging_full,
+                        text: 'To ${stop.targetSoc}%',
+                      ),
+                    if (stop.arrivalSoc != null)
+                      _buildRouteMetaChip(
+                        context,
+                        icon: Icons.battery_3_bar,
+                        text: 'Arrive ${stop.arrivalSoc}%',
+                      ),
+                    if (stop.departureSoc != null)
+                      _buildRouteMetaChip(
+                        context,
+                        icon: Icons.battery_full,
+                        text: 'Leave ${stop.departureSoc}%',
+                      ),
+                    if (stop.cost != null)
+                      _buildRouteMetaChip(
+                        context,
+                        icon: Icons.currency_rupee,
+                        text: '₹${stop.cost!.toStringAsFixed(0)} est.',
+                      ),
+                    if (_distanceLabel(stop) != null)
+                      _buildRouteMetaChip(
+                        context,
+                        icon: Icons.route,
+                        text: _distanceLabel(stop)!,
+                      ),
+                  ],
+                ),
+                const Gap(12),
+                FutureBuilder<StationModel?>(
+                  future: _chargerDetailsFuture,
+                  builder: (context, snapshot) {
+                    final station = snapshot.data;
+                    if (snapshot.connectionState == ConnectionState.waiting ||
+                        station == null) {
+                      return const SizedBox.shrink();
+                    }
+
+                    final ratingText = station.rating != null
+                        ? '${station.rating!.toStringAsFixed(1)} (${station.userRatingCount ?? 0})'
+                        : 'NA';
+                    final phoneText =
+                        (station.phoneNumber?.trim().isNotEmpty ?? false)
+                            ? station.phoneNumber!.trim()
+                            : 'NA';
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _buildRouteMetaChip(
+                            context,
+                            icon: Icons.star_rounded,
+                            text: ratingText,
+                          ),
+                          _buildRouteMetaChip(
+                            context,
+                            icon: Icons.phone_outlined,
+                            text: phoneText,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                Text(
+                  'Nearby food within 10 km',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Gap(8),
+                FutureBuilder<List<NearbyFoodPlace>>(
+                  future: _nearbyFoodFuture,
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+
+                    final items = [...(snapshot.data ?? const <NearbyFoodPlace>[])];
+                    items.sort((a, b) {
+                      final distanceA = _distanceKm(stop.location, a.location);
+                      final distanceB = _distanceKm(stop.location, b.location);
+                      return distanceA.compareTo(distanceB);
+                    });
+
+                    if (items.isEmpty) {
+                      return Text(
+                        'No nearby food places found.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      );
+                    }
+
+                    return Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surfaceContainerLowest,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: theme.colorScheme.outlineVariant,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          for (final item in items.take(5))
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 10,
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      item.name,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ),
+                                  const Gap(12),
+                                  Text(
+                                    '${_distanceKm(stop.location, item.location).toStringAsFixed(1)} km',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+                const Gap(12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: widget.onOpenInMaps,
+                    icon: const Icon(Icons.navigation, size: 18),
+                    label: const Text('Open in Maps'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<StationModel?> _loadNearestChargerDetails() async {
+    final stations = await PlacesService().fetchChargingStations(
+      widget.stop.location,
+      2,
+    );
+    if (stations.isEmpty) {
+      return null;
+    }
+
+    stations.sort((a, b) {
+      final distanceA = _distanceKm(widget.stop.location, a.location);
+      final distanceB = _distanceKm(widget.stop.location, b.location);
+      return distanceA.compareTo(distanceB);
+    });
+    return stations.first;
+  }
+
+  String? _distanceLabel(RouteStop stop) {
+    final fromPreviousCharge = stop.distanceFromPreviousChargingStopKm;
+    final fromOrigin = stop.distanceFromOriginKm;
+
+    if (fromPreviousCharge == null && fromOrigin == null) {
+      return null;
+    }
+    if (fromPreviousCharge != null && fromOrigin != null) {
+      final sameLeg = (fromPreviousCharge - fromOrigin).abs() < 0.2;
+      if (sameLeg) {
+        return '${fromOrigin.toStringAsFixed(1)} km from start';
+      }
+      return '${fromPreviousCharge.toStringAsFixed(1)} km since last charge';
+    }
+    final fallback = fromPreviousCharge ?? fromOrigin!;
+    return '${fallback.toStringAsFixed(1)} km from start';
+  }
+
+  double _distanceKm(LatLng origin, LatLng? target) {
+    if (target == null) {
+      return 9999;
+    }
+
+    const radiusKm = 6371.0;
+    double radians(double degrees) => degrees * math.pi / 180;
+
+    final dLat = radians(target.latitude - origin.latitude);
+    final dLng = radians(target.longitude - origin.longitude);
+    final lat1 = radians(origin.latitude);
+    final lat2 = radians(target.latitude);
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1) * math.cos(lat2) * math.sin(dLng / 2) * math.sin(dLng / 2);
+    return 2 * radiusKm * math.asin(math.sqrt(a));
   }
 }
 
@@ -1252,11 +1636,13 @@ class _TripStyleChip extends StatelessWidget {
 class _LocationAutocomplete extends StatefulWidget {
   final TextEditingController controller;
   final String label;
+  final VoidCallback? onChanged;
   final Function(Map<String, String>) onSelected;
 
   const _LocationAutocomplete({
     required this.controller,
     required this.label,
+    this.onChanged,
     required this.onSelected,
   });
 
@@ -1285,20 +1671,22 @@ class _LocationAutocompleteState extends State<_LocationAutocomplete> {
         if (textEditingController.text != widget.controller.text) {
            textEditingController.text = widget.controller.text;
         }
-        
-        textEditingController.addListener(() {
-          widget.controller.text = textEditingController.text;
-        });
 
         return TextField(
           controller: textEditingController,
           focusNode: focusNode,
+          onChanged: (value) {
+            widget.controller.text = value;
+            widget.onChanged?.call();
+          },
           style: Theme.of(context).textTheme.bodyMedium,
           decoration: InputDecoration(
-            labelText: widget.label,
-            labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[700]),
+            hintText: widget.label,
+            hintStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Colors.grey[700],
+            ),
             border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(vertical: 4),
+            contentPadding: const EdgeInsets.symmetric(vertical: 12),
             isDense: true,
             suffixIcon: textEditingController.text.isNotEmpty
               ? IconButton(
@@ -1306,6 +1694,7 @@ class _LocationAutocompleteState extends State<_LocationAutocomplete> {
                   onPressed: () {
                     textEditingController.clear();
                     widget.controller.clear();
+                    widget.onChanged?.call();
                   },
                 )
               : null,

@@ -8,8 +8,8 @@ import 'app_config.dart';
 class BackendService {
   static final _client = http.Client();
 
-  // Aggregate endpoint calls external APIs (Google Places, OpenChargeMap) — needs 35s.
-  static const _timeout = Duration(seconds: 35);
+  // Route calculation calls external APIs (HERE routing, elevation, chargers) — needs 60s
+  static const _timeout = Duration(seconds: 60);
   static const _retryDelay = Duration(seconds: 3);
 
   static String get baseUrl => AppConfig.backendBaseUrl;

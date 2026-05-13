@@ -2,55 +2,97 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/backend_service.dart';
+import '../../core/app_config.dart';
 import 'user_model.dart';
 
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
   static bool _userStatsTableAvailable = true;
   static bool _userBadgesTableAvailable = true;
+  static String? _currentAuthToken;
+  static String? _currentRefreshToken;
 
-  /// Sign up a new user
+  /// Get the current auth token
+  String? getAuthToken() => _currentAuthToken;
+
+  /// Sign up a new user via backend API
   Future<UserProfile?> signUp({
     required String email,
     required String password,
     required String name,
   }) async {
     try {
-      final response = await _supabase.auth.signUp(
-        email: email,
-        password: password,
-        data: {'name': name},
+      debugPrint('Attempting signup for email: $email via backend API');
+
+      final response = await BackendService.post(
+        '/api/auth/signup',
+        body: {
+          'email': email,
+          'password': password,
+          'name': name,
+        },
       );
 
-      if (response.user != null) {
-        return UserProfile(
-          id: response.user!.id,
-          email: response.user!.email!,
-          name: name,
-        );
+      debugPrint('Signup response: $response');
+
+      if (response is Map<String, dynamic>) {
+        final userData = response['user'] as Map<String, dynamic>?;
+        final sessionData = response['session'] as Map<String, dynamic>?;
+
+        if (userData != null && sessionData != null) {
+          _currentAuthToken = sessionData['access_token'] as String?;
+          _currentRefreshToken = sessionData['refresh_token'] as String?;
+
+          debugPrint('Signup successful for user: ${userData['email']}');
+          return UserProfile(
+            id: userData['id'] as String,
+            email: userData['email'] as String,
+            name: userData['name'] as String? ?? name,
+          );
+        }
       }
-      return null;
+      throw Exception('Signup failed: Invalid response from server');
     } catch (e) {
       debugPrint('Sign up error: $e');
       rethrow;
     }
   }
 
-  /// Sign in an existing user
+  /// Sign in an existing user via backend API
   Future<UserProfile?> signIn({
     required String email,
     required String password,
   }) async {
     try {
-      final response = await _supabase.auth.signInWithPassword(
-        email: email,
-        password: password,
+      debugPrint('Attempting signin for email: $email via backend API');
+
+      final response = await BackendService.post(
+        '/api/auth/login',
+        body: {
+          'email': email,
+          'password': password,
+        },
       );
 
-      if (response.user != null) {
-        return _buildUserProfile(response.user!);
+      debugPrint('Login response: $response');
+
+      if (response is Map<String, dynamic>) {
+        final userData = response['user'] as Map<String, dynamic>?;
+        final sessionData = response['session'] as Map<String, dynamic>?;
+
+        if (userData != null && sessionData != null) {
+          _currentAuthToken = sessionData['access_token'] as String?;
+          _currentRefreshToken = sessionData['refresh_token'] as String?;
+
+          debugPrint('Login successful for user: ${userData['email']}');
+          return UserProfile(
+            id: userData['id'] as String,
+            email: userData['email'] as String,
+            name: userData['name'] as String? ?? '',
+          );
+        }
       }
-      return null;
+      throw Exception('Login failed: Invalid credentials or server error');
     } catch (e) {
       debugPrint('Sign in error: $e');
       rethrow;
@@ -60,9 +102,22 @@ class AuthService {
   /// Sign out the current user
   Future<void> signOut() async {
     try {
-      await _supabase.auth.signOut();
+      debugPrint('Signing out user');
+      if (_currentAuthToken != null) {
+        await BackendService.post(
+          '/api/auth/logout',
+          body: {},
+          headers: {
+            'Authorization': 'Bearer $_currentAuthToken',
+          },
+        );
+      }
+      _currentAuthToken = null;
+      _currentRefreshToken = null;
     } catch (e) {
       debugPrint('Sign out error: $e');
+      _currentAuthToken = null;
+      _currentRefreshToken = null;
       rethrow;
     }
   }
@@ -70,143 +125,50 @@ class AuthService {
   /// Get the current authenticated user
   Future<UserProfile?> getCurrentUser() async {
     try {
-      final user = _supabase.auth.currentUser;
-      if (user != null) {
-        return _buildUserProfile(user);
+      if (_currentAuthToken == null) {
+        return null;
+      }
+
+      debugPrint('Fetching current user from backend');
+
+      final response = await BackendService.get(
+        '/api/auth/user',
+        headers: {
+          'Authorization': 'Bearer $_currentAuthToken',
+        },
+      );
+
+      if (response is Map<String, dynamic>) {
+        debugPrint('Current user fetched: ${response['email']}');
+        return UserProfile(
+          id: response['id'] as String,
+          email: response['email'] as String,
+          name: response['name'] as String? ?? '',
+        );
       }
       return null;
     } catch (e) {
       debugPrint('Get current user error: $e');
+      _currentAuthToken = null;
       return null;
     }
   }
 
-  Future<UserProfile> _buildUserProfile(User user) async {
-    final userData = user.userMetadata ?? {};
-    var isVerified = user.phoneConfirmedAt != null;
-    String? phoneNumber = _cleanPhoneNumber(user.phone);
-    var points = 0;
-    var streak = 0;
-    var badges = <String>[];
-
-    try {
-      final profileResponse =
-          await _supabase
-              .from('profiles')
-              .select('preferences')
-              .eq('id', user.id)
-              .maybeSingle();
-
-      if (profileResponse != null) {
-        final prefs = profileResponse['preferences'];
-        if (prefs is Map) {
-          isVerified = isVerified || prefs['is_phone_verified'] == true;
-          final rawPhone = prefs['phone_number'];
-          if (rawPhone is String && rawPhone.trim().isNotEmpty) {
-            phoneNumber = rawPhone.trim();
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching profile data: $e');
-    }
-
-    if (_userStatsTableAvailable) {
-      try {
-        final statsResponse =
-            await _supabase
-                .from('user_stats')
-                .select('total_points, current_streak')
-                .eq('user_id', user.id)
-                .maybeSingle();
-
-        if (statsResponse != null) {
-          points = statsResponse['total_points'] ?? 0;
-          streak = statsResponse['current_streak'] ?? 0;
-        }
-      } catch (e) {
-        _userStatsTableAvailable = !_isMissingTableError(e);
-        debugPrint('Error fetching user stats: $e');
-      }
-    }
-
-    if (_userBadgesTableAvailable) {
-      try {
-        final badgesResponse = await _supabase
-            .from('user_badges')
-            .select('badge_id')
-            .eq('user_id', user.id);
-
-        badges =
-            (badgesResponse as List)
-                .map((e) => e['badge_id'] as String)
-                .toList();
-      } catch (e) {
-        _userBadgesTableAvailable = !_isMissingTableError(e);
-        debugPrint('Error fetching user badges: $e');
-      }
-    }
-
-    return UserProfile(
-      id: user.id,
-      email: user.email!,
-      name: userData['name'] ?? '',
-      profileImageUrl: userData['profile_image_url'],
-      phoneNumber: phoneNumber,
-      isPhoneVerified: isVerified,
-      points: points,
-      streak: streak,
-      badges: badges,
-    );
-  }
-
-  bool _isMissingTableError(Object error) {
-    final message = error.toString();
-    return message.contains('PGRST205') ||
-        message.contains("Could not find the table 'public.");
-  }
-
-  /// Get the current session access token
-  String? getAuthToken() {
-    return _supabase.auth.currentSession?.accessToken;
-  }
-
   /// Check if user is authenticated
   bool isAuthenticated() {
-    return _supabase.auth.currentUser != null;
+    return _currentAuthToken != null;
   }
 
-  /// Listen to auth state changes
-  Stream<AuthState> get authStateChanges {
-    return _supabase.auth.onAuthStateChange;
-  }
+  /// Get current user ID (stored locally after login)
+  String? get currentUserId => null; // Will be set after login via getCurrentUser()
 
-  /// Get current user ID
-  String? get currentUserId {
-    return _supabase.auth.currentUser?.id;
-  }
-
-  /// Update user profile (name, email)
+  /// Update user profile (name, email) - placeholder for future backend implementation
   Future<UserProfile?> updateProfile({String? name, String? email}) async {
     try {
-      final response = await _supabase.auth.updateUser(
-        UserAttributes(
-          email: email,
-          data: name != null ? {'name': name} : null,
-        ),
-      );
-
-      if (response.user != null) {
-        final userData = response.user!.userMetadata ?? {};
-        return UserProfile(
-          id: response.user!.id,
-          email: response.user!.email!,
-          name: userData['name'] ?? '',
-          profileImageUrl: userData['profile_image_url'],
-          phoneNumber: _cleanPhoneNumber(response.user!.phone),
-          isPhoneVerified: response.user!.phoneConfirmedAt != null,
-        );
+      if (_currentAuthToken == null) {
+        throw Exception('You must be signed in to update your profile.');
       }
+      // TODO: Implement profile update via backend API
       return null;
     } catch (e) {
       debugPrint('Update profile error: $e');
@@ -214,20 +176,24 @@ class AuthService {
     }
   }
 
-  /// Change password
+  /// Change password - placeholder for future backend implementation
   Future<void> changePassword(String newPassword) async {
     try {
-      await _supabase.auth.updateUser(UserAttributes(password: newPassword));
+      if (_currentAuthToken == null) {
+        throw Exception('You must be signed in to change your password.');
+      }
+      // TODO: Implement password change via backend API
     } catch (e) {
       debugPrint('Change password error: $e');
       rethrow;
     }
   }
 
-  /// Send password reset email
+  /// Send password reset email - placeholder for future backend implementation
   Future<void> sendPasswordResetEmail(String email) async {
     try {
-      await _supabase.auth.resetPasswordForEmail(email);
+      // TODO: Implement password reset via backend API
+      debugPrint('Password reset email request for: $email');
     } catch (e) {
       debugPrint('Password reset error: $e');
       rethrow;
@@ -237,14 +203,13 @@ class AuthService {
   /// Delete user account
   Future<void> deleteAccount() async {
     try {
-      final accessToken = _supabase.auth.currentSession?.accessToken;
-      if (accessToken == null) {
+      if (_currentAuthToken == null) {
         throw Exception('You must be signed in to delete your account.');
       }
 
       await BackendService.delete(
         '/api/users/me',
-        headers: {'Authorization': 'Bearer $accessToken'},
+        headers: {'Authorization': 'Bearer $_currentAuthToken'},
       );
       await signOut();
     } catch (e) {
@@ -262,7 +227,15 @@ class AuthService {
     }
 
     try {
-      await _supabase.auth.updateUser(UserAttributes(phone: normalizedPhone));
+      if (_currentAuthToken == null) {
+        throw Exception('You must be signed in to request phone verification.');
+      }
+
+      await BackendService.post(
+        '/api/auth/request-phone-verification',
+        body: {'phone_number': normalizedPhone},
+        headers: {'Authorization': 'Bearer $_currentAuthToken'},
+      );
       return normalizedPhone;
     } catch (e) {
       debugPrint('Request phone verification error: $e');
@@ -283,10 +256,17 @@ class AuthService {
     }
 
     try {
-      await _supabase.auth.verifyOTP(
-        phone: normalizedPhone,
-        token: otp.trim(),
-        type: OtpType.phoneChange,
+      if (_currentAuthToken == null) {
+        throw Exception('You must be signed in to verify phone OTP.');
+      }
+
+      await BackendService.post(
+        '/api/auth/verify-phone-otp',
+        body: {
+          'phone_number': normalizedPhone,
+          'otp': otp.trim(),
+        },
+        headers: {'Authorization': 'Bearer $_currentAuthToken'},
       );
     } catch (e) {
       debugPrint('Verify phone OTP error: $e');

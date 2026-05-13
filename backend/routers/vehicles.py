@@ -62,6 +62,15 @@ def _range_to_efficiency(range_km: float) -> float:
     return max(0.55, min(1.2, range_km / 400.0))
 
 
+def _coerce_float(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def _vehicle_image_url(brand: str, model: str) -> str:
     key = f"{brand}|{model}".lower()
     images = {
@@ -124,6 +133,48 @@ def _default_networks(brand: str) -> List[str]:
     if brand_key in {"maruti suzuki", "toyota"}:
         return ["Tata Power", "ChargeZone"]
     return []
+
+
+def _normalized_template_id(brand: str, model: str, variant: str, explicit_id: Any) -> str:
+    if isinstance(explicit_id, str) and explicit_id.strip():
+        return explicit_id.strip()
+
+    raw_id = f"{brand}-{model}-{variant}".lower()
+    normalized_id = "".join(ch if ch.isalnum() else "-" for ch in raw_id).strip("-")
+    while "--" in normalized_id:
+        normalized_id = normalized_id.replace("--", "-")
+    return normalized_id
+
+
+def _coerce_template(item: Dict[str, Any]) -> VehicleTemplate:
+    brand = str(item.get("brand") or "").strip()
+    model = str(item.get("model") or "").strip()
+    variant = str(item.get("variant") or "").strip()
+    if not brand or not model or not variant:
+        raise ValueError("Vehicle template is missing brand/model/variant")
+
+    range_efficiency = _coerce_float(item.get("range_efficiency"))
+    if range_efficiency is None:
+        derived_range_km = _coerce_float(item.get("real_world_range_km"))
+        if derived_range_km is None:
+            derived_range_km = _coerce_float(item.get("range_wltp_km"))
+        range_efficiency = _range_to_efficiency(derived_range_km or 250.0)
+
+    image_url = str(item.get("image_url") or "").strip() or _vehicle_image_url(brand, model)
+
+    networks = item.get("preferred_charging_networks")
+    if not isinstance(networks, list) or not networks:
+        networks = _default_networks(brand)
+
+    return VehicleTemplate(
+        id=_normalized_template_id(brand, model, variant, item.get("id")),
+        brand=brand,
+        model=model,
+        variant=variant,
+        range_efficiency=range_efficiency,
+        image_url=image_url,
+        preferred_charging_networks=[str(network).strip() for network in networks if str(network).strip()],
+    )
 
 
 def _extract_vehicle_photo_path(photo_url: Optional[str]) -> Optional[str]:
@@ -292,17 +343,30 @@ async def get_vehicle_templates():
         return _FALLBACK_TEMPLATES
 
     try:
-        response = (
-            supabase.table("vehicle_templates")
-            .select("*")
-            .eq("is_active", True)
-            .order("sort_order")
-            .execute()
-        )
+        try:
+            response = (
+                supabase.table("vehicle_templates")
+                .select("*")
+                .eq("is_active", True)
+                .order("sort_order")
+                .execute()
+            )
+        except Exception:
+            response = supabase.table("vehicle_templates").select("*").execute()
         templates = response.data or []
         if not templates:
             return _FALLBACK_TEMPLATES
-        db_templates = [VehicleTemplate(**item) for item in templates]
+
+        db_templates = []
+        for item in templates:
+            try:
+                db_templates.append(_coerce_template(item))
+            except Exception as exc:
+                logger.warning("Skipping invalid vehicle template row %s: %s", item.get("id"), exc)
+
+        if not db_templates:
+            return _FALLBACK_TEMPLATES
+
         return _merge_templates(db_templates, _FALLBACK_TEMPLATES)
     except Exception as exc:
         logger.warning("Falling back to seeded vehicle templates: %s", exc)

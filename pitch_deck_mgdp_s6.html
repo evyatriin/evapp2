@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EVraahein — MGDP Season 6 Pitch Deck</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+
+  :root {
+    --mg-red: #C8102E;
+    --mg-dark: #1A1A2E;
+    --mg-blue: #16213E;
+    --accent: #E8B04B;
+    --accent2: #4FC3F7;
+    --text: #F0F4F8;
+    --muted: #90A4AE;
+    --card: rgba(255,255,255,0.06);
+    --card-border: rgba(255,255,255,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #0D1117;
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 40px 20px;
+    gap: 0;
+  }
+
+  /* ── Slide shell ── */
+  .slide {
+    width: 960px;
+    min-height: 540px;
+    border-radius: 16px;
+    padding: 56px 64px;
+    margin-bottom: 40px;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Slide themes ── */
+  .slide-hero { background: linear-gradient(135deg, #0D1117 0%, #1A1A2E 50%, #0D1117 100%); border: 1px solid var(--mg-red); }
+  .slide-dark { background: linear-gradient(160deg, #0F1923 0%, #1A2535 100%); border: 1px solid var(--card-border); }
+  .slide-accent { background: linear-gradient(135deg, #1A1A2E 0%, #16213E 100%); border: 1px solid rgba(200,16,46,0.4); }
+
+  /* ── Slide number badge ── */
+  .slide-num {
+    position: absolute; top: 20px; right: 24px;
+    font-size: 12px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase;
+  }
+
+  /* ── MG stripe ── */
+  .mg-stripe {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 5px;
+    background: linear-gradient(to bottom, var(--mg-red), #FF6B6B);
+  }
+
+  /* ── Tag ── */
+  .tag {
+    display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: var(--mg-red); border: 1px solid var(--mg-red);
+    border-radius: 4px; padding: 4px 10px; margin-bottom: 16px;
+  }
+
+  .tag-gold {
+    color: var(--accent); border-color: var(--accent);
+  }
+
+  .tag-blue { color: var(--accent2); border-color: var(--accent2); }
+
+  /* ── Hero Typography ── */
+  .hero-title {
+    font-size: 72px; font-weight: 900; line-height: 1.0;
+    background: linear-gradient(90deg, #fff 0%, #B0BEC5 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 12px;
+  }
+  .hero-sub {
+    font-size: 22px; font-weight: 300; color: var(--muted);
+    letter-spacing: 0.5px; margin-bottom: 32px;
+  }
+  .hero-tagline {
+    font-size: 18px; color: var(--accent); font-weight: 600;
+    background: rgba(232,176,75,0.12); border-left: 3px solid var(--accent);
+    padding: 10px 18px; border-radius: 0 8px 8px 0; display: inline-block;
+  }
+
+  /* ── Slide heading ── */
+  h2 {
+    font-size: 38px; font-weight: 800; margin-bottom: 8px; line-height: 1.1;
+    color: #fff;
+  }
+  .sub-head { font-size: 16px; color: var(--muted); margin-bottom: 36px; }
+
+  /* ── Cards ── */
+  .card-grid { display: grid; gap: 18px; margin-top: 8px; }
+  .card-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .card-grid-2 { grid-template-columns: 1fr 1fr; }
+
+  .card {
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: 24px;
+  }
+  .card-icon { font-size: 32px; margin-bottom: 12px; }
+  .card h3 { font-size: 17px; font-weight: 700; margin-bottom: 8px; color: #fff; }
+  .card p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+  .card .stat { font-size: 32px; font-weight: 900; color: var(--accent); line-height: 1; margin-bottom: 6px; }
+  .card .stat-label { font-size: 13px; color: var(--muted); }
+
+  .card-red { border-color: rgba(200,16,46,0.5); background: rgba(200,16,46,0.08); }
+  .card-gold { border-color: rgba(232,176,75,0.4); background: rgba(232,176,75,0.07); }
+  .card-blue { border-color: rgba(79,195,247,0.4); background: rgba(79,195,247,0.07); }
+  .card-green { border-color: rgba(76,175,80,0.4); background: rgba(76,175,80,0.07); }
+
+  /* ── Problem points ── */
+  .pain-item {
+    display: flex; align-items: flex-start; gap: 20px;
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: 22px; margin-bottom: 16px;
+  }
+  .pain-num {
+    font-size: 40px; font-weight: 900; color: var(--mg-red);
+    min-width: 48px; line-height: 1;
+  }
+  .pain-title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .pain-desc { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+  /* ── Table ── */
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .compare-table th {
+    background: rgba(200,16,46,0.2); padding: 12px 16px;
+    text-align: left; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--mg-red);
+  }
+  .compare-table td { padding: 12px 16px; border-bottom: 1px solid var(--card-border); }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table .highlight { color: #4CAF50; font-weight: 700; }
+  .compare-table .weak { color: #EF5350; }
+  .compare-table .partial { color: var(--accent); }
+  .compare-table .us { background: rgba(76,175,80,0.07); }
+
+  /* ── Pill badges ── */
+  .pill {
+    display: inline-block; font-size: 12px; font-weight: 700;
+    border-radius: 20px; padding: 4px 12px; margin: 4px 2px;
+  }
+  .pill-green { background: rgba(76,175,80,0.2); color: #81C784; }
+  .pill-red { background: rgba(239,83,80,0.2); color: #EF9A9A; }
+  .pill-gold { background: rgba(232,176,75,0.2); color: var(--accent); }
+  .pill-blue { background: rgba(79,195,247,0.2); color: var(--accent2); }
+
+  /* ── Timeline ── */
+  .timeline { display: flex; gap: 0; margin-top: 28px; }
+  .tl-item { flex: 1; position: relative; }
+  .tl-item:not(:last-child)::after {
+    content: ''; position: absolute; top: 20px; right: 0;
+    width: 50%; height: 2px; background: linear-gradient(to right, var(--mg-red), transparent);
+  }
+  .tl-dot {
+    width: 40px; height: 40px; border-radius: 50%; background: var(--mg-red);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; margin-bottom: 12px;
+  }
+  .tl-date { font-size: 12px; color: var(--accent); font-weight: 700; margin-bottom: 4px; }
+  .tl-text { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  /* ── Architecture boxes ── */
+  .arch-layer {
+    border: 1px solid var(--card-border); border-radius: 12px; padding: 18px 22px;
+    margin-bottom: 14px; background: var(--card);
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  }
+  .arch-label { font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 2px; color: var(--muted); min-width: 120px; }
+  .arch-items { display: flex; gap: 10px; flex-wrap: wrap; }
+  .arch-chip {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 600;
+  }
+  .arch-chip.red { background: rgba(200,16,46,0.2); border-color: var(--mg-red); }
+  .arch-chip.gold { background: rgba(232,176,75,0.15); border-color: var(--accent); }
+  .arch-chip.blue { background: rgba(79,195,247,0.15); border-color: var(--accent2); }
+  .arch-chip.green { background: rgba(76,175,80,0.15); border-color: #81C784; }
+
+  /* ── Big stat row ── */
+  .big-stats { display: flex; gap: 20px; margin: 28px 0; }
+  .big-stat { flex: 1; text-align: center; }
+  .big-stat .num { font-size: 52px; font-weight: 900; line-height: 1; }
+  .big-stat .unit { font-size: 18px; font-weight: 700; color: var(--accent); }
+  .big-stat .desc { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* ── Business model ── */
+  .biz-track {
+    border-radius: 12px; padding: 22px; margin-bottom: 16px;
+    border: 1px solid var(--card-border);
+  }
+  .biz-track h3 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+  .biz-track .rev { font-size: 13px; color: var(--accent); font-weight: 600; margin-bottom: 8px; }
+  .biz-track p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  /* ── Footer branding ── */
+  .slide-footer {
+    margin-top: auto; padding-top: 24px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-top: 1px solid var(--card-border);
+  }
+  .footer-brand { font-size: 14px; font-weight: 700; color: var(--mg-red); }
+  .footer-conf { font-size: 11px; color: var(--muted); letter-spacing: 1px; }
+
+  /* ── List ── */
+  ul.check { list-style: none; padding: 0; }
+  ul.check li { padding: 8px 0; font-size: 14px; color: var(--muted); line-height: 1.6; }
+  ul.check li::before { content: '✓ '; color: #4CAF50; font-weight: 700; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; }
+  .highlight-box {
+    background: rgba(232,176,75,0.1); border: 1px solid rgba(232,176,75,0.3);
+    border-radius: 10px; padding: 18px 22px; margin-top: 20px;
+  }
+  .highlight-box p { font-size: 15px; color: #fff; line-height: 1.6; }
+
+  /* ── Ask slide ── */
+  .ask-item {
+    display: flex; align-items: center; gap: 18px;
+    background: var(--card); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: 20px 24px; margin-bottom: 14px;
+  }
+  .ask-icon { font-size: 28px; min-width: 44px; text-align: center; }
+  .ask-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+  .ask-desc { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  /* Print styles */
+  @media print {
+    body { padding: 0; background: #000; }
+    .slide { page-break-after: always; margin-bottom: 0; border-radius: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 1 — TITLE                                         -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide slide-hero">
+  <div class="mg-stripe"></div>
+  <div class="slide-num">01 / 12</div>
+
+  <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
+    <div class="tag">MG Developer Program — Grant Season 6.0</div>
+    <div class="hero-title">EVraahein</div>
+    <div class="hero-sub">India's Intelligent EV Companion App</div>
+    <div class="hero-tagline">"Know your battery. Find your charger. Drive without fear."</div>
+
+    <div style="display:flex; gap:32px; margin-top:48px;">
+      <div>
+        <div style="font-size:11px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:6px;">Category</div>
+        <div style="font-size:15px; font-weight:700;">4b — EV Battery Diagnostics & Range Prediction</div>
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:6px;">Platform</div>
+        <div style="font-size:15px; font-weight:700;">Android (Flutter) · Cloud Run · Supabase</div>
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--muted); letter-spacing:2px; text-transform:uppercase; margin-bottom:6px;">Stage</div>
+        <div style="font-size:15px; font-weight:700;">Working MVP — OBD Live + Maps Live</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div class="footer-brand">EVraahein · evyatri.in</div>
+    <div class="footer-conf">CONFIDENTIAL — MGDP SEASON 6 SUBMISSION · MAY 2026</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 2 — THE PROBLEM                                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide slide-dark">
+  <div class="mg-stripe"></div>
+  <div class="slide-num">02 / 12</div>
+
+  <div class="tag tag-red" style="color:var(--mg-red); border-color:var(--mg-red);">The Problem</div>
+  <h2>Every Indian EV Owner Faces<br>Three Invisible Walls</h2>
+  <div class="sub-head">Adoption is soaring — but the ownership experience still runs on anxiety</div>
+
+  <div class="pain-item">
+    <div class="pain-num">1</div>
+    <div>
+      <div class="pain-title">Range Anxiety — "Will I make it?"</div>
+      <div class="pain-desc">Dashboard SOC percentages are theoretical. Real-world range depends on traffic, elevation, AC load, battery age — none of which the factory display accounts for. 63% of Indian EV owners report anxiety about running out of charge on every long journey.</div>
+    </div>
+  </div>
+
+  <div class="pain-item">
+    <div class="pain-num">2</div>
+    <div>
+      <div class="pain-title">Charging Desert — "Where do I charge?"</div>
+      <div class="pain-desc">India has fewer than 25,000 public EV chargers for 3 million+ EVs. Existing apps show stale data, unmaintained stations, and no real-time availability. Drivers waste 45+ minutes per trip hunting for working chargers.</div>
+    </div>
+  </div>
+
+  <div class="pain-item">
+    <div class="pain-num">3</div>
+    <div>
+      <div class="pain-title">Battery Mystery — "Is my battery healthy?"</div>
+      <div class="pain-desc">OEMs provide no consumer-facing battery health tool. State of Health (SOH) is locked inside diagnostic ECUs. Owners discover degradation only when range drops 30% — often after the warranty window. There is no early warning system.</div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div class="footer-brand">EVraahein</div>
+    <div class="footer-conf">MGDP S6 · CONFIDENTIAL</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 3 — THE SOLUTION                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide slide-accent">
+  <div class="mg-stripe"></div>
+  <div class="slide-num">03 / 12</div>
+
+  <div class="tag tag-gold">The Solution</div>
+  <h2>One App. Three Superpowers.</h2>
+  <div class="sub-head">EVraahein unifies real-time diagnostics, AI prediction, and live charging maps</div>
+
+  <div class="card-grid card-grid-3" style="margin-top:8px;">
+    <div class="card card-blue">
+      <div class="card-icon">🗺️</div>
+      <h3>Smart Charging Map</h3>
+      <p>Live charger stations with real-time aggregated availability. Multi-source data fusion (OCPI, OpenChargeMap, crowd-sourced). Route-aware "charge en route" suggestions.</p>
+      <div style="margin-top:14px;">
+        <span class="pill pill-blue">HERE Maps</span>
+        <span class="pill pill-blue">Flutter Map</span>
+        <span class="pill pill-blue">Live API</span>
+      </div>
+    </div>
+
+    <div class="card card-red">
+      <div class="card-icon">🔌</div>
+      <h3>OBD Battery Diagnostics</h3>
+      <p>BLE/Bluetooth OBD-II adapter reads live ECU data: SOC, SOH, pack voltage, cell delta, battery current, temperature. Deep UDS profiles for MG ZS EV, Hyundai Creta EV, Nexon EV, BYD.</p>
+      <div style="margin-top:14px;">
+        <span class="pill pill-red">ELM327 BLE</span>
+        <span class="pill pill-red">ISO-TP / UDS</span>
+        <span class="pill pill-red">ECU PIDs</span>
+      </div>
+    </div>
+
+    <div class="card card-gold">
+      <div class="card-icon">🔮</div>
+      <h3>AI Range Prediction</h3>
+      <p>Rolling-window SOC depletion model learns your real %-per-km rate from live driving. GPS-fused speed + elevation-aware prediction tells you exactly when you'll hit your charge threshold.</p>
+      <div style="margin-top:14px;">
+        <span class="pill pill-gold">GPS Fusion</span>
+        <span class="pill pill-gold">SOC Model</span>
+        <span class="pill pill-gold">Elevation</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="highlight-box" style="margin-top:20px;">
+    <p>💡 <strong>Unique integration:</strong> All three capabilities share a unified data pipeline — OBD telemetry feeds the range predictor, which re-ranks charger suggestions by reachability. No other Indian app connects these three systems end-to-end.</p>
+  </div>
+
+  <div class="slide-footer">
+    <div class="footer-brand">EVraahein</div>
+    <div class="footer-conf">MGDP S6 · CONFIDENTIAL</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 4 — MG ZS EV — THE ACE CARD                     -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide slide-dark">
+  <div class="mg-stripe"></div>
+  <div class="slide-num">04 / 12</div>
+
+  <div class="tag">MG-Specific Value</div>
+  <h2>We Read the MG ZS EV's<br>Battery ECU Natively</h2>
+  <div class="sub-head">Deep diagnostic integration that even MG service centres don't offer customers</div>
+
+  <div class="two-col">
+    <div>
+      <div class="card card-red" style="margin-bottom:16px;">
+        <div class="card-icon">🔋</div>
+        <h3>Live Battery Metrics via UDS</h3>
+        <ul class="check">
+          <li>State of Charge (SOC) — raw ECU value</li>
+          <li>State of Health (SOH) — estimated degradation</li>
+          <li>Pack Voltage — live HV bus reading</li>
+          <li>Battery Current (A) — charge/discharge</li>
+          <li>Cell Voltage Delta (mV) — imbalance warning</li>
+          <li>Coolant / Battery Temperature</li>
+          <li>Estimated Power Draw (kW)</li>
+        </ul>
+      </div>
+      <div class="card" style="border-color:rgba(79,195,247,0.3);">
+        <h3 style="color:var(--accent2);">ECU Headers</h3>
+        <p style="font-family:monospace; color:var(--muted); font-size:13px; line-height:2;">
+          TX: 0x781 (Battery Management System)<br>
+          RX: 0x789<br>
+          Protocol: ISO-TP (15765-2)<br>
+          Mode: UDS 0x22 (Read Data By ID)
+        </p>
+      </div>
+    </div>
+
+    <div>
+      <div class="card card-gold" style="margin-bottom:16px;">
+        <div class="card-icon">📊</div>
+        <h3>Driving Intelligence</h3>
+        <ul class="check">
+          <li>Smooth Driving Score (0–100)</li>
+          <li>Efficiency Score vs baseline</li>
+          <li>Harsh acceleration / braking events</li>
+          <li>GPS-fused trip distance & avg speed</li>
+          <li>Road grade (%) from GPS elevation delta</li>
+          <li>Peak speed & energy consumption</li>
+        </ul>
+      </div>
+      <div class="card card-green">
+        <div class="card-icon">🛡️</div>
+        <h3>Early Warning System</h3>
+        <p>High cell delta (>50mV) alerts users to imminent cell failure — weeks before visible range loss. SOH trending below 80% triggers pre-emptive service recommendation.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div class="footer-brand">EVraahein</div>
+    <div class="footer-conf">MGDP S6 · CONFIDENTIAL</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 5 — MARKET OPPORTUNITY                           -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide slide-accent">
+  <div class="mg-stripe"></div>
+  <div class="slide-num">05 / 12</div>
+
+  <div class="tag tag-gold">Market Opportunity</div>
+  <h2>India's EV Market Is at Inflection</h2>
+  <div class="sub-head">The largest addressable EV diagnostics market outside China</div>
+
+  <div class="big-stats">
+    <div class="big-stat">
+      <div class="num" style="color:var(--accent);">3.7<span class="unit">M</span></div>
+      <div class="desc">EVs registered in India<br>(Dec 2025, VAHAN)</div>
+    </div>
+    <div class="big-stat">
+      <div class="num" style="color:#4FC3F7;">42<span class="unit">%</span></div>
+      <div class="desc">Year-on-year EV sales<br>growth rate (FY25)</div>
+    </div>
+    <div class="big-stat">
+      <div class="num" style="color:#81C784;">10<span class="unit">M+</span></div>
+      <div class="desc">Projected EV fleet<br>by 2030 (NITI Aayog)</div>
+    </div>
+    <div class="big-stat">
+      <div class="num" style="color:var(--mg-red);">₹2,400<span class="unit">Cr</span></div>
+      <div class="desc">Projected EV aftermarket<br>services TAM by 2028</div>
+    </div>
+  </div>
+
+  <div class="card-grid card-grid-3">
+    <div class="card">
+      <h3>🎯 Serviceable Market</h3>
+      <p>1.2M+ 4-wheel EV owners with smartphones who purchase a ₹1,500–3,000 OBD adapter. Target: urban professionals aged 28–45 in 15 metro cities.</p>
+    </div>
+    <div class="card card-red">
+      <h3>🏢 Fleet Opportunity</h3>
+      <p>40,000+ fleet EV operators (Ola, Rapido, BluSmart, corporate pools) paying ₹499–999/vehicle/month for telemetry SaaS. Growing 60% YoY.</p>
+    </div>
+    <div class="card card-gold">
+      <h3>🤝 OEM / Dealer B2B</h3>
+      <p>MG Motor, Tata, Hyundai paying per-insight for anonymised battery health fleet data to improve warranty reserving and predictive maintenance.</p>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div class="footer-brand">EVraahein</div>
+    <div class="footer-conf">MGDP S6 · CONFIDENTIAL</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 6 — COMPETITIVE LANDSCAPE                        -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide slide-dark">
+  <div class="mg-stripe"></div>
+  <div class="slide-num">06 / 12</div>
+
+  <div class="tag">Competitive Landscape</div>
+  <h2>No One Connects All Three Dots</h2>
+  <div class="sub-head">Competitors solve one problem. EVraahein solves the whole journey.</div>
+
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>App / Product</th>
+        <th>Charging Map</th>
+        <th>OBD Diagnostics</th>
+        <th>Range Prediction</th>
+        <th>India EV PIDs</th>
+        <th>Offline</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="us">
+        <td><strong>EVraahein</strong> <span class="pill pill-green">US</span></td>
+        <td class="highlight">✓ Live</td>
+        <td class="highlight">✓ Deep UDS</td>
+        <td class="highlight">✓ GPS-fused AI</td>
+        <td class="highlight">✓ MG / Tata / Hyundai</td>
+        <td class="highlight">✓ Cached</td>
+      </tr>
+      <tr>
+        <td>PlugShare</td>
+        <td class="highlight">✓ Good</td>
+        <td class="weak">✗</td>
+        <td class="weak">✗</td>
+        <td class="weak">✗</td>
+        <td class="partial">Partial</td>
+      </tr>
+      <tr>
+        <td>Tata iRA / ZConnect</td>
+        <td class="partial">OEM only</td>
+        <td class="partial">Basic SOC</td>
+        <td class="partial">Simple</td>
+        <td class="partial">Own brand only</td>
+        <td class="weak">✗</td>
+      </tr>
+      <tr>
+        <td>OBD Fusion / Torque Pro</td>
+        <td class="weak">✗</td>
+        <td class="partial">Generic PIDs</td>
+        <td class="weak">✗</td>
+        <td class="weak">✗ No EV profiles</td>
+        <td class="partial">Partial</td>
+      </tr>
+      <tr>
+        <td>ABRP (A Better Route Planner)</td>
+        <td class="partial">Route only</td>
+        <td class="weak">✗</td>
+        <td class="highlight">✓ Good</td>
+        <td class="weak">✗ No India data</td>
+        <td class="weak">✗</td>
+      </tr>
+      <tr>
+        <td>Kazam / Tata Power EZ Charge</td>
+        <td class="partial">Own network</td>
+        <td class="weak">✗</td>
+        <td class="weak">✗</td>
+        <td class="weak">✗</td>
+        <td class="weak">✗</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="highlight-box" style="margin-top:18px;">
+    <p>💡 <strong>Moat:</strong> India-specific OBD PID library (MG, Tata, Hyundai, BYD) took 6+ months of reverse engineering. ELM327 UDS profiles with ISO-TP flow control are not publicly documented. This is non-trivial to replicate.</p>
+  </div>
+
+  <div class="slide-footer">
+    <div class="footer-brand">EVraahein</div>
+    <div class="footer-conf">MGDP S6 · CONFIDENTIAL</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 7 — TECHNICAL ARCHITECTURE                       -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide slide-accent">
+  <div class="mg-stripe"></div>
+  <div class="slide-num">07 / 12</div>
+
+  <div class="tag tag-blue">Technical Architecture</div>
+  <h2>Production-Grade, Cloud-Native</h2>
+  <div class="sub-head">Three-tier architecture built for scale — from day 1</div>
+
+  <div class="arch-layer" style="border-color:rgba(200,16,46,0.5); background:rgba(200,16,46,0.08);">
+    <div class="arch-label" style="color:var(--mg-red);">📱 Device Layer</div>
+    <div class="arch-items">
+      <div class="arch-chip red">Flutter (Dart)</div>
+      <div class="arch-chip red">Riverpod 3 State</div>
+      <div class="arch-chip red">ELM327 BLE/BT</div>
+      <div class="arch-chip red">GPS (Geolocator)</div>
+      <div class="arch-chip red">ISO-TP / UDS parser</div>
+      <div class="arch-chip red">Local cache (Hive)</div>
+    </div>
+  </div>
+
+  <div style="text-align:center; font-size:20px; color:var(--muted); margin: 4px 0;">↕ HTTPS / JWT Bearer Auth</div>
+
+  <div class="arch-layer" style="border-color:rgba(232,176,75,0.4); background:rgba(232,176,75,0.07);">
+    <div class="arch-label" style="color:var(--accent);">⚙️ API Layer</div>
+    <div class="arch-items">
+      <div class="arch-chip gold">FastAPI (Python)</div>
+      <div class="arch-chip gold">Google Cloud Run</div>
+      <div class="arch-chip gold">asia-south1 (Mumbai)</div>
+      <div class="arch-chip gold">Async charger aggregation</div>
+      <div class="arch-chip gold">JWT validation</div>
+      <div class="arch-chip gold">Stale-while-revalidate cache</div>
+    </div>
+  </div>
+
+  <div style="text-align:center; font-size:20px; color:var(--muted); margin: 4px 0;">↕ Supabase Client / PostgREST</div>
+
+  <div class="arch-layer" style="border-color:rgba(76,175,80,0.4); background:rgba(76,175,80,0.07);">
+    <div class="arch-label" style="color:#81C784;">🗄️ Data Layer</div>
+    <div class="arch-items">
+      <div class="arch-chip green">Supabase PostgreSQL</div>
+      <div class="arch-chip green">Row-Level Security</div>
+      <div class="arch-chip green">OBD sessions (27 cols)</div>
+      <div class="arch-chip green">Auth (JWT)</div>
+      <div class="arch-chip green">Realtime subscriptions</div>
+    </div>
+  </div>
+
+  <div style="text-align:center; font-size:20px; color:var(--muted); margin: 4px 0;">↕ External APIs</div>
+
+  <div class="arch-layer">
+    <div class="arch-label">🌐 External Data</div>
+    <div class="arch-items">
+      <div class="arch-chip">HERE Maps API</div>
+      <div class="arch-chip">Google Directions</div>
+      <div class="arch-chip">OpenChargeMap</div>
+      <div class="arch-chip">OCPI (Tata Power / Charge+Zone)</div>
+      <div class="arch-chip">OEM Data (planned)</div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div class="footer-brand">EVraahein</div>
+    <div class="footer-conf">MGDP S6 · CONFIDENTIAL</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 8 — WIN-WIN FOR MG                               -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide slide-dark">
+  <div class="mg-stripe"></div>
+  <div class="slide-num">08 / 12</div>
+
+  <div class="tag">MG Value Proposition</div>
+  <h2>Four Ways EVraahein Wins for MG</h2>
+  <div class="sub-head">Not just an app — a strategic asset for MG Motor India</div>
+
+  <div class="card-grid card-grid-2">
+    <div class="card card-red">
+      <div class="card-icon">📡</div>
+      <h3>Real-World Battery Fleet Data</h3>
+      <p>Anonymised, consented SOH + cell delta telemetry from thousands of MG ZS EVs in real Indian conditions — data no lab simulation can match. Feeds warranty reserving, battery design iteration, and recall early warning.</p>
+    </div>
+
+    <div class="card card-gold">
+      <div class="card-icon">🏪</div>
+      <h3>Dealer Diagnostics Portal</h3>
+      <p>EVraahein-powered service check-in: customer drives in, BMS history already synced. Technicians see SOH trend, cell imbalance events, and driving patterns before lifting the bonnet. Reduces diagnostic time by 60%.</p>
+    </div>
+
+    <div class="card card-blue">
+      <div class="card-icon">⚡</div>
+      <h3>V2G / BSES Smart Grid Integration</h3>
+      <p>MG ZS EV has V2L capability. EVraahein's real-time SOC + grid API integration enables smart charge scheduling around Delhi's TOU tariffs — a natural V2G pilot with BSES Rajdhani. MG branding on the energy dashboard.</p>
+    </div>
+
+    <div class="card card-green">
+      <div class="card-icon">🎯</div>
+      <h3>Owner Retention & Loyalty</h3>
+      <p>MG-white-labelled "MG Drive" mode within EVraahein. Push alerts for battery health milestones drive service visits. In-app MG accessory offers triggered by driving profile. NPS boost from proactive ownership experience.</p>
+    </div>
+  </div>
+
+  <div class="highlight-box">
+    <p>🤝 <strong>Proposed partnership:</strong> EVraahein provides MG with aggregated anonymised fleet insights. MG provides OEM-validated PIDs + dealer network pilot access. Joint press release: "MG partners with Indian startup for India's first OEM-grade EV diagnostics app."</p>
+  </div>
+
+  <div class="slide-footer">
+    <div class="footer-brand">EVraahein</div>
+    <div class="footer-conf">MGDP S6 · CONFIDENTIAL</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 9 — BUSINESS MODEL                               -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide slide-accent">
+  <div class="mg-stripe"></div>
+  <div class="slide-num">09 / 12</div>
+
+  <div class="tag tag-gold">Business Model</div>
+  <h2>Three Revenue Streams,<br>One Platform</h2>
+  <div class="sub-head">Freemium consumer base funds premium B2B data products</div>
+
+  <div class="two-col">
+    <div>
+      <div class="biz-track" style="background:rgba(200,16,46,0.08); border-color:rgba(200,16,46,0.3);">
+        <h3>🆓 → 💎 Consumer Freemium</h3>
+        <div class="rev">₹149 / month · ₹999 / year</div>
+        <p>Free: charging map, basic SOC display. Pro: live OBD diagnostics, SOH history, AI range prediction, trip reports, unlimited session history, cell delta alerts.</p>
+      </div>
+      <div class="biz-track" style="background:rgba(232,176,75,0.07); border-color:rgba(232,176,75,0.3);">
+        <h3>🏢 Fleet SaaS</h3>
+        <div class="rev">₹499–999 / vehicle / month</div>
+        <p>Multi-vehicle dashboard, driver scoring, maintenance scheduling, geofencing alerts, CSV export. Targets Ola Electric, BluSmart, corporate fleet managers, delivery fleets (Mahindra Treo, Zomato EV bikes).</p>
+      </div>
+    </div>
+    <div>
+      <div class="biz-track" style="background:rgba(79,195,247,0.07); border-color:rgba(79,195,247,0.3);">
+        <h3>📊 B2B Data Licensing</h3>
+        <div class="rev">₹10–50L / year per OEM / insurer</div>
+        <p>Anonymised, consented battery health datasets for OEMs (warranty planning), insurers (EV-specific premiums), battery leasing companies (residual value modelling). GDPR-compliant data room.</p>
+      </div>
+      <div class="biz-track" style="background:rgba(76,175,80,0.07); border-color:rgba(76,175,80,0.3);">
+        <h3>🔧 Marketplace (Year 2)</h3>
+        <div class="rev">15% transaction commission</div>
+        <p>In-app OBD adapter sales, certified battery reconditioning bookings, EV insurance comparison (Acko, TATA AIG), charger installation leads. Triggered by diagnostic alerts for high conversion.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div class="footer-brand">EVraahein</div>
+    <div class="footer-conf">MGDP S6 · CONFIDENTIAL</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 10 — TRACTION & ROADMAP                          -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide slide-dark">
+  <div class="mg-stripe"></div>
+  <div class="slide-num">10 / 12</div>
+
+  <div class="tag">Traction & Roadmap</div>
+  <h2>From Working MVP to<br>Market Leader in 18 Months</h2>
+  <div class="sub-head">Core technology is built — grant accelerates go-to-market</div>
+
+  <div class="card-grid card-grid-3" style="margin-bottom:24px;">
+    <div class="card card-green">
+      <div class="card-icon">✅</div>
+      <h3>Already Built (May 2026)</h3>
+      <ul class="check" style="margin-top:8px;">
+        <li>Live charger map (HERE + OpenChargeMap)</li>
+        <li>OBD BLE/BT with UDS for MG, Hyundai, BYD, Tata</li>
+        <li>GPS-fused SOC range predictor</li>
+        <li>Cloud Run API + Supabase backend</li>
+        <li>JWT auth + RLS security</li>
+        <li>Session history (27-column telemetry table)</li>
+        <li>Smooth driving score + efficiency analytics</li>
+      </ul>
+    </div>
+    <div class="card card-gold">
+      <div class="card-icon">🚀</div>
+      <h3>Q3 2026 (with Grant)</h3>
+      <ul class="check" style="margin-top:8px;">
+        <li>Play Store public launch</li>
+        <li>MG dealer pilot (5 cities)</li>
+        <li>Battery health alert push notifications</li>
+        <li>OBD adapter bundling with purchase</li>
+        <li>Fleet dashboard v1</li>
+        <li>1,000 active users target</li>
+      </ul>
+    </div>
+    <div class="card card-blue">
+      <div class="card-icon">🌟</div>
+      <h3>2027 Horizon</h3>
+      <ul class="check" style="margin-top:8px;">
+        <li>V2G smart charging with BSES</li>
+        <li>Insurance premium integration</li>
+        <li>OEM data licensing deals</li>
+        <li>iOS version</li>
+        <li>10,000+ active users</li>
+        <li>Series A readiness</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-dot">🔬</div>
+      <div class="tl-date">Jan–Apr 2026</div>
+      <div class="tl-text">OBD reverse engineering, GPS fusion, SOC predictor, Supabase backend</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot">📱</div>
+      <div class="tl-date">May 2026</div>
+      <div class="tl-text">MVP complete, MGDP application</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot">🚀</div>
+      <div class="tl-date">Q3 2026</div>
+      <div class="tl-text">Play Store launch, MG pilot</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot">💼</div>
+      <div class="tl-date">Q4 2026</div>
+      <div class="tl-text">Fleet SaaS, first paid B2B customer</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-dot">⚡</div>
+      <div class="tl-date">2027</div>
+      <div class="tl-text">V2G pilot, Series A</div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div class="footer-brand">EVraahein</div>
+    <div class="footer-conf">MGDP S6 · CONFIDENTIAL</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 11 — TEAM                                         -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide slide-accent">
+  <div class="mg-stripe"></div>
+  <div class="slide-num">11 / 12</div>
+
+  <div class="tag tag-gold">The Team</div>
+  <h2>Built by a Developer Who<br>Owns and Drives an EV</h2>
+  <div class="sub-head">Unique combination of mobile engineering depth and first-person user insight</div>
+
+  <div class="card-grid card-grid-2" style="margin-bottom:24px;">
+    <div class="card card-red" style="padding:32px;">
+      <div style="display:flex; align-items:center; gap:20px; margin-bottom:20px;">
+        <div style="width:64px; height:64px; border-radius:50%; background:linear-gradient(135deg,var(--mg-red),#FF6B6B); display:flex; align-items:center; justify-content:center; font-size:28px;">👨‍💻</div>
+        <div>
+          <div style="font-size:20px; font-weight:800;">Founder & Lead Engineer</div>
+          <div style="font-size:13px; color:var(--muted);">EV Owner · Flutter Developer · OBD Researcher</div>
+        </div>
+      </div>
+      <ul class="check">
+        <li>Full-stack mobile (Flutter/Dart, Riverpod)</li>
+        <li>Cloud backend (FastAPI, Cloud Run, Supabase)</li>
+        <li>OBD-II / UDS / ISO-TP protocol implementation</li>
+        <li>BLE/Bluetooth adapter integration</li>
+        <li>GPS signal processing & sensor fusion</li>
+        <li>Personal MG ZS EV owner — real user testing</li>
+      </ul>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px;">
+        <h3>🎓 Why This Founder?</h3>
+        <p>The OBD reverse engineering required understanding CAN bus framing, ECU address mapping, ISO-TP multi-frame reassembly, and UDS service modes — simultaneously, for 4 different OEM implementations. This is not a typical app — it required embedded systems knowledge applied to a consumer mobile context.</p>
+      </div>
+      <div class="card card-gold">
+        <h3>🤝 Looking to Hire (with Grant)</h3>
+        <ul class="check">
+          <li>Backend engineer (Python / FastAPI)</li>
+          <li>Android BLE specialist</li>
+          <li>Growth / community manager</li>
+          <li>Advisor: EV powertrain / battery engineer</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div class="footer-brand">EVraahein</div>
+    <div class="footer-conf">MGDP S6 · CONFIDENTIAL</div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SLIDE 12 — THE ASK                                      -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="slide slide-hero">
+  <div class="mg-stripe"></div>
+  <div class="slide-num">12 / 12</div>
+
+  <div class="tag">The Ask</div>
+  <h2>Partner With Us to Build<br>India's #1 EV Companion</h2>
+  <div class="sub-head">Four things that would make an outsized difference</div>
+
+  <div style="margin-top:16px;">
+    <div class="ask-item">
+      <div class="ask-icon">💰</div>
+      <div>
+        <div class="ask-title">Grant Funding — ₹10–25 Lakhs</div>
+        <div class="ask-desc">12-month runway for 2 additional hires (backend engineer + Android BLE specialist), server costs scaling from 100 → 10,000 users, Play Store launch marketing in Delhi/Mumbai, OBD adapter procurement for bundling.</div>
+      </div>
+    </div>
+
+    <div class="ask-item">
+      <div class="ask-icon">🏪</div>
+      <div>
+        <div class="ask-title">MG Dealer Network Access — 5-City Pilot</div>
+        <div class="ask-desc">Access to 5 MG service centres in Delhi, Mumbai, Bangalore, Hyderabad, Chennai to pilot the dealer diagnostic check-in flow. Introduction letter from MG Motor India to shortcut 6 months of cold outreach.</div>
+      </div>
+    </div>
+
+    <div class="ask-item">
+      <div class="ask-icon">🔑</div>
+      <div>
+        <div class="ask-title">OEM-Validated PID Library for MG ZS EV</div>
+        <div class="ask-desc">Official confirmation / expansion of UDS PIDs for MG ZS EV (and MG Comet, Astor EV). This would make EVraahein the most accurate MG diagnostic tool outside the dealer network — a shared win for MG owners everywhere.</div>
+      </div>
+    </div>
+
+    <div class="ask-item">
+      <div class="ask-icon">🧭</div>
+      <div>
+        <div class="ask-title">Mentorship & Technical Guidance</div>
+        <div class="ask-desc">Access to MG Motor India's EV engineering team for 1 session/month. Guidance on battery chemistry thresholds (SOH warning levels, cell delta alarm points) to ensure EVraahein's diagnostics are OEM-grade accurate.</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-top:20px;">
+    <div>
+      <div style="font-size:13px; color:var(--muted); margin-bottom:4px;">Contact</div>
+      <div style="font-size:16px; font-weight:700;">pidaparthy@gmail.com</div>
+      <div style="font-size:14px; color:var(--muted);">evyatri.in@gmail.com · evyatri.in</div>
+    </div>
+    <div style="text-align:right;">
+      <div style="font-size:36px; font-weight:900; color:var(--mg-red);">EVraahein</div>
+      <div style="font-size:13px; color:var(--muted);">Know your battery. Find your charger. Drive without fear.</div>
+    </div>
+  </div>
+
+  <div class="slide-footer">
+    <div class="footer-brand">EVraahein · MGDP Season 6 · May 2026</div>
+    <div class="footer-conf">CONFIDENTIAL</div>
+  </div>
+</div>
+
+</body>
+</html>

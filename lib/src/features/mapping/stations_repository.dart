@@ -66,15 +66,102 @@ class ConnectorFilter extends _$ConnectorFilter {
   }
 }
 
-/// Calculate search radius in km from zoom level
-/// Google Maps zoom levels: 1 (world) to 20 (buildings)
-/// Approx: Zoom 12 = ~5km visible, Zoom 10 = ~20km, Zoom 8 = ~80km
+// Speed filter: 'AC' | 'DC Fast'
+@riverpod
+class SpeedFilter extends _$SpeedFilter {
+  @override
+  Set<String> build() => {};
+
+  void toggle(String speed) {
+    if (state.contains(speed)) {
+      state = {...state}..remove(speed);
+    } else {
+      state = {...state, speed};
+    }
+  }
+
+  void clear() {
+    state = {};
+  }
+}
+
+// Price filter: 'Free' | 'Paid' | 'Community'
+@riverpod
+class PriceFilter extends _$PriceFilter {
+  @override
+  Set<String> build() => {};
+
+  void toggle(String price) {
+    if (state.contains(price)) {
+      state = {...state}..remove(price);
+    } else {
+      state = {...state, price};
+    }
+  }
+
+  void clear() {
+    state = {};
+  }
+}
+
+// Availability filter: show only 'working' stations
+@riverpod
+class AvailableNowFilter extends _$AvailableNowFilter {
+  @override
+  bool build() => false;
+
+  void toggle() => state = !state;
+
+  void clear() => state = false;
+}
+
+// Access-type filter: 'Public' | 'Community Hosted'
+@riverpod
+class AccessFilter extends _$AccessFilter {
+  @override
+  Set<String> build() => {};
+
+  void toggle(String access) {
+    if (state.contains(access)) {
+      state = {...state}..remove(access);
+    } else {
+      state = {...state, access};
+    }
+  }
+
+  void clear() {
+    state = {};
+  }
+
+}
+
+/// DC connector type names (used for speed-filter approximation)
+const _kDcConnectors = {'CCS2', 'CCS1', 'CHAdeMO', 'GB/T', 'Tesla'};
+
+/// Returns how many filter groups have at least one active option.
+int totalActiveFilters({
+  required Set<String> connectors,
+  required Set<String> speed,
+  required Set<String> price,
+  required bool availableNow,
+  required Set<String> access,
+}) {
+  int count = 0;
+  if (connectors.isNotEmpty) count++;
+  if (speed.isNotEmpty) count++;
+  if (price.isNotEmpty) count++;
+  if (availableNow) count++;
+  if (access.isNotEmpty) count++;
+  return count;
+}
+
+/// Calculate search radius in km from zoom level.
+/// Uses 70 000 / 2^zoom so zoom 12 yields ~17 km — covering the full visible
+/// area on a typical phone — while the 50 km cap avoids slow/timed-out
+/// backend queries at extreme zoom-out.
 double _calculateRadiusFromZoom(double zoom) {
-  // Formula: radius = 40000 / (2^zoom) km (rough approximation)
-  // We'll cap at a reasonable max to avoid too many API calls
-  final calculatedRadius = 40000 / (1 << zoom.round());
-  // Clamp between 5km and 50km
-  return calculatedRadius.clamp(5.0, 50.0);
+  final calculatedRadius = 70000 / (1 << zoom.round());
+  return calculatedRadius.clamp(12.0, 50.0);
 }
 
 double _round4(double v) => (v * 10000).round() / 10000;
@@ -84,9 +171,15 @@ Future<List<StationModel>> stations(Ref ref) async {
   final repository = ref.watch(stationsRepositoryProvider);
   final rawCenter = ref.watch(mapCenterProvider);
   final zoom = ref.watch(mapZoomProvider);
-  final filters = ref.watch(connectorFilterProvider);
 
-  // Round to 4 decimal places (~11m) so near-identical GPS/map positions share one request
+  // Filter state
+  final connectors = ref.watch(connectorFilterProvider);
+  final speed = ref.watch(speedFilterProvider);
+  final price = ref.watch(priceFilterProvider);
+  final availableNow = ref.watch(availableNowFilterProvider);
+  final access = ref.watch(accessFilterProvider);
+
+  // Round to 4 decimal places (~11m) so near-identical positions share one request
   final center = LatLng(_round4(rawCenter.latitude), _round4(rawCenter.longitude));
 
   final radiusKm = _calculateRadiusFromZoom(zoom);
@@ -94,17 +187,46 @@ Future<List<StationModel>> stations(Ref ref) async {
     'DEBUG: Fetching stations for center: ${center.latitude}, ${center.longitude}, zoom: $zoom, radius: ${radiusKm}km',
   );
 
-  final allStations = await repository.getStationsNear(
-    center,
-    radiusKm: radiusKm,
-  );
+  var result = await repository.getStationsNear(center, radiusKm: radiusKm);
 
-  // Apply connector filter
-  if (filters.isEmpty) {
-    return allStations;
+  // --- Connector type filter ---
+  if (connectors.isNotEmpty) {
+    result = result.where((s) => s.connectors.any((c) => connectors.contains(c))).toList();
   }
 
-  return allStations.where((station) {
-    return station.connectors.any((c) => filters.contains(c));
-  }).toList();
+  // --- Speed filter (approximated from connector types) ---
+  if (speed.isNotEmpty) {
+    result = result.where((s) {
+      if (speed.contains('DC Fast') && s.connectors.any((c) => _kDcConnectors.contains(c))) return true;
+      if (speed.contains('AC') && s.connectors.any((c) => !_kDcConnectors.contains(c))) return true;
+      return false;
+    }).toList();
+  }
+
+  // --- Price filter ---
+  if (price.isNotEmpty) {
+    result = result.where((s) {
+      final kwh = s.pricePerKwh;
+      if (price.contains('Free') && (kwh == null || kwh == 0) && !s.isAcceptingRequests) return true;
+      if (price.contains('Paid') && kwh != null && kwh > 0) return true;
+      if (price.contains('Community') && s.isAcceptingRequests) return true;
+      return false;
+    }).toList();
+  }
+
+  // --- Availability filter ---
+  if (availableNow) {
+    result = result.where((s) => s.status == 'working').toList();
+  }
+
+  // --- Access type filter ---
+  if (access.isNotEmpty) {
+    result = result.where((s) {
+      if (access.contains('Public') && !s.isPrivate && !s.isAcceptingRequests) return true;
+      if (access.contains('Community Hosted') && s.isAcceptingRequests) return true;
+      return false;
+    }).toList();
+  }
+
+  return result;
 }

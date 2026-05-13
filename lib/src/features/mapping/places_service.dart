@@ -73,4 +73,72 @@ class PlacesService {
       return null;
     }
   }
+
+  Future<List<NearbyFoodPlace>> fetchNearbyFoodPlaces(
+    LatLng center, {
+    double radiusKm = 10,
+    int maxResults = 5,
+  }) async {
+    try {
+      final response = await BackendService.post(
+        '/api/places/food-nearby',
+        body: {
+          'center': {
+            'latitude': center.latitude,
+            'longitude': center.longitude,
+          },
+          'radius_km': radiusKm,
+          'max_results': maxResults,
+        },
+      );
+
+      final data = response as Map<String, dynamic>;
+      final List<dynamic> places = data['places'] ?? [];
+      return places
+          .map((json) => NearbyFoodPlace.fromJson(json as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching nearby food places: $e');
+      return [];
+    }
+  }
+}
+
+class NearbyFoodPlace {
+  final String id;
+  final String name;
+  final String? address;
+  final double? rating;
+  final int? userRatingCount;
+  final String? phoneNumber;
+  final LatLng? location;
+
+  const NearbyFoodPlace({
+    required this.id,
+    required this.name,
+    this.address,
+    this.rating,
+    this.userRatingCount,
+    this.phoneNumber,
+    this.location,
+  });
+
+  factory NearbyFoodPlace.fromJson(Map<String, dynamic> json) {
+    final location = json['location'] as Map<String, dynamic>?;
+    return NearbyFoodPlace(
+      id: json['id']?.toString() ?? '',
+      name: json['name'] as String? ?? 'Food stop',
+      address: json['address'] as String?,
+      rating: (json['rating'] as num?)?.toDouble(),
+      userRatingCount: json['user_rating_count'] as int?,
+      phoneNumber: json['phone_number'] as String?,
+      location:
+          location?['latitude'] != null && location?['longitude'] != null
+              ? LatLng(
+                (location!['latitude'] as num).toDouble(),
+                (location['longitude'] as num).toDouble(),
+              )
+              : null,
+    );
+  }
 }

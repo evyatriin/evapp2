@@ -55,7 +55,7 @@ final class StationsRepositoryProvider
 }
 
 String _$stationsRepositoryHash() =>
-    r'a35687d7184b57e16524bfa0cfe64afa25c819d8';
+    r'0b70af19d83d478009969ad38e481d8e5d977079';
 
 @ProviderFor(MapCenter)
 const mapCenterProvider = MapCenterProvider._();
@@ -88,7 +88,7 @@ final class MapCenterProvider extends $NotifierProvider<MapCenter, LatLng> {
   }
 }
 
-String _$mapCenterHash() => r'7680730805d74a56cef3ff79aa3604e4e6f34947';
+String _$mapCenterHash() => r'9c87207bc06425e6eb36c2d0ac35f50f91878405';
 
 abstract class _$MapCenter extends $Notifier<LatLng> {
   LatLng build();
@@ -214,6 +214,219 @@ abstract class _$ConnectorFilter extends $Notifier<Set<String>> {
   }
 }
 
+@ProviderFor(SpeedFilter)
+const speedFilterProvider = SpeedFilterProvider._();
+
+final class SpeedFilterProvider
+    extends $NotifierProvider<SpeedFilter, Set<String>> {
+  const SpeedFilterProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'speedFilterProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$speedFilterHash();
+
+  @$internal
+  @override
+  SpeedFilter create() => SpeedFilter();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<String>>(value),
+    );
+  }
+}
+
+String _$speedFilterHash() => r'e389947777e26684328cff4d5d985d90a176d3ce';
+
+abstract class _$SpeedFilter extends $Notifier<Set<String>> {
+  Set<String> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<Set<String>, Set<String>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Set<String>, Set<String>>,
+              Set<String>,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
+@ProviderFor(PriceFilter)
+const priceFilterProvider = PriceFilterProvider._();
+
+final class PriceFilterProvider
+    extends $NotifierProvider<PriceFilter, Set<String>> {
+  const PriceFilterProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'priceFilterProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$priceFilterHash();
+
+  @$internal
+  @override
+  PriceFilter create() => PriceFilter();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<String>>(value),
+    );
+  }
+}
+
+String _$priceFilterHash() => r'04a977b0d5e12f3c1a2953270a3af076c74a8f93';
+
+abstract class _$PriceFilter extends $Notifier<Set<String>> {
+  Set<String> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<Set<String>, Set<String>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Set<String>, Set<String>>,
+              Set<String>,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
+@ProviderFor(AvailableNowFilter)
+const availableNowFilterProvider = AvailableNowFilterProvider._();
+
+final class AvailableNowFilterProvider
+    extends $NotifierProvider<AvailableNowFilter, bool> {
+  const AvailableNowFilterProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'availableNowFilterProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$availableNowFilterHash();
+
+  @$internal
+  @override
+  AvailableNowFilter create() => AvailableNowFilter();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$availableNowFilterHash() =>
+    r'29d25a0ed067cf658372e80f4cba0216f3db0d83';
+
+abstract class _$AvailableNowFilter extends $Notifier<bool> {
+  bool build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<bool, bool>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<bool, bool>,
+              bool,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
+@ProviderFor(AccessFilter)
+const accessFilterProvider = AccessFilterProvider._();
+
+final class AccessFilterProvider
+    extends $NotifierProvider<AccessFilter, Set<String>> {
+  const AccessFilterProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'accessFilterProvider',
+        isAutoDispose: true,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$accessFilterHash();
+
+  @$internal
+  @override
+  AccessFilter create() => AccessFilter();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Set<String> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Set<String>>(value),
+    );
+  }
+}
+
+String _$accessFilterHash() => r'5fff750948aeddf436aa6f91667885e957228406';
+
+abstract class _$AccessFilter extends $Notifier<Set<String>> {
+  Set<String> build();
+  @$mustCallSuper
+  @override
+  void runBuild() {
+    final created = build();
+    final ref = this.ref as $Ref<Set<String>, Set<String>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Set<String>, Set<String>>,
+              Set<String>,
+              Object?,
+              Object?
+            >;
+    element.handleValue(ref, created);
+  }
+}
+
 @ProviderFor(stations)
 const stationsProvider = StationsProvider._();
 
@@ -253,4 +466,4 @@ final class StationsProvider
   }
 }
 
-String _$stationsHash() => r'048d1e03bbfb8d12502adc6a1a28aa581baf58bb';
+String _$stationsHash() => r'1e4e20dc72147675bb88497b25e3c9b32740310e';

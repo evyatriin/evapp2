@@ -18,6 +18,17 @@ class AppDrawer extends ConsumerStatefulWidget {
 class _AppDrawerState extends ConsumerState<AppDrawer> {
   static const _supportEmail = 'hey@evraahein.app';
   static const _websiteUrl = 'https://www.evraahein.app/';
+  static const _hostGuidelinesText =
+      'Host Guidelines\n\n'
+      'Private hosted chargers on EVraahein are meant for temporary EV charging access between users. Hosts should share only chargers they control, keep access instructions accurate, and respond clearly before travellers arrive.\n\n'
+      'Hosts should avoid presenting listings as public charging stations, should use manual UPI or direct payment for MVP coordination, and should disclose parking limits, visitor access requirements, and connector details honestly.\n\n'
+      'Apartment or gated-community hosts should ensure visitors are actually permitted before listing.\n\n'
+      'Upload charger and parking photos when possible to improve traveller trust.';
+  static const _chargingSafetyPolicyText =
+      'Charging Safety Policy\n\n'
+      'Hosted chargers should be properly earthed, protected by MCB/RCCB devices, protected from unsafe water exposure, and free from loose extension wiring.\n\n'
+      'Hosts are responsible for maintaining safe parking access, avoiding cable obstruction across public roads, and ensuring travellers can approach and charge without creating obvious hazards.\n\n'
+      'EVraahein may remove or flag listings that appear unsafe, misleading, inaccessible, or non-compliant with community rules.';
   static const _termsText =
       'Terms of Use\n\n'
       'Effective date: April 27, 2026\n\n'
@@ -26,6 +37,7 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
       'You may submit content such as profile details, charger listings, check-ins, photos, and charging slips. You confirm that you have the right to share that content and that it does not violate another person’s privacy or rights.\n\n'
       'EVraahein may remove abusive, misleading, unsafe, or fraudulent content, restrict access to community features, or suspend accounts that misuse the service.\n\n'
       'Routing, charger, and availability data may come from third parties and community submissions. EVraahein does not guarantee uninterrupted service, complete coverage, or real-time station accuracy.\n\n'
+      'Community Charging listings are privately hosted chargers shared by individual users. EVraahein facilitates discovery and request coordination only, and does not act as a regulated public charging operator, guaranteed charging network, or electricity reseller.\n\n'
       'To the maximum extent allowed by law, EVraahein is provided on an as-available basis and is not liable for indirect losses, missed charging opportunities, or damages arising from reliance on route, charger, or community information.\n\n'
       'If you delete your account, EVraahein will attempt to remove your profile, vehicles, saved items, check-ins, and other account-linked data from active systems, subject to legal, security, fraud-prevention, and backup-retention needs.\n\n'
       'Questions about these terms can be sent to hey@evraahein.app.';
@@ -174,7 +186,7 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
           ListTile(
             leading: Icon(PhosphorIcons.houseLine(PhosphorIconsStyle.duotone)),
             title: const Text('Community Charging'),
-            subtitle: const Text('Host your charger or manage requests'),
+            subtitle: const Text('Private charger sharing and request coordination'),
             onTap: () {
               Navigator.pop(context);
               context.push('/community-charging');
@@ -302,6 +314,32 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
             onTap: () {
               Navigator.pop(context);
               _showDocumentDialog(context, 'Terms of Use', _termsText);
+            },
+          ),
+
+          ListTile(
+            leading: Icon(PhosphorIcons.handshake(PhosphorIconsStyle.duotone)),
+            title: const Text('Host Guidelines'),
+            onTap: () {
+              Navigator.pop(context);
+              _showDocumentDialog(
+                context,
+                'Host Guidelines',
+                _hostGuidelinesText,
+              );
+            },
+          ),
+
+          ListTile(
+            leading: Icon(PhosphorIcons.shieldWarning(PhosphorIconsStyle.duotone)),
+            title: const Text('Charging Safety Policy'),
+            onTap: () {
+              Navigator.pop(context);
+              _showDocumentDialog(
+                context,
+                'Charging Safety Policy',
+                _chargingSafetyPolicyText,
+              );
             },
           ),
 

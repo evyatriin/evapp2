@@ -58,6 +58,19 @@ class NormalizedCharger:
     is_accepting_requests: bool = False
     parking_notes: Optional[str] = None
     house_rules: Optional[str] = None
+    charger_photos: list[str] = field(default_factory=list)
+    parking_photos: list[str] = field(default_factory=list)
+    property_type: Optional[str] = None
+    visitor_access_type: Optional[str] = None
+    available_hours: Optional[str] = None
+    vehicle_size_support: list[str] = field(default_factory=list)
+    location_access_checks: dict[str, bool] = field(default_factory=dict)
+    safety_checks: dict[str, bool] = field(default_factory=dict)
+    host_declarations: dict[str, bool] = field(default_factory=dict)
+    declaration_version: Optional[str] = None
+    declarations_completed_at: Optional[str] = None
+    moderation_flags: list[str] = field(default_factory=list)
+    verification_badges: dict[str, bool] = field(default_factory=dict)
     verified_by: str = "EVraahein"
     freshness_score: Optional[int] = None
     last_verified: Optional[str] = None
@@ -77,6 +90,10 @@ class NormalizedCharger:
         self.connector_types = _unique_strings(self.connector_types)
         self.amenities = _unique_strings(self.amenities)
         self.available_days = _unique_strings(self.available_days)
+        self.charger_photos = _unique_strings(self.charger_photos)
+        self.parking_photos = _unique_strings(self.parking_photos)
+        self.vehicle_size_support = _unique_strings(self.vehicle_size_support)
+        self.moderation_flags = _unique_strings(self.moderation_flags)
         self.verified_by = self.verified_by or "EVraahein"
         self.source_priority = SOURCE_PRIORITY.get(self.source_name, 0)
         if not self.data_sources:
@@ -132,6 +149,19 @@ class NormalizedCharger:
             "is_accepting_requests": self.is_accepting_requests,
             "parking_notes": self.parking_notes,
             "house_rules": self.house_rules,
+            "charger_photos": self.charger_photos,
+            "parking_photos": self.parking_photos,
+            "property_type": self.property_type,
+            "visitor_access_type": self.visitor_access_type,
+            "available_hours": self.available_hours,
+            "vehicle_size_support": self.vehicle_size_support,
+            "location_access_checks": self.location_access_checks,
+            "safety_checks": self.safety_checks,
+            "host_declarations": self.host_declarations,
+            "declaration_version": self.declaration_version,
+            "declarations_completed_at": self.declarations_completed_at,
+            "moderation_flags": self.moderation_flags,
+            "verification_badges": self.verification_badges,
         }
 
     def to_canonical_upsert(self) -> dict[str, Any]:
@@ -373,9 +403,22 @@ async def _fetch_legacy_db_stations(
                 available_from=str(row.get("available_from")) if row.get("available_from") else None,
                 available_to=str(row.get("available_to")) if row.get("available_to") else None,
                 available_days=list(row.get("available_days") or []),
+                available_hours=row.get("available_hours"),
                 is_accepting_requests=bool(row.get("is_accepting_requests") or False),
                 parking_notes=row.get("parking_notes"),
                 house_rules=row.get("house_rules"),
+                charger_photos=list(row.get("charger_photos") or []),
+                parking_photos=list(row.get("parking_photos") or []),
+                property_type=row.get("property_type"),
+                visitor_access_type=row.get("visitor_access_type"),
+                vehicle_size_support=list(row.get("vehicle_size_support") or []),
+                location_access_checks=dict(row.get("location_access_checks") or {}),
+                safety_checks=dict(row.get("safety_checks") or {}),
+                host_declarations=dict(row.get("host_declarations") or {}),
+                declaration_version=row.get("declaration_version"),
+                declarations_completed_at=_as_iso(row.get("declarations_completed_at")),
+                moderation_flags=list(row.get("moderation_flags") or []),
+                verification_badges=dict(row.get("verification_badges") or {}),
                 verified_by="EVraahein Community",
                 freshness_score=_build_freshness_score(row.get("updated_at"), row.get("created_at")),
                 last_verified=_as_iso(row.get("updated_at") or row.get("created_at")),
@@ -857,10 +900,26 @@ def _merge_into(target: NormalizedCharger, incoming: NormalizedCharger) -> None:
     target.price_per_session = _pick_preferred_number(target.price_per_session, incoming.price_per_session)
     target.available_from = _pick_preferred_text(target.available_from, incoming.available_from, target.source_priority, incoming.source_priority)
     target.available_to = _pick_preferred_text(target.available_to, incoming.available_to, target.source_priority, incoming.source_priority)
+    target.available_hours = _pick_preferred_text(target.available_hours, incoming.available_hours, target.source_priority, incoming.source_priority)
     target.available_days = _unique_strings(target.available_days + incoming.available_days)
     target.is_accepting_requests = target.is_accepting_requests or incoming.is_accepting_requests
     target.parking_notes = _pick_preferred_text(target.parking_notes, incoming.parking_notes, target.source_priority, incoming.source_priority)
     target.house_rules = _pick_preferred_text(target.house_rules, incoming.house_rules, target.source_priority, incoming.source_priority)
+    target.charger_photos = _unique_strings(target.charger_photos + incoming.charger_photos)
+    target.parking_photos = _unique_strings(target.parking_photos + incoming.parking_photos)
+    target.property_type = _pick_preferred_text(target.property_type, incoming.property_type, target.source_priority, incoming.source_priority)
+    target.visitor_access_type = _pick_preferred_text(target.visitor_access_type, incoming.visitor_access_type, target.source_priority, incoming.source_priority)
+    target.vehicle_size_support = _unique_strings(target.vehicle_size_support + incoming.vehicle_size_support)
+    target.location_access_checks = target.location_access_checks or incoming.location_access_checks
+    target.safety_checks = target.safety_checks or incoming.safety_checks
+    target.host_declarations = target.host_declarations or incoming.host_declarations
+    target.declaration_version = _pick_preferred_text(target.declaration_version, incoming.declaration_version, target.source_priority, incoming.source_priority)
+    target.declarations_completed_at = _pick_latest_iso(target.declarations_completed_at, incoming.declarations_completed_at)
+    target.moderation_flags = _unique_strings(target.moderation_flags + incoming.moderation_flags)
+    target.verification_badges = {
+        **incoming.verification_badges,
+        **target.verification_badges,
+    }
     target.freshness_score = _pick_preferred_int(target.freshness_score, incoming.freshness_score)
     target.last_verified = _pick_latest_iso(target.last_verified, incoming.last_verified)
     target.rating = _pick_preferred_number(target.rating, incoming.rating)
@@ -1131,9 +1190,22 @@ def _legacy_row_to_normalized_charger(
         available_from=str(row.get("available_from")) if row.get("available_from") else None,
         available_to=str(row.get("available_to")) if row.get("available_to") else None,
         available_days=list(row.get("available_days") or []),
+        available_hours=row.get("available_hours"),
         is_accepting_requests=bool(row.get("is_accepting_requests") or False),
         parking_notes=row.get("parking_notes"),
         house_rules=row.get("house_rules"),
+        charger_photos=list(row.get("charger_photos") or []),
+        parking_photos=list(row.get("parking_photos") or []),
+        property_type=row.get("property_type"),
+        visitor_access_type=row.get("visitor_access_type"),
+        vehicle_size_support=list(row.get("vehicle_size_support") or []),
+        location_access_checks=dict(row.get("location_access_checks") or {}),
+        safety_checks=dict(row.get("safety_checks") or {}),
+        host_declarations=dict(row.get("host_declarations") or {}),
+        declaration_version=row.get("declaration_version"),
+        declarations_completed_at=_as_iso(row.get("declarations_completed_at")),
+        moderation_flags=list(row.get("moderation_flags") or []),
+        verification_badges=dict(row.get("verification_badges") or {}),
         verified_by="EVraahein Community",
         freshness_score=_build_freshness_score(row.get("updated_at"), row.get("created_at")),
         last_verified=_as_iso(row.get("updated_at") or row.get("created_at")),

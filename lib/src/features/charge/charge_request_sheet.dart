@@ -142,10 +142,20 @@ class _ChargeRequestSheetState extends ConsumerState<ChargeRequestSheet> {
     final theme = Theme.of(context);
     final station = widget.station;
     final availabilityBits = <String>[
+      if ((station.availableHours ?? '').isNotEmpty) station.availableHours!,
       if (station.availableDays.isNotEmpty) station.availableDays.join(', '),
       if ((station.availableFrom ?? '').isNotEmpty ||
           (station.availableTo ?? '').isNotEmpty)
         '${station.availableFrom ?? '--'} - ${station.availableTo ?? '--'}',
+    ];
+    final trustIndicators = <String>[
+      if (station.verificationBadges['phone_verified'] == true) 'Phone verified',
+      if (station.verificationBadges['charger_photo_uploaded'] == true)
+        'Charger photo uploaded',
+      if (station.verificationBadges['parking_photo_uploaded'] == true)
+        'Parking photo uploaded',
+      if (station.verificationBadges['responsive_host'] == true) 'Responsive host',
+      if (station.verificationBadges['repeat_host'] == true) 'Repeat host',
     ];
 
     return Padding(
@@ -158,7 +168,7 @@ class _ChargeRequestSheetState extends ConsumerState<ChargeRequestSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Request Charging',
+                'Request Charging Access',
                 style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),
@@ -170,14 +180,29 @@ class _ChargeRequestSheetState extends ConsumerState<ChargeRequestSheet> {
                   color: theme.colorScheme.primary,
                 ),
               ),
+              const Gap(10),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  'This is a privately hosted charger shared by an individual host. Verify connector compatibility, parking suitability, and availability before arrival.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
               const Gap(12),
               if (station.pricePerKwh != null || station.pricePerSession != null)
                 Text(
                   [
                     if (station.pricePerKwh != null)
-                      'Rs ${station.pricePerKwh!.toStringAsFixed(0)}/kWh',
+                      'Suggested energy access ₹${station.pricePerKwh!.toStringAsFixed(0)}/kWh',
                     if (station.pricePerSession != null)
-                      'Rs ${station.pricePerSession!.toStringAsFixed(0)}/session',
+                      'Session amount ₹${station.pricePerSession!.toStringAsFixed(0)}',
                   ].join(' • '),
                 ),
               if (availabilityBits.isNotEmpty) ...[
@@ -187,6 +212,30 @@ class _ChargeRequestSheetState extends ConsumerState<ChargeRequestSheet> {
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
+                ),
+              ],
+              if ((station.visitorAccessType ?? '').isNotEmpty) ...[
+                const Gap(6),
+                Text(
+                  'Visitor access: ${station.visitorAccessType}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+              if (trustIndicators.isNotEmpty) ...[
+                const Gap(10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: trustIndicators
+                      .map(
+                        (label) => Chip(
+                          visualDensity: VisualDensity.compact,
+                          label: Text(label),
+                        ),
+                      )
+                      .toList(),
                 ),
               ],
               const Gap(16),
@@ -255,7 +304,7 @@ class _ChargeRequestSheetState extends ConsumerState<ChargeRequestSheet> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Send Request'),
+                      : const Text('Send Access Request'),
                 ),
               ),
             ],

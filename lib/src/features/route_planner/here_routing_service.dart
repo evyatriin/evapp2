@@ -49,16 +49,30 @@ class HereRoutingService {
         throw Exception('Unexpected route response from server');
       }
 
+      debugPrint('Raw route response: $response');
+
       final routes =
           response
               .cast<Map<String, dynamic>>()
-              .map(RouteModel.fromJson)
+              .map((routeJson) {
+                debugPrint('Route JSON: $routeJson');
+                debugPrint('Has elevationProfile: ${routeJson.containsKey('elevationProfile')}');
+                if (routeJson.containsKey('elevationProfile')) {
+                  debugPrint('Elevation profile value: ${routeJson['elevationProfile']}');
+                }
+                return RouteModel.fromJson(routeJson);
+              })
               .toList();
 
       if (routes.isEmpty) {
         throw Exception(
           'No route options were returned. Try different locations or charge settings.',
         );
+      }
+
+      debugPrint('Successfully parsed ${routes.length} routes');
+      for (var i = 0; i < routes.length; i++) {
+        debugPrint('Route $i - has elevation profile: ${routes[i].elevationProfile != null}');
       }
 
       return routes;
