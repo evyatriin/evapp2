@@ -125,7 +125,7 @@ async def _fetch_here_route(params: dict[str, str]) -> dict[str, Any]:
 
 async def _fetch_elevation_data(polyline_points: list[dict[str, float]]) -> Optional[ElevationProfile]:
     """
-    Fetch elevation data from Open Elevation API for a polyline.
+    Fetch elevation data from Google Maps Elevation API (reliable alternative to Open Elevation).
     Samples the polyline to reduce API calls and interpolates missing points.
     """
     import logging
@@ -139,27 +139,35 @@ async def _fetch_elevation_data(polyline_points: list[dict[str, float]]) -> Opti
         logging.info("Elevation is disabled in settings")
         return None
 
+    if not settings.GOOGLE_MAPS_API_KEY:
+        logging.warning("Google Maps API key not configured for elevation data")
+        return None
+
     try:
         # Sample polyline to reduce API calls (target 100-150 points, max 512 per API call)
-        sampled_indices = _sample_polyline(len(polyline_points))
+        sampled_indices = _sample_polyline(len(polyline_points), target_samples=100)
         sampled_points = [polyline_points[i] for i in sampled_indices]
 
-        # Prepare API request
-        locations = [
-            {"latitude": p["latitude"], "longitude": p["longitude"]}
+        # Prepare Google Maps Elevation API request
+        # Format: locations=lat1,lng1|lat2,lng2|...
+        locations_str = "|".join([
+            f"{p['latitude']},{p['longitude']}"
             for p in sampled_points
-        ]
+        ])
 
-        # Fetch elevations from Open Elevation API
+        # Fetch elevations from Google Maps Elevation API (more reliable)
         async with httpx.AsyncClient(timeout=settings.ELEVATION_API_TIMEOUT_SECONDS) as client:
-            response = await client.post(
-                settings.OPEN_ELEVATION_API_URL,
-                json={"locations": locations}
-            )
+            url = "https://maps.googleapis.com/maps/api/elevation/json"
+            params = {
+                "locations": locations_str,
+                "key": settings.GOOGLE_MAPS_API_KEY
+            }
+            response = await client.get(url, params=params)
             response.raise_for_status()
             data = response.json()
 
-        if not data.get("results"):
+        if data.get("status") != "OK" or not data.get("results"):
+            logging.warning(f"Google Elevation API error: {data.get('status')} - {data.get('error_message')}")
             return None
 
         # Map sampled elevations back to original indices
@@ -173,6 +181,7 @@ async def _fetch_elevation_data(polyline_points: list[dict[str, float]]) -> Opti
 
         # Calculate statistics
         elevation_profile = _calculate_elevation_stats(elevation_points)
+        logging.info(f"Successfully calculated elevation: gain={elevation_profile.elevation_gain_m}m, loss={elevation_profile.elevation_loss_m}m")
         return elevation_profile
 
     except Exception as e:

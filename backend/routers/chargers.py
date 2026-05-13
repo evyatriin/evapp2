@@ -1331,12 +1331,13 @@ async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
             return sampled
 
         def perpendicular_distance_to_polyline(lat: float, lng: float, polyline: List[dict]) -> float:
-            """Calculate perpendicular distance from point to nearest segment in polyline (sampled)"""
+            """Calculate perpendicular distance from point to nearest segment in polyline.
+            Uses accurate cross-track distance formula for geographic coordinates."""
             if not polyline or len(polyline) < 2:
                 return float('inf')
 
-            # Sample polyline to reduce computation (100 points max instead of potentially 1000+)
-            sampled = sample_polyline(polyline, max_samples=100)
+            # Sample polyline to reduce computation (150 points max for better accuracy)
+            sampled = sample_polyline(polyline, max_samples=150)
             min_dist = float('inf')
 
             for i in range(len(sampled) - 1):
@@ -1346,24 +1347,55 @@ async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
                 lat1, lng1 = p1['latitude'], p1['longitude']
                 lat2, lng2 = p2['latitude'], p2['longitude']
 
-                # Calculate segment length
+                # Distance from point to start of segment
+                dist_to_p1 = haversine_distance(lat, lng, lat1, lng1)
+                # Distance from point to end of segment
+                dist_to_p2 = haversine_distance(lat, lng, lat2, lng2)
+                # Distance of segment itself
                 segment_dist = haversine_distance(lat1, lng1, lat2, lng2)
 
-                if segment_dist < 0.01:  # Points too close, use direct distance
-                    dist = haversine_distance(lat, lng, lat1, lng1)
-                    min_dist = min(min_dist, dist)
+                if segment_dist < 0.001:  # Points too close, use direct distance
+                    min_dist = min(min_dist, dist_to_p1)
                     continue
 
-                # Distance from point to endpoints
-                dist_to_p1 = haversine_distance(lat, lng, lat1, lng1)
-                dist_to_p2 = haversine_distance(lat, lng, lat2, lng2)
+                # Use cross-track distance formula (more accurate for geographic data)
+                # Formula: angular_distance * earth_radius
+                lat1_rad = radians(lat1)
+                lat2_rad = radians(lat2)
+                lng1_rad = radians(lng1)
+                lng2_rad = radians(lng2)
+                lat_rad = radians(lat)
+                lng_rad = radians(lng)
 
-                # Use perpendicular distance approximation via cross product
-                # This is faster than full cross-track distance formula
-                cross_dist = abs((lng2 - lng1) * (lat1 - lat) - (lat2 - lat1) * (lng1 - lng))
-                perp_dist = cross_dist / max(0.001, segment_dist * 111.0)  # Convert to km
+                # Cross track distance using Haversine
+                dlon = lng2_rad - lng1_rad
+                dlat = lat2_rad - lat1_rad
 
-                min_dist = min(min_dist, perp_dist, dist_to_p1, dist_to_p2)
+                # Bearing from p1 to p2
+                y = sin(dlon) * cos(lat2_rad)
+                x = cos(lat1_rad) * sin(lat2_rad) - sin(lat1_rad) * cos(lat2_rad) * cos(dlon)
+                bearing_to_p2 = atan2(y, x)
+
+                # Bearing from p1 to target point
+                dlon_to_pt = lng_rad - lng1_rad
+                y = sin(dlon_to_pt) * cos(lat_rad)
+                x = cos(lat1_rad) * sin(lat_rad) - sin(lat1_rad) * cos(lat_rad) * cos(dlon_to_pt)
+                bearing_to_pt = atan2(y, x)
+
+                # Distance from p1 to point
+                dist_p1_to_pt = haversine_distance(lat1, lng1, lat, lng)
+
+                # Cross track distance
+                if dist_p1_to_pt < 0.001:
+                    cross_track_dist = 0
+                else:
+                    bearing_diff = bearing_to_pt - bearing_to_p2
+                    cross_track_dist = abs(asin(sin(dist_p1_to_pt / 6371) * sin(bearing_diff)) * 6371)
+
+                # Use minimum of: perpendicular distance, or distance to either endpoint
+                # This handles cases where closest point is outside the segment
+                point_dist = min(cross_track_dist, dist_to_p1, dist_to_p2)
+                min_dist = min(min_dist, point_dist)
 
             return min_dist
 
@@ -1394,9 +1426,10 @@ async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
 
         all_stations = [row for row in (response.data or []) if _station_is_publicly_visible(row)]
 
-        # Process each charger - ONLY include if within 5km of route
+        # Process each charger - include if within tolerance of route
         chargers_along_route: List[ChargerAlongRoute] = []
-        ROUTE_BUFFER_KM = 5.0  # Only chargers within 5km of the route corridor
+        OPTIMAL_BUFFER_KM = 2.0   # On-route chargers (optimal)
+        ALTERNATIVE_BUFFER_KM = 8.0  # Nearby alternatives (increased from 5km for better coverage)
 
         for station in all_stations:
             lat, lng = station.get('latitude'), station.get('longitude')
@@ -1407,7 +1440,7 @@ async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
             dist_to_route = perpendicular_distance_to_polyline(lat, lng, route_polyline)
 
             # SKIP if too far from the actual route
-            if dist_to_route > ROUTE_BUFFER_KM:
+            if dist_to_route > ALTERNATIVE_BUFFER_KM:
                 continue
 
             # Distance from origin (for sorting)
@@ -1418,9 +1451,8 @@ async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
                 lng
             )
 
-            # Determine if optimal (very close to route, <2km)
-            is_optimal = dist_to_route <= 2.0
-
+            # Determine if optimal (very close to route, <2km) or alternative (2-8km)
+            is_optimal = dist_to_route <= OPTIMAL_BUFFER_KM
             charger_type = "optimal" if is_optimal else "alternative"
 
             chargers_along_route.append(ChargerAlongRoute(
