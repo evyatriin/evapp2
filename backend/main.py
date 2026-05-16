@@ -26,6 +26,9 @@ from routers import (
     news,
     content,
 )
+# Beckn EV charging router — always imported so /feature-flags endpoint is available,
+# but individual routes gate themselves behind settings.BECKN_CHARGING_ENABLED
+from routers import beckn_charging
 from config import settings
 
 sentry_sdk.init(
@@ -92,6 +95,8 @@ app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(gamification.router, prefix="/api/gamification", tags=["Gamification"])
 app.include_router(news.router, prefix="/api/news", tags=["News"])
 app.include_router(content.router, prefix="/api/content", tags=["Content"])
+# Beckn EV charging — mounted at /api/chargers so /feature-flags is at /api/chargers/feature-flags
+app.include_router(beckn_charging.router, prefix="/api/chargers", tags=["Beckn Charging"])
 
 @app.get("/")
 def read_root():

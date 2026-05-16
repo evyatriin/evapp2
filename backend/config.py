@@ -41,4 +41,29 @@ class Settings:
     ELEVATION_API_TIMEOUT_SECONDS = int(_clean_env(os.getenv("ELEVATION_API_TIMEOUT_SECONDS", "30")))
     ELEVATION_ENABLED = _clean_env(os.getenv("ELEVATION_ENABLED", "true")).lower() == "true"
 
+    # ── Beckn EV Charging (disabled by default; set BECKN_CHARGING_ENABLED=true to activate) ──
+    BECKN_CHARGING_ENABLED = _clean_env(os.getenv("BECKN_CHARGING_ENABLED", "false")).lower() == "true"
+
+    # QR code HMAC signing secret — must be 32+ bytes in production
+    QR_SIGNING_SECRET = _clean_env(os.getenv("QR_SIGNING_SECRET", "dev-qr-secret-key-change-in-prod-32b"))
+
+    # Redis — optional; Beckn features degrade gracefully without it
+    REDIS_URL = _clean_env(os.getenv("REDIS_URL", ""))
+
+    # Beckn BAP/BPP identifiers
+    BAP_ID = _clean_env(os.getenv("BAP_ID", "ev-router-bap"))
+    BPP_ID = _clean_env(os.getenv("BPP_ID", "ev-router-bpp"))
+    BACKEND_URL = _clean_env(os.getenv("BACKEND_URL", "http://localhost:8080"))
+
+    # Beckn payment settings
+    PLATFORM_MERCHANT_UPI = _clean_env(os.getenv("PLATFORM_MERCHANT_UPI", "evrouter@paytm"))
+
+    # OCPP settings
+    OCPP_REQUEST_TIMEOUT = int(_clean_env(os.getenv("OCPP_REQUEST_TIMEOUT", "10")))
+    OCPP_START_TIMEOUT = int(_clean_env(os.getenv("OCPP_START_TIMEOUT", "30")))
+
+    # Session lifecycle limits
+    SESSION_PAYMENT_TIMEOUT_MINUTES = int(_clean_env(os.getenv("SESSION_PAYMENT_TIMEOUT_MINUTES", "15")))
+    SESSION_INACTIVITY_TIMEOUT_HOURS = int(_clean_env(os.getenv("SESSION_INACTIVITY_TIMEOUT_HOURS", "6")))
+
 settings = Settings()
