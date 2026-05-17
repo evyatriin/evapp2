@@ -70,7 +70,21 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 
-app = FastAPI(title="EV Router Backend", lifespan=lifespan)
+_is_prod = settings.APP_ENV == "production"
+app = FastAPI(
+    title="EVraahein Backend",
+    description=(
+        "EV routing, charging discovery, OBD telemetry, and Beckn EV charging API. "
+        "Docs are available in non-production environments only."
+    ),
+    version="1.0.0",
+    contact={"name": "EVraahein Support", "email": "pidaparthy@gmail.com"},
+    license_info={"name": "Proprietary"},
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
+    openapi_url=None if _is_prod else "/openapi.json",
+    lifespan=lifespan,
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
