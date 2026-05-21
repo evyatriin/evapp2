@@ -28,6 +28,7 @@ class ReportRequest(BaseModel):
 
 class UpdateProfileRequest(BaseModel):
     user_id: str
+    name: Optional[str] = None
     preferences: Optional[Dict[str, Any]] = {}
     phone_number: Optional[str] = None
     is_phone_verified: Optional[bool] = None
@@ -190,7 +191,10 @@ async def update_profile(
         if request.vehicle_details:
             current_prefs["vehicle_details"] = request.vehicle_details
             
-        supabase.table("profiles").update({"preferences": current_prefs}).eq("id", request.user_id).execute()
+        update_payload: Dict[str, Any] = {"preferences": current_prefs}
+        if request.name:
+            update_payload["name"] = request.name
+        supabase.table("profiles").update(update_payload).eq("id", request.user_id).execute()
         return {"status": "success", "message": "Profile updated"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

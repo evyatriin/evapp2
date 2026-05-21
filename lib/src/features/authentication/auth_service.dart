@@ -11,6 +11,7 @@ class AuthService {
   static bool _userBadgesTableAvailable = true;
   static String? _currentAuthToken;
   static String? _currentRefreshToken;
+  static String? _currentUserId;
 
   /// Get the current auth token
   String? getAuthToken() => _currentAuthToken;
@@ -42,6 +43,7 @@ class AuthService {
         if (userData != null && sessionData != null) {
           _currentAuthToken = sessionData['access_token'] as String?;
           _currentRefreshToken = sessionData['refresh_token'] as String?;
+          _currentUserId = userData['id'] as String?;
 
           debugPrint('Signup successful for user: ${userData['email']}');
           return UserProfile(
@@ -83,6 +85,7 @@ class AuthService {
         if (userData != null && sessionData != null) {
           _currentAuthToken = sessionData['access_token'] as String?;
           _currentRefreshToken = sessionData['refresh_token'] as String?;
+          _currentUserId = userData['id'] as String?;
 
           debugPrint('Login successful for user: ${userData['email']}');
           return UserProfile(
@@ -114,10 +117,12 @@ class AuthService {
       }
       _currentAuthToken = null;
       _currentRefreshToken = null;
+      _currentUserId = null;
     } catch (e) {
       debugPrint('Sign out error: $e');
       _currentAuthToken = null;
       _currentRefreshToken = null;
+      _currentUserId = null;
       rethrow;
     }
   }
@@ -140,6 +145,7 @@ class AuthService {
 
       if (response is Map<String, dynamic>) {
         debugPrint('Current user fetched: ${response['email']}');
+        _currentUserId = response['id'] as String?;
         return UserProfile(
           id: response['id'] as String,
           email: response['email'] as String,
@@ -150,6 +156,7 @@ class AuthService {
     } catch (e) {
       debugPrint('Get current user error: $e');
       _currentAuthToken = null;
+      _currentUserId = null;
       return null;
     }
   }
@@ -160,44 +167,42 @@ class AuthService {
   }
 
   /// Get current user ID (stored locally after login)
-  String? get currentUserId => null; // Will be set after login via getCurrentUser()
+  String? get currentUserId => _currentUserId;
 
-  /// Update user profile (name, email) - placeholder for future backend implementation
+  /// Update user profile (name) via backend API.
   Future<UserProfile?> updateProfile({String? name, String? email}) async {
-    try {
-      if (_currentAuthToken == null) {
-        throw Exception('You must be signed in to update your profile.');
-      }
-      // TODO: Implement profile update via backend API
-      return null;
-    } catch (e) {
-      debugPrint('Update profile error: $e');
-      rethrow;
+    if (_currentAuthToken == null || _currentUserId == null) {
+      throw Exception('You must be signed in to update your profile.');
     }
+    await BackendService.put(
+      '/api/users/profile',
+      headers: {'Authorization': 'Bearer $_currentAuthToken'},
+      body: {
+        'user_id': _currentUserId,
+        if (name != null) 'name': name,
+      },
+    );
+    return getCurrentUser();
   }
 
-  /// Change password - placeholder for future backend implementation
+  /// Change password via backend API (requires service role on backend).
   Future<void> changePassword(String newPassword) async {
-    try {
-      if (_currentAuthToken == null) {
-        throw Exception('You must be signed in to change your password.');
-      }
-      // TODO: Implement password change via backend API
-    } catch (e) {
-      debugPrint('Change password error: $e');
-      rethrow;
+    if (_currentAuthToken == null) {
+      throw Exception('You must be signed in to change your password.');
     }
+    await BackendService.post(
+      '/api/auth/change-password',
+      headers: {'Authorization': 'Bearer $_currentAuthToken'},
+      body: {'new_password': newPassword},
+    );
   }
 
-  /// Send password reset email - placeholder for future backend implementation
+  /// Send password reset email. Always succeeds (backend hides enumeration).
   Future<void> sendPasswordResetEmail(String email) async {
-    try {
-      // TODO: Implement password reset via backend API
-      debugPrint('Password reset email request for: $email');
-    } catch (e) {
-      debugPrint('Password reset error: $e');
-      rethrow;
-    }
+    await BackendService.post(
+      '/api/auth/reset-password',
+      body: {'email': email},
+    );
   }
 
   /// Delete user account

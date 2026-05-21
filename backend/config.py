@@ -32,7 +32,9 @@ class Settings:
     OPENCHARGEMAP_API_KEY = _clean_env(os.getenv("OPENCHARGEMAP_API_KEY", ""))
     HERE_API_KEY = _clean_env(os.getenv("HERE_API_KEY", ""))
     APP_ENV = _clean_env(os.getenv("APP_ENV", "development"))
-    ALLOWED_ORIGINS = _parse_allowed_origins(os.getenv("ALLOWED_ORIGINS", "*"))
+    ALLOWED_ORIGINS = _parse_allowed_origins(
+        os.getenv("ALLOWED_ORIGINS", "https://evraahein.app,https://www.evraahein.app")
+    )
     PORT = int(_clean_env(os.getenv("PORT", "8080")))
 
     # Elevation API settings

@@ -13,7 +13,6 @@ import 'route_service.dart';
 import 'saved_route_model.dart';
 import 'widgets/charger_details_sheet.dart';
 import 'widgets/charger_map_marker.dart';
-import 'widgets/chargers_list.dart';
 
 class RouteResultScreen extends StatefulWidget {
   final Map<String, dynamic> extra;

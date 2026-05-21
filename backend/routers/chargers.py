@@ -2,16 +2,19 @@ import logging
 from math import cos, radians
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from pydantic import BaseModel
 from datetime import datetime
 from supabase_client import supabase, service_supabase
 import uuid
 from auth_utils import ensure_same_user, get_authenticated_user, require_auth
-from utils.charger_aggregation import aggregate_chargers_nearby
+from utils.charger_aggregation import aggregate_chargers_nearby, _fetch_open_charge_map_nearby
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+limiter = Limiter(key_func=get_remote_address)
 
 PLATFORM_FEE_PERCENT = 5.0   # 5% of energy cost
 PLATFORM_FEE_MINIMUM_INR = 2.0  # floor so micro-sessions aren't free for the platform
@@ -456,7 +459,9 @@ def _hydrate_request_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # --- Endpoints ---
 
 @router.get("/aggregate", response_model=List[AggregatedChargingStation])
+@limiter.limit("30/minute")
 async def get_aggregated_stations(
+    request: Request,
     lat: float,
     lng: float,
     radius: float = 10.0,
@@ -475,7 +480,8 @@ async def get_aggregated_stations(
         raise HTTPException(status_code=500, detail=f"Error aggregating chargers: {e}")
 
 @router.get("/", response_model=List[ChargingStation])
-async def get_stations(lat: Optional[float] = None, lng: Optional[float] = None, radius: float = 5.0):
+@limiter.limit("60/minute")
+async def get_stations(request: Request, lat: Optional[float] = None, lng: Optional[float] = None, radius: float = 5.0):
     """
     Get charging stations.
     If lat/lng are provided, returns stations within 'radius' km.
@@ -586,7 +592,9 @@ async def create_station(
 
 
 @router.post("/host")
+@limiter.limit("5/minute")
 async def create_or_update_host_station(
+    http_request: Request,
     request: HostChargerRequest,
     auth_user: Dict[str, Any] = Depends(get_authenticated_user),
 ):
@@ -744,7 +752,9 @@ async def get_my_hosted_stations(
 
 
 @router.post("/request")
+@limiter.limit("10/minute")
 async def create_charger_request(
+    http_request: Request,
     request: CreateChargerRequest,
     auth_user: Dict[str, Any] = Depends(get_authenticated_user),
 ):
@@ -1188,7 +1198,8 @@ async def vote_checkin(
         raise HTTPException(status_code=500, detail=f"Error voting checkin: {str(e)}")
 
 @router.post("/upload-checkin-image")
-async def upload_checkin_image(file: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def upload_checkin_image(request: Request, file: UploadFile = File(...)):
     """Upload an image for a check-in to Supabase Storage"""
     try:
         # Validate file type
@@ -1221,7 +1232,8 @@ async def upload_checkin_image(file: UploadFile = File(...)):
 
 
 @router.post("/upload-hosted-charger-image")
-async def upload_hosted_charger_image(file: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def upload_hosted_charger_image(request: Request, file: UploadFile = File(...)):
     """Upload a hosted charger or parking/access image to Supabase Storage."""
     try:
         allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
@@ -1280,7 +1292,8 @@ class SaveChargerRequest(BaseModel):
     station_id: str
 
 @router.post("/along-route", response_model=List[ChargerAlongRoute])
-async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
+@limiter.limit("15/minute")
+async def get_chargers_along_route(http_request: Request, request_data: ChargerOnRouteRequest):
     """
     Get chargers along a route corridor.
     - Creates a 4-5km buffer zone around the actual route
@@ -1288,7 +1301,7 @@ async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
     - Searches along the full route direction (not just from origin)
     """
     try:
-        from math import radians, cos, sin, asin, sqrt, atan2, degrees
+        from math import radians, cos, sin, asin, acos, sqrt, atan2, degrees
 
         def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
             """Calculate distance between two points in km"""
@@ -1330,36 +1343,32 @@ async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
             sampled.append(polyline[-1])  # Always include end
             return sampled
 
-        def perpendicular_distance_to_polyline(lat: float, lng: float, polyline: List[dict]) -> float:
-            """Calculate perpendicular distance from point to nearest segment in polyline.
-            Uses accurate cross-track distance formula for geographic coordinates."""
-            if not polyline or len(polyline) < 2:
-                return float('inf')
+        def closest_point_on_polyline(lat: float, lng: float, sampled: List[dict], cum_distances: List[float]) -> tuple:
+            """Returns (perpendicular_distance_km, along_route_distance_km) for point relative to polyline.
+            Uses pre-sampled polyline and pre-computed cumulative distances."""
+            if not sampled or len(sampled) < 2:
+                return (float('inf'), 0.0)
 
-            # Sample polyline to reduce computation (150 points max for better accuracy)
-            sampled = sample_polyline(polyline, max_samples=150)
-            min_dist = float('inf')
+            R = 6371.0
+            min_perp = float('inf')
+            best_along = 0.0
 
             for i in range(len(sampled) - 1):
                 p1 = sampled[i]
                 p2 = sampled[i + 1]
-
                 lat1, lng1 = p1['latitude'], p1['longitude']
                 lat2, lng2 = p2['latitude'], p2['longitude']
 
-                # Distance from point to start of segment
                 dist_to_p1 = haversine_distance(lat, lng, lat1, lng1)
-                # Distance from point to end of segment
                 dist_to_p2 = haversine_distance(lat, lng, lat2, lng2)
-                # Distance of segment itself
                 segment_dist = haversine_distance(lat1, lng1, lat2, lng2)
 
-                if segment_dist < 0.001:  # Points too close, use direct distance
-                    min_dist = min(min_dist, dist_to_p1)
+                if segment_dist < 0.001:
+                    if dist_to_p1 < min_perp:
+                        min_perp = dist_to_p1
+                        best_along = cum_distances[i]
                     continue
 
-                # Use cross-track distance formula (more accurate for geographic data)
-                # Formula: angular_distance * earth_radius
                 lat1_rad = radians(lat1)
                 lat2_rad = radians(lat2)
                 lng1_rad = radians(lng1)
@@ -1367,11 +1376,8 @@ async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
                 lat_rad = radians(lat)
                 lng_rad = radians(lng)
 
-                # Cross track distance using Haversine
-                dlon = lng2_rad - lng1_rad
-                dlat = lat2_rad - lat1_rad
-
                 # Bearing from p1 to p2
+                dlon = lng2_rad - lng1_rad
                 y = sin(dlon) * cos(lat2_rad)
                 x = cos(lat1_rad) * sin(lat2_rad) - sin(lat1_rad) * cos(lat2_rad) * cos(dlon)
                 bearing_to_p2 = atan2(y, x)
@@ -1382,22 +1388,41 @@ async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
                 x = cos(lat1_rad) * sin(lat_rad) - sin(lat1_rad) * cos(lat_rad) * cos(dlon_to_pt)
                 bearing_to_pt = atan2(y, x)
 
-                # Distance from p1 to point
-                dist_p1_to_pt = haversine_distance(lat1, lng1, lat, lng)
-
-                # Cross track distance
-                if dist_p1_to_pt < 0.001:
-                    cross_track_dist = 0
+                if dist_to_p1 < 0.001:
+                    cross_track = 0.0
+                    along_track = 0.0
                 else:
                     bearing_diff = bearing_to_pt - bearing_to_p2
-                    cross_track_dist = abs(asin(sin(dist_p1_to_pt / 6371) * sin(bearing_diff)) * 6371)
+                    sin_arg = sin(dist_to_p1 / R) * sin(bearing_diff)
+                    sin_arg = max(-1.0, min(1.0, sin_arg))
+                    cross_track = abs(asin(sin_arg) * R)
+                    # Along-track distance along segment to projection of point
+                    try:
+                        cos_arg = cos(dist_to_p1 / R) / cos(cross_track / R)
+                        cos_arg = max(-1.0, min(1.0, cos_arg))
+                        along_track = acos(cos_arg) * R
+                        # Sign: if bearing_diff is obtuse, projection lies behind p1
+                        if cos(bearing_diff) < 0:
+                            along_track = -along_track
+                    except (ValueError, ZeroDivisionError):
+                        along_track = dist_to_p1
 
-                # Use minimum of: perpendicular distance, or distance to either endpoint
-                # This handles cases where closest point is outside the segment
-                point_dist = min(cross_track_dist, dist_to_p1, dist_to_p2)
-                min_dist = min(min_dist, point_dist)
+                # Clamp projection to segment endpoints
+                if along_track <= 0:
+                    cand_perp = dist_to_p1
+                    cand_along = cum_distances[i]
+                elif along_track >= segment_dist:
+                    cand_perp = dist_to_p2
+                    cand_along = cum_distances[i + 1]
+                else:
+                    cand_perp = cross_track
+                    cand_along = cum_distances[i] + along_track
 
-            return min_dist
+                if cand_perp < min_perp:
+                    min_perp = cand_perp
+                    best_along = cand_along
+
+            return (min_perp, best_along)
 
         # Use polyline if provided, otherwise create one from origin/destination
         if request_data.polyline and len(request_data.polyline) > 0:
@@ -1426,30 +1451,34 @@ async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
 
         all_stations = [row for row in (response.data or []) if _station_is_publicly_visible(row)]
 
+        # Pre-sample polyline once and pre-compute cumulative along-route distances
+        sampled_polyline = sample_polyline(route_polyline, max_samples=150)
+        cum_distances = [0.0]
+        for i in range(1, len(sampled_polyline)):
+            d = haversine_distance(
+                sampled_polyline[i - 1]['latitude'], sampled_polyline[i - 1]['longitude'],
+                sampled_polyline[i]['latitude'], sampled_polyline[i]['longitude'],
+            )
+            cum_distances.append(cum_distances[-1] + d)
+
         # Process each charger - include if within tolerance of route
         chargers_along_route: List[ChargerAlongRoute] = []
         OPTIMAL_BUFFER_KM = 2.0   # On-route chargers (optimal)
-        ALTERNATIVE_BUFFER_KM = 8.0  # Nearby alternatives (increased from 5km for better coverage)
+        ALTERNATIVE_BUFFER_KM = 15.0  # Nearby alternatives (widened from 8km to surface more chargers along corridor)
 
         for station in all_stations:
             lat, lng = station.get('latitude'), station.get('longitude')
             if lat is None or lng is None:
                 continue
 
-            # Calculate perpendicular distance to route
-            dist_to_route = perpendicular_distance_to_polyline(lat, lng, route_polyline)
+            # Calculate perpendicular distance and along-route distance
+            dist_to_route, dist_from_origin = closest_point_on_polyline(
+                lat, lng, sampled_polyline, cum_distances
+            )
 
             # SKIP if too far from the actual route
             if dist_to_route > ALTERNATIVE_BUFFER_KM:
                 continue
-
-            # Distance from origin (for sorting)
-            dist_from_origin = haversine_distance(
-                request_data.origin_lat,
-                request_data.origin_lng,
-                lat,
-                lng
-            )
 
             # Determine if optimal (very close to route, <2km) or alternative (2-8km)
             is_optimal = dist_to_route <= OPTIMAL_BUFFER_KM
@@ -1469,10 +1498,72 @@ async def get_chargers_along_route(request_data: ChargerOnRouteRequest):
                 charger_type=charger_type
             ))
 
+        # OCM fallback: if our DB is sparse for this corridor, query OpenChargeMap
+        # at points sampled along the route and merge.
+        OCM_MIN_THRESHOLD = 5
+        if len(chargers_along_route) < OCM_MIN_THRESHOLD and sampled_polyline:
+            try:
+                seen_ids = {c.id for c in chargers_along_route}
+                # Sample ~6 query points along the route (every ~100km on a 600km route)
+                route_len_km = cum_distances[-1] if cum_distances else 0.0
+                step_km = max(40.0, route_len_km / 6.0) if route_len_km > 0 else 50.0
+                query_points: List[tuple] = []
+                target = 0.0
+                idx = 0
+                while target <= route_len_km and idx < len(cum_distances):
+                    while idx < len(cum_distances) - 1 and cum_distances[idx + 1] < target:
+                        idx += 1
+                    query_points.append((sampled_polyline[idx]['latitude'], sampled_polyline[idx]['longitude']))
+                    target += step_km
+
+                ocm_chargers = []
+                for q_lat, q_lng in query_points:
+                    try:
+                        fetched = await _fetch_open_charge_map_nearby(q_lat, q_lng, radius_km=30.0)
+                        ocm_chargers.extend(fetched)
+                    except Exception as ocm_err:
+                        logger.warning(f"OCM fetch failed at ({q_lat},{q_lng}): {ocm_err}")
+
+                # Dedupe by source_station_id and project onto route
+                ocm_seen = set()
+                for nc in ocm_chargers:
+                    key = (nc.source_name, nc.source_station_id)
+                    if key in ocm_seen:
+                        continue
+                    ocm_seen.add(key)
+                    lat, lng = nc.latitude, nc.longitude
+                    if lat is None or lng is None:
+                        continue
+                    dist_to_route, dist_from_origin = closest_point_on_polyline(
+                        lat, lng, sampled_polyline, cum_distances
+                    )
+                    if dist_to_route > ALTERNATIVE_BUFFER_KM:
+                        continue
+                    is_optimal = dist_to_route <= OPTIMAL_BUFFER_KM
+                    ocm_id = f"ocm:{nc.source_station_id}"
+                    if ocm_id in seen_ids:
+                        continue
+                    chargers_along_route.append(ChargerAlongRoute(
+                        id=ocm_id,
+                        name=nc.name or "Charging Station",
+                        latitude=lat,
+                        longitude=lng,
+                        address=nc.address,
+                        provider=nc.provider,
+                        connector_types=nc.connector_types or [],
+                        power_kw=nc.power_kw,
+                        distance_from_origin_km=round(dist_from_origin, 1),
+                        is_optimal=is_optimal,
+                        charger_type="optimal" if is_optimal else "alternative",
+                    ))
+                logger.info(f"OCM fallback added {len(chargers_along_route) - len(seen_ids)} chargers")
+            except Exception as fallback_err:
+                logger.warning(f"OCM fallback failed: {fallback_err}")
+
         # Sort by distance from origin
         chargers_along_route.sort(key=lambda c: c.distance_from_origin_km)
 
-        logger.info(f"Found {len(chargers_along_route)} chargers within 5km of route")
+        logger.info(f"Found {len(chargers_along_route)} chargers along route")
         return chargers_along_route
 
     except Exception as e:

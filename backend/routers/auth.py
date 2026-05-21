@@ -1,10 +1,14 @@
-from fastapi import APIRouter, HTTPException, Header, Request
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel, EmailStr
-from typing import Optional
-from supabase_client import supabase
+from typing import Any, Dict, Optional
+from supabase_client import supabase, service_supabase
 from metrics_tracker import track_user_event
+from auth_utils import get_authenticated_user
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -21,6 +25,12 @@ class SignInRequest(BaseModel):
 class AuthResponse(BaseModel):
     user: dict
     session: dict
+
+class ChangePasswordRequest(BaseModel):
+    new_password: str
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
 
 @router.post("/signup", response_model=AuthResponse)
 @limiter.limit("3/minute")  # SECURITY FIX: Prevent signup spam
@@ -138,3 +148,38 @@ async def get_current_user(authorization: Optional[str] = Header(None)):
             raise HTTPException(status_code=401, detail="Invalid token")
     except Exception as e:
         raise HTTPException(status_code=401, detail=str(e))
+
+
+@router.post("/change-password")
+@limiter.limit("5/minute")
+async def change_password(
+    request: Request,
+    body: ChangePasswordRequest,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    """Change password for the authenticated user using service role."""
+    if not service_supabase:
+        raise HTTPException(status_code=503, detail="Service role not configured")
+    try:
+        service_supabase.auth.admin.update_user_by_id(
+            auth_user["user_id"],
+            {"password": body.new_password},
+        )
+        return {"status": "success"}
+    except Exception as e:
+        logger.warning("change_password failed for %s: %s", auth_user.get("user_id"), e)
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/reset-password")
+@limiter.limit("3/minute")
+async def reset_password(request: Request, body: ResetPasswordRequest):
+    """Send a password-reset email via Supabase. Always returns 200 to prevent enumeration."""
+    try:
+        supabase.auth.reset_password_for_email(
+            body.email,
+            options={"redirect_to": "https://evraahein.app/reset.html"},
+        )
+    except Exception as e:
+        logger.warning("reset_password email error for %s: %s", body.email, e)
+    return {"status": "success"}

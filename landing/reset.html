@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reset Password – EVraahein</title>
+  <link rel="icon" type="image/png" href="app_icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --cyan: #00e5ff; --green: #00e676; --dark: #060d1b; --border: rgba(0,229,255,0.12); }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--dark); color: #d0e8f4; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .glow { position: fixed; top: -20%; left: 50%; transform: translateX(-50%); width: 600px; height: 400px; background: radial-gradient(ellipse, rgba(0,229,255,0.07) 0%, transparent 70%); pointer-events: none; }
+    .card { position: relative; z-index: 1; width: 100%; max-width: 420px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 20px; padding: 40px 36px; }
+    .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; margin-bottom: 32px; }
+    .logo img { width: 32px; height: 32px; border-radius: 8px; box-shadow: 0 0 12px rgba(0,229,255,0.3); }
+    .logo-text { font-family: 'Outfit', sans-serif; font-size: 1.2rem; font-weight: 900; background: linear-gradient(90deg, var(--cyan), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    h1 { font-family: 'Outfit', sans-serif; font-size: 1.5rem; font-weight: 800; color: #fff; margin-bottom: 8px; }
+    .subtitle { font-size: 0.88rem; color: rgba(255,255,255,0.45); margin-bottom: 28px; }
+    label { display: block; font-size: 0.82rem; font-weight: 500; color: rgba(255,255,255,0.55); margin-bottom: 6px; }
+    input[type="password"] { width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 10px; padding: 12px 14px; color: #fff; font-size: 0.95rem; font-family: inherit; outline: none; transition: border-color 0.2s; margin-bottom: 14px; }
+    input[type="password"]:focus { border-color: var(--cyan); }
+    button { width: 100%; background: linear-gradient(135deg, var(--cyan), var(--green)); border: none; border-radius: 10px; padding: 13px; font-family: 'Outfit', sans-serif; font-size: 1rem; font-weight: 700; color: #060d1b; cursor: pointer; transition: opacity 0.2s; margin-top: 4px; }
+    button:hover { opacity: 0.9; }
+    button:disabled { opacity: 0.4; cursor: default; }
+    .message { margin-top: 18px; padding: 12px 16px; border-radius: 10px; font-size: 0.87rem; text-align: center; display: none; }
+    .message.success { background: rgba(0,230,118,0.08); border: 1px solid rgba(0,230,118,0.2); color: #69f0ae; }
+    .message.error { background: rgba(255,82,82,0.08); border: 1px solid rgba(255,82,82,0.2); color: #ff8a80; }
+    .back { display: block; text-align: center; margin-top: 20px; font-size: 0.82rem; color: rgba(255,255,255,0.35); text-decoration: none; }
+    .back:hover { color: var(--cyan); }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="card">
+    <a class="logo" href="/">
+      <img src="app_icon.png" alt="EVraahein" />
+      <span class="logo-text">EVraahein</span>
+    </a>
+    <h1>Set new password</h1>
+    <p class="subtitle">Enter a new password for your account. You will be signed in automatically after saving.</p>
+
+    <form id="resetForm">
+      <label for="password">New password</label>
+      <input type="password" id="password" placeholder="At least 8 characters" minlength="8" required />
+      <label for="confirm">Confirm password</label>
+      <input type="password" id="confirm" placeholder="Repeat password" minlength="8" required />
+      <button type="submit" id="submitBtn">Save new password</button>
+    </form>
+
+    <div class="message" id="msg"></div>
+    <a class="back" href="/">← Back to EVraahein</a>
+  </div>
+
+  <!-- Supabase JS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    const SUPABASE_URL = 'https://mzxwbfpxmyjmbfhosgkk.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im16eHdiZnB4bXlqbWJmaG9zZ2trIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ1NTY0NjIsImV4cCI6MjA4MDEzMjQ2Mn0.dX-ZkKDOgXfOeyYrkyA77NLZmM-sWyf2zjXfVp7zFWg';
+    const { createClient } = supabase;
+    const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function showMsg(text, type) {
+      const el = document.getElementById('msg');
+      el.textContent = text;
+      el.className = 'message ' + type;
+      el.style.display = 'block';
+    }
+
+    document.getElementById('resetForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const pw = document.getElementById('password').value;
+      const cf = document.getElementById('confirm').value;
+      if (pw !== cf) { showMsg('Passwords do not match.', 'error'); return; }
+      if (pw.length < 8) { showMsg('Password must be at least 8 characters.', 'error'); return; }
+
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+
+      try {
+        const { error } = await sb.auth.updateUser({ password: pw });
+        if (error) throw error;
+        showMsg('Password updated! You can now sign in with your new password.', 'success');
+        btn.textContent = 'Done';
+      } catch (err) {
+        showMsg(err.message || 'Something went wrong. The reset link may have expired.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Save new password';
+      }
+    });
+  </script>
+</body>
+</html>

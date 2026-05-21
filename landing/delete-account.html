@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Delete Your Account – EVraahein</title>
+  <meta name="description" content="How to delete your EVraahein account and what data is removed." />
+  <link rel="icon" type="image/png" href="app_icon.png" />
+  <link rel="apple-touch-icon" href="app_icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root { --cyan: #00e5ff; --green: #00e676; --dark: #060d1b; --border: rgba(0,229,255,0.12); --red: #ff5252; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: var(--dark); color: #d0e8f4; min-height: 100vh; line-height: 1.7; }
+    .glow { position: fixed; top: -20%; left: 50%; transform: translateX(-50%); width: 800px; height: 400px; background: radial-gradient(ellipse, rgba(0,230,118,0.07) 0%, transparent 70%); pointer-events: none; z-index: 0; }
+    .wrapper { position: relative; z-index: 1; max-width: 780px; margin: 0 auto; padding: 0 24px 80px; }
+    nav { display: flex; align-items: center; justify-content: space-between; padding: 24px 0; border-bottom: 1px solid var(--border); margin-bottom: 56px; }
+    .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+    .logo img { width: 36px; height: 36px; border-radius: 10px; box-shadow: 0 0 16px rgba(0,229,255,0.35); object-fit: cover; }
+    .logo-text { font-family: 'Outfit', sans-serif; font-size: 1.3rem; font-weight: 900; background: linear-gradient(90deg, var(--cyan), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .back-link { font-size: 0.82rem; color: rgba(255,255,255,0.4); text-decoration: none; transition: color 0.2s; }
+    .back-link:hover { color: var(--cyan); }
+    .page-hero { margin-bottom: 48px; }
+    .page-tag { display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; color: var(--red); background: rgba(255,82,82,0.08); border: 1px solid rgba(255,82,82,0.18); padding: 4px 14px; border-radius: 100px; margin-bottom: 16px; }
+    h1 { font-family: 'Outfit', sans-serif; font-size: clamp(1.8rem, 4vw, 2.6rem); font-weight: 800; color: #fff; letter-spacing: -0.8px; margin-bottom: 12px; }
+    .effective { font-size: 0.82rem; color: rgba(255,255,255,0.3); }
+    .doc-body { display: flex; flex-direction: column; gap: 36px; }
+    .section { background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 16px; padding: 28px 32px; }
+    h2 { font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700; color: #fff; margin-bottom: 14px; }
+    p { color: rgba(255,255,255,0.65); font-size: 0.93rem; margin-bottom: 10px; }
+    p:last-child { margin-bottom: 0; }
+    ol, ul { padding-left: 20px; color: rgba(255,255,255,0.65); font-size: 0.93rem; }
+    li { margin-bottom: 8px; }
+    .step-num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(0,229,255,0.15); border: 1px solid rgba(0,229,255,0.3); color: var(--cyan); font-size: 0.72rem; font-weight: 700; flex-shrink: 0; margin-right: 10px; }
+    .step { display: flex; align-items: flex-start; gap: 0; margin-bottom: 12px; color: rgba(255,255,255,0.65); font-size: 0.93rem; }
+    .step:last-child { margin-bottom: 0; }
+    .step-text { flex: 1; }
+    .callout { background: rgba(255,82,82,0.06); border: 1px solid rgba(255,82,82,0.18); border-radius: 12px; padding: 16px 20px; margin-top: 14px; }
+    .callout p { color: rgba(255,200,200,0.8); margin-bottom: 0; }
+    .kept-badge { display: inline-block; font-size: 0.7rem; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; padding: 2px 9px; border-radius: 6px; margin-left: 6px; vertical-align: middle; }
+    .badge-removed { background: rgba(255,82,82,0.12); color: #ff8a80; border: 1px solid rgba(255,82,82,0.2); }
+    .badge-kept { background: rgba(255,193,7,0.1); color: #ffd54f; border: 1px solid rgba(255,193,7,0.2); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 8px; }
+    td, th { padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.06); text-align: left; }
+    th { color: rgba(255,255,255,0.4); font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { color: rgba(255,255,255,0.65); }
+    a { color: var(--cyan); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .contact-box { background: rgba(0,229,255,0.04); border: 1px solid rgba(0,229,255,0.14); border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 6px; }
+    .contact-email { font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 700; color: var(--cyan); }
+    footer { border-top: 1px solid var(--border); padding-top: 28px; margin-top: 60px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .footer-links { display: flex; gap: 20px; flex-wrap: wrap; }
+    .footer-links a { font-size: 0.8rem; color: rgba(255,255,255,0.35); text-decoration: none; transition: color 0.2s; }
+    .footer-links a:hover { color: var(--cyan); }
+    .footer-copy { font-size: 0.78rem; color: rgba(255,255,255,0.2); }
+  </style>
+</head>
+<body>
+  <div class="glow"></div>
+  <div class="wrapper">
+    <nav>
+      <a class="logo" href="/">
+        <img src="app_icon.png" alt="EVraahein" />
+        <span class="logo-text">EVraahein</span>
+      </a>
+      <a class="back-link" href="/">← Back to home</a>
+    </nav>
+
+    <div class="page-hero">
+      <span class="page-tag">Account Deletion</span>
+      <h1>Delete Your Account</h1>
+      <p class="effective">Last updated: May 2026</p>
+    </div>
+
+    <div class="doc-body">
+
+      <div class="section">
+        <h2>How to delete your account</h2>
+        <p>You can delete your EVraahein account at any time using either of the methods below. Deletion is permanent and cannot be undone.</p>
+
+        <p style="margin-top:18px;font-weight:600;color:#fff;font-size:0.93rem;">Option 1 — Delete directly from the app</p>
+        <div style="margin-top:12px;">
+          <div class="step"><span class="step-num">1</span><span class="step-text">Open the <strong style="color:#fff;">EVraahein</strong> app and sign in.</span></div>
+          <div class="step"><span class="step-num">2</span><span class="step-text">Tap the <strong style="color:#fff;">Profile</strong> tab (bottom navigation).</span></div>
+          <div class="step"><span class="step-num">3</span><span class="step-text">Tap <strong style="color:#fff;">Settings</strong> (gear icon, top right).</span></div>
+          <div class="step"><span class="step-num">4</span><span class="step-text">Scroll to the bottom and tap <strong style="color:#fff;">Delete Account</strong>.</span></div>
+          <div class="step"><span class="step-num">5</span><span class="step-text">Confirm the action. Your account and data will be deleted immediately.</span></div>
+        </div>
+
+        <p style="margin-top:22px;font-weight:600;color:#fff;font-size:0.93rem;">Option 2 — Request deletion by email</p>
+        <p>If you no longer have access to the app, email us from the address registered to your account:</p>
+        <div class="contact-box" style="margin-top:10px;">
+          <a class="contact-email" href="mailto:hey@evraahein.app">hey@evraahein.app</a>
+          <p style="margin:0;font-size:0.82rem;">Subject: <em>Account Deletion Request</em><br>Include the email address or phone number on your account. We will process the request within <strong>7 days</strong>.</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>What gets deleted</h2>
+        <p>When your account is deleted, the following data is permanently removed from our systems:</p>
+        <table>
+          <thead>
+            <tr><th>Data type</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Profile (name, email, phone number)</td><td><span class="kept-badge badge-removed">Deleted</span></td></tr>
+            <tr><td>Saved vehicles and vehicle photos</td><td><span class="kept-badge badge-removed">Deleted</span></td></tr>
+            <tr><td>Saved routes and route history</td><td><span class="kept-badge badge-removed">Deleted</span></td></tr>
+            <tr><td>Charging session history</td><td><span class="kept-badge badge-removed">Deleted</span></td></tr>
+            <tr><td>Station check-ins and photos</td><td><span class="kept-badge badge-removed">Deleted</span></td></tr>
+            <tr><td>OBD trip logs and telemetry</td><td><span class="kept-badge badge-removed">Deleted</span></td></tr>
+            <tr><td>Gamification points, streaks, badges</td><td><span class="kept-badge badge-removed">Deleted</span></td></tr>
+            <tr><td>SOS alerts you submitted</td><td><span class="kept-badge badge-removed">Deleted</span></td></tr>
+            <tr><td>Block and report records</td><td><span class="kept-badge badge-removed">Deleted</span></td></tr>
+            <tr><td>Messages sent or received</td><td><span class="kept-badge badge-removed">Deleted</span></td></tr>
+            <tr><td>Hosted charger listings (if any)</td><td><span class="kept-badge badge-removed">Deleted</span></td></tr>
+            <tr><td>Aggregated, anonymised usage statistics</td><td><span class="kept-badge badge-kept">Retained (anonymous)</span></td></tr>
+            <tr><td>Transaction and financial records (if applicable)</td><td><span class="kept-badge badge-kept">Retained per law (7 years)</span></td></tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <p>Deletion is irreversible. Once your account is deleted, your data cannot be recovered. If you only want a break, you can simply sign out — your account will remain intact until you return.</p>
+        </div>
+      </div>
+
+      <div class="section">
+        <h2>How long does deletion take?</h2>
+        <p>In-app deletion is immediate — your account and all associated data listed above is removed from active systems as soon as you confirm.</p>
+        <p>Email requests are processed within <strong>7 days</strong>. You will receive a confirmation email once the deletion is complete.</p>
+        <p>Backups are purged on our normal backup rotation cycle (maximum 30 days). Anonymous, aggregated analytics are not purged as they cannot be linked back to you.</p>
+      </div>
+
+      <div class="section">
+        <h2>Questions or concerns</h2>
+        <p>If you have questions about data deletion, your rights under applicable privacy law, or need help with the process, contact us at:</p>
+        <div class="contact-box">
+          <p style="margin:0;font-size:0.82rem;color:rgba(255,255,255,0.4);">Privacy &amp; Account Support</p>
+          <a class="contact-email" href="mailto:hey@evraahein.app">hey@evraahein.app</a>
+          <p style="margin:0;font-size:0.82rem;">TaruniLakshmi Ventures · Hyderabad, India</p>
+        </div>
+      </div>
+
+    </div>
+
+    <footer>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms &amp; Conditions</a>
+        <a href="delete-account.html" style="color:rgba(255,82,82,0.6);">Delete Account</a>
+      </div>
+      <span class="footer-copy">&copy; 2026 TaruniLakshmi Ventures</span>
+    </footer>
+  </div>
+</body>
+</html>
