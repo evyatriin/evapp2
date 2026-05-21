@@ -309,7 +309,10 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
                   );
                 }).toList(),
               ),
-              // Chargers along route layer
+              // Dashed connector lines: off-route charger → nearest route point
+              if (_showChargersOnMap && _chargersAlongRoute.isNotEmpty)
+                ChargersConnectorLayer(chargers: _chargersAlongRoute),
+              // Charger markers on top of connector lines
               if (_showChargersOnMap && _chargersAlongRoute.isNotEmpty)
                 ChargersMarkerLayer(
                   chargers: _chargersAlongRoute,

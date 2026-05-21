@@ -182,15 +182,17 @@ class ChargersMarkerLayer extends StatelessWidget {
     return selected;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Filter chargers if showing optimal only
+  /// Returns the filtered+spaced charger list for reuse by connector layer.
+  List<ChargerAlongRoute> buildDisplayList() {
     final filtered = showOptimalOnly
         ? chargers.where((c) => c.isOptimal).toList()
         : chargers;
+    return _spaceAlongRoute(filtered);
+  }
 
-    final displayChargers = _spaceAlongRoute(filtered);
-
+  @override
+  Widget build(BuildContext context) {
+    final displayChargers = buildDisplayList();
     return MarkerLayer(
       markers: displayChargers
           .map(
@@ -207,5 +209,48 @@ class ChargersMarkerLayer extends StatelessWidget {
           )
           .toList(),
     );
+  }
+}
+
+/// Draws dashed "detour" connector lines from off-route chargers to their
+/// nearest point on the route. Must be added to FlutterMap.children BEFORE
+/// [ChargersMarkerLayer] so markers render on top of lines.
+class ChargersConnectorLayer extends StatelessWidget {
+  final List<ChargerAlongRoute> chargers;
+  final bool showOptimalOnly;
+
+  const ChargersConnectorLayer({
+    Key? key,
+    required this.chargers,
+    this.showOptimalOnly = false,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final polylines = <Polyline>[];
+    final source = showOptimalOnly
+        ? chargers.where((c) => c.isOptimal)
+        : chargers;
+
+    for (final c in source) {
+      if (!c.isOptimal &&
+          c.nearestRouteLat != null &&
+          c.nearestRouteLng != null &&
+          c.distToRouteKm > 0.3) {
+        polylines.add(
+          Polyline(
+            points: [
+              LatLng(c.latitude, c.longitude),
+              LatLng(c.nearestRouteLat!, c.nearestRouteLng!),
+            ],
+            color: Colors.blue.withValues(alpha: 0.55),
+            strokeWidth: 1.5,
+            pattern: StrokePattern.dashed(segments: const [6, 5]),
+          ),
+        );
+      }
+    }
+
+    return PolylineLayer(polylines: polylines);
   }
 }

@@ -1276,6 +1276,10 @@ class ChargerAlongRoute(BaseModel):
     distance_from_origin_km: float
     is_optimal: bool  # True if on optimal route, False if alternative nearby
     charger_type: str  # "optimal", "alternative", or "far"
+    # Nearest point on the route polyline — used to draw a detour connector line
+    nearest_route_lat: Optional[float] = None
+    nearest_route_lng: Optional[float] = None
+    dist_to_route_km: float = 0.0
 
 
 class ChargerOnRouteRequest(BaseModel):
@@ -1424,6 +1428,23 @@ async def get_chargers_along_route(http_request: Request, request_data: ChargerO
 
             return (min_perp, best_along)
 
+        def nearest_route_point(along_dist: float, sampled: List[dict], cum_dists: List[float]) -> tuple:
+            """Interpolate the lat/lng on the polyline at a given along-route distance."""
+            if not sampled or len(sampled) < 2:
+                return (sampled[0]['latitude'], sampled[0]['longitude']) if sampled else (0.0, 0.0)
+            # Find the segment that contains along_dist
+            for i in range(len(cum_dists) - 1):
+                if cum_dists[i] <= along_dist <= cum_dists[i + 1]:
+                    seg_len = cum_dists[i + 1] - cum_dists[i]
+                    if seg_len < 0.001:
+                        return (sampled[i]['latitude'], sampled[i]['longitude'])
+                    frac = (along_dist - cum_dists[i]) / seg_len
+                    lat = sampled[i]['latitude'] + frac * (sampled[i + 1]['latitude'] - sampled[i]['latitude'])
+                    lng = sampled[i]['longitude'] + frac * (sampled[i + 1]['longitude'] - sampled[i]['longitude'])
+                    return (lat, lng)
+            # Past end: return last point
+            return (sampled[-1]['latitude'], sampled[-1]['longitude'])
+
         # Use polyline if provided, otherwise create one from origin/destination
         if request_data.polyline and len(request_data.polyline) > 0:
             route_polyline = request_data.polyline
@@ -1483,6 +1504,7 @@ async def get_chargers_along_route(http_request: Request, request_data: ChargerO
             # Determine if optimal (very close to route, <2km) or alternative (2-8km)
             is_optimal = dist_to_route <= OPTIMAL_BUFFER_KM
             charger_type = "optimal" if is_optimal else "alternative"
+            nr_lat, nr_lng = nearest_route_point(dist_from_origin, sampled_polyline, cum_distances)
 
             chargers_along_route.append(ChargerAlongRoute(
                 id=station.get('id'),
@@ -1495,7 +1517,10 @@ async def get_chargers_along_route(http_request: Request, request_data: ChargerO
                 power_kw=station.get('power_kw'),
                 distance_from_origin_km=round(dist_from_origin, 1),
                 is_optimal=is_optimal,
-                charger_type=charger_type
+                charger_type=charger_type,
+                nearest_route_lat=round(nr_lat, 6),
+                nearest_route_lng=round(nr_lng, 6),
+                dist_to_route_km=round(dist_to_route, 2),
             ))
 
         # OCM fallback: if our DB is sparse for this corridor, query OpenChargeMap
@@ -1543,6 +1568,7 @@ async def get_chargers_along_route(http_request: Request, request_data: ChargerO
                     ocm_id = f"ocm:{nc.source_station_id}"
                     if ocm_id in seen_ids:
                         continue
+                    nr_lat, nr_lng = nearest_route_point(dist_from_origin, sampled_polyline, cum_distances)
                     chargers_along_route.append(ChargerAlongRoute(
                         id=ocm_id,
                         name=nc.name or "Charging Station",
@@ -1555,6 +1581,9 @@ async def get_chargers_along_route(http_request: Request, request_data: ChargerO
                         distance_from_origin_km=round(dist_from_origin, 1),
                         is_optimal=is_optimal,
                         charger_type="optimal" if is_optimal else "alternative",
+                        nearest_route_lat=round(nr_lat, 6),
+                        nearest_route_lng=round(nr_lng, 6),
+                        dist_to_route_km=round(dist_to_route, 2),
                     ))
                 logger.info(f"OCM fallback added {len(chargers_along_route) - len(seen_ids)} chargers")
             except Exception as fallback_err:

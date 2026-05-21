@@ -12,6 +12,12 @@ class ChargerAlongRoute {
   final double distanceFromOriginKm;
   final bool isOptimal;
   final String chargerType; // "optimal", "alternative", or "far"
+  /// Nearest point on the route polyline to this charger (for connector line).
+  /// Null when charger is exactly on the route (isOptimal) or not provided.
+  final double? nearestRouteLat;
+  final double? nearestRouteLng;
+  /// Perpendicular distance from this charger to the nearest route point (km).
+  final double distToRouteKm;
 
   ChargerAlongRoute({
     required this.id,
@@ -25,6 +31,9 @@ class ChargerAlongRoute {
     required this.distanceFromOriginKm,
     required this.isOptimal,
     required this.chargerType,
+    this.nearestRouteLat,
+    this.nearestRouteLng,
+    this.distToRouteKm = 0.0,
   });
 
   factory ChargerAlongRoute.fromJson(Map<String, dynamic> json) {
@@ -43,6 +52,9 @@ class ChargerAlongRoute {
         distanceFromOriginKm: (json['distance_from_origin_km'] as num?)?.toDouble() ?? 0.0,
         isOptimal: json['is_optimal'] as bool? ?? false,
         chargerType: json['charger_type'] as String? ?? 'alternative',
+        nearestRouteLat: (json['nearest_route_lat'] as num?)?.toDouble(),
+        nearestRouteLng: (json['nearest_route_lng'] as num?)?.toDouble(),
+        distToRouteKm: (json['dist_to_route_km'] as num?)?.toDouble() ?? 0.0,
       );
     } catch (e) {
       debugPrint('Error parsing ChargerAlongRoute: $e');

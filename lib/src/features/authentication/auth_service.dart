@@ -45,6 +45,16 @@ class AuthService {
           _currentRefreshToken = sessionData['refresh_token'] as String?;
           _currentUserId = userData['id'] as String?;
 
+          // Sync Supabase Flutter client so currentSession is available
+          // to services (e.g. RemoteChargerService) that read it directly.
+          if (_currentAuthToken != null && _currentRefreshToken != null) {
+            try {
+              await _supabase.auth.setSession(_currentAuthToken!);
+            } catch (e) {
+              debugPrint('Supabase session sync warning (signup): $e');
+            }
+          }
+
           debugPrint('Signup successful for user: ${userData['email']}');
           return UserProfile(
             id: userData['id'] as String,
@@ -87,6 +97,16 @@ class AuthService {
           _currentRefreshToken = sessionData['refresh_token'] as String?;
           _currentUserId = userData['id'] as String?;
 
+          // Sync Supabase Flutter client so currentSession is available
+          // to services (e.g. RemoteChargerService) that read it directly.
+          if (_currentAuthToken != null) {
+            try {
+              await _supabase.auth.setSession(_currentAuthToken!);
+            } catch (e) {
+              debugPrint('Supabase session sync warning (login): $e');
+            }
+          }
+
           debugPrint('Login successful for user: ${userData['email']}');
           return UserProfile(
             id: userData['id'] as String,
@@ -118,11 +138,13 @@ class AuthService {
       _currentAuthToken = null;
       _currentRefreshToken = null;
       _currentUserId = null;
+      try { await _supabase.auth.signOut(); } catch (_) {}
     } catch (e) {
       debugPrint('Sign out error: $e');
       _currentAuthToken = null;
       _currentRefreshToken = null;
       _currentUserId = null;
+      try { await _supabase.auth.signOut(); } catch (_) {}
       rethrow;
     }
   }
