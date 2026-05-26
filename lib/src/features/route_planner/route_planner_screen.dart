@@ -8,6 +8,7 @@ import 'package:map_launcher/map_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'here_routing_service.dart';
 import 'route_model.dart';
+import 'trip_cost_calculator.dart';
 import '../mapping/places_service.dart';
 import '../mapping/station_model.dart';
 import '../vehicle_profile/vehicle_provider.dart';
@@ -850,6 +851,7 @@ class TripSummarySheet extends StatefulWidget {
 
 class _TripSummarySheetState extends State<TripSummarySheet> {
   bool _showElevationChart = false;
+  bool _showCostBreakdown = false;
 
   @override
   Widget build(BuildContext context) {
@@ -915,7 +917,7 @@ class _TripSummarySheetState extends State<TripSummarySheet> {
               _buildInfoRow(context, 'Total Distance', '${widget.route.totalDistanceKm.toStringAsFixed(1)} km'),
               _buildInfoRow(context, 'Est. Time', '${(widget.route.totalDurationMin / 60).toStringAsFixed(1)} hrs'),
               _buildInfoRow(context, 'Charge Time', '${widget.route.totalChargeDurationMin} min'),
-              _buildInfoRow(context, 'Est. Cost', '₹${widget.route.estimatedCost.toStringAsFixed(0)}'),
+              _buildCostSection(context),
               if (widget.route.elevationProfile != null) ...[
                 const Gap(4),
                 Row(
@@ -1097,6 +1099,185 @@ class _TripSummarySheetState extends State<TripSummarySheet> {
           ),
         );
       },
+    );
+  }
+
+  /// Cost section: shows total prominently, expands to per-stop breakdown.
+  Widget _buildCostSection(BuildContext context) {
+    final theme = Theme.of(context);
+    final breakdown = TripCostCalculator.calculate(widget.route);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Cost header row (always visible)
+        GestureDetector(
+          onTap: () => setState(() => _showCostBreakdown = !_showCostBreakdown),
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Charging Cost',
+                      style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
+                    ),
+                    const Gap(4),
+                    Icon(
+                      _showCostBreakdown
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 16,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ],
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      breakdown.formattedTotal,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    const Gap(4),
+                    Text(
+                      breakdown.formattedRate,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Expandable breakdown
+        if (_showCostBreakdown) ...[
+          Container(
+            margin: const EdgeInsets.only(bottom: 6),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Energy estimate row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.bolt, size: 14, color: theme.colorScheme.primary),
+                        const Gap(4),
+                        Text(
+                          'Est. energy consumed',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      breakdown.formattedKwh,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                if (breakdown.hasPerStopBreakdown && breakdown.stops.isNotEmpty) ...[
+                  const Divider(height: 14, thickness: 0.5),
+                  Text(
+                    'Per stop',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const Gap(6),
+                  ...breakdown.stops.asMap().entries.map((entry) {
+                    final i = entry.key;
+                    final stop = entry.value;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 18,
+                            height: 18,
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${i + 1}',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onPrimaryContainer,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const Gap(8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  stop.name,
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  '${stop.arrivalSoc}% → ${stop.departureSoc}%  ·  ${stop.durationMin} min',
+                                  style: theme.textTheme.labelSmall?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Text(
+                            stop.formattedCost,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                ] else ...[
+                  const Divider(height: 14, thickness: 0.5),
+                  Text(
+                    'Breakdown available after route is confirmed by the network',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 

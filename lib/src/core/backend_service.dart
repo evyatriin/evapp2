@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import 'app_config.dart';
+import 'connectivity_service.dart';
+import 'result.dart';
 
 class BackendService {
   static final _client = http.Client();
@@ -128,5 +131,71 @@ class BackendService {
       return jsonDecode(response.body);
     }
     throw Exception('Backend Error: ${response.statusCode} - ${response.body}');
+  }
+
+  // ── Safe variants returning Result<T> ─────────────────────────────────────
+  //
+  // Use these when you want to handle offline / error states without try/catch
+  // at the call site, e.g. in services that back cached screens.
+  //
+  // The old throwing `get/post/put/delete` are kept for backward compatibility.
+
+  /// GET that returns `Result<dynamic>` instead of throwing.
+  /// Checks connectivity first; returns `Failure(AppError.offline())` immediately
+  /// when the device has no network, so callers can fall back to cache.
+  static Future<Result<dynamic>> safeGet(
+    String endpoint, {
+    Map<String, String>? queryParams,
+    Map<String, String>? headers,
+  }) async {
+    final online = await checkConnectivityNow();
+    if (!online) return Failure(AppError.offline());
+
+    try {
+      final data = await _getWithRetry(
+        endpoint,
+        queryParams: queryParams,
+        headers: headers,
+      );
+      return Success(data);
+    } on TimeoutException {
+      return Failure(AppError.timeout());
+    } on SocketException {
+      return Failure(AppError.offline());
+    } catch (e) {
+      // If the error message looks like a server error, parse it
+      final msg = e.toString();
+      final match = RegExp(r'Backend Error: (\d+) - (.*)').firstMatch(msg);
+      if (match != null) {
+        return Failure(AppError.server(int.parse(match.group(1)!), match.group(2)!));
+      }
+      return Failure(AppError.unknown(e));
+    }
+  }
+
+  /// POST that returns `Result<dynamic>` instead of throwing.
+  static Future<Result<dynamic>> safePost(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    Map<String, String>? headers,
+  }) async {
+    final online = await checkConnectivityNow();
+    if (!online) return Failure(AppError.offline());
+
+    try {
+      final data = await _postWithRetry(endpoint, body: body, headers: headers);
+      return Success(data);
+    } on TimeoutException {
+      return Failure(AppError.timeout());
+    } on SocketException {
+      return Failure(AppError.offline());
+    } catch (e) {
+      final msg = e.toString();
+      final match = RegExp(r'Backend Error: (\d+) - (.*)').firstMatch(msg);
+      if (match != null) {
+        return Failure(AppError.server(int.parse(match.group(1)!), match.group(2)!));
+      }
+      return Failure(AppError.unknown(e));
+    }
   }
 }
