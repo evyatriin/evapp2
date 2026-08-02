@@ -459,9 +459,7 @@ class _RoutePlannerScreenState extends State<RoutePlannerScreen> with SingleTick
                     ),
                   ),
                   
-                  // Floating Action Button for Planning
-                  
-                  // Floating Action Button for Planning
+                  // Plan Route action
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     child: SizedBox(

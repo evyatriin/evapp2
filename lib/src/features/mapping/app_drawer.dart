@@ -4,9 +4,15 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:gap/gap.dart';
 import '../../core/navigation_helpers.dart';
+import '../../core/theme.dart';
+import '../authentication/user_model.dart';
 import '../authentication/user_provider.dart';
+import '../authentication/verification_gate.dart';
 import '../community/gamification_widgets.dart';
+import '../vehicle_profile/vehicle_model.dart';
+import '../vehicle_profile/vehicle_provider.dart';
 
 class AppDrawer extends ConsumerStatefulWidget {
   const AppDrawer({super.key});
@@ -109,58 +115,304 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
     );
   }
 
+  Widget _sectionLabel(ThemeData theme, String label) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+      child: Row(
+        children: [
+          Container(
+            width: 16,
+            height: 3,
+            decoration: BoxDecoration(
+              color: AppTheme.electricLime, // deliberate lime accent
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const Gap(8),
+          Text(
+            label.toUpperCase(),
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerChip(
+    ThemeData theme, {
+    required IconData icon,
+    required String label,
+    required Color bg,
+    required Color fg,
+    bool border = false,
+    VoidCallback? onTap,
+  }) {
+    final chip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: border
+            ? Border.all(color: Colors.white.withValues(alpha: 0.5))
+            : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: fg),
+          const Gap(5),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 170),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: fg,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (onTap == null) return chip;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: chip,
+    );
+  }
+
+  Widget _buildHeader(
+    BuildContext context,
+    ThemeData theme,
+    UserProfile? user,
+    VehicleProfile? vehicle,
+  ) {
+    final topPad = MediaQuery.of(context).padding.top;
+    final name = (user?.name.isNotEmpty ?? false) ? user!.name : 'Guest';
+    final initial = name != 'Guest' ? name[0].toUpperCase() : 'U';
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary,
+            theme.colorScheme.primaryContainer,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      padding: EdgeInsets.fromLTRB(20, topPad + 22, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: user == null
+                ? null
+                : () {
+                    Navigator.pop(context);
+                    context.push('/profile');
+                  },
+            borderRadius: BorderRadius.circular(12),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: theme.colorScheme.surface,
+                  child: Text(
+                    initial,
+                    style: TextStyle(
+                      fontSize: 28,
+                      color: theme.colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const Gap(14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ),
+                          if (user != null) ...[
+                            const Gap(8),
+                            PointsBadge(
+                              points: user.points,
+                              compact: true,
+                              color: Colors.white,
+                            ),
+                          ],
+                        ],
+                      ),
+                      const Gap(2),
+                      Text(
+                        user?.email ?? '',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.85),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (user != null) ...[
+            const Gap(16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (user.isDoubleVerified)
+                  _headerChip(
+                    theme,
+                    icon: Icons.verified,
+                    label: 'Verified',
+                    bg: AppTheme.electricLime,
+                    fg: const Color(0xFF0A2E14),
+                  )
+                else
+                  _headerChip(
+                    theme,
+                    icon: Icons.gpp_maybe_outlined,
+                    label: 'Verify phone',
+                    bg: Colors.white.withValues(alpha: 0.18),
+                    fg: Colors.white,
+                    border: true,
+                    onTap: () async {
+                      final ok = await showModalBottomSheet<bool>(
+                        context: context,
+                        isScrollControlled: true,
+                        showDragHandle: true,
+                        builder: (_) => const PhoneVerificationSheet(),
+                      );
+                      if (ok == true) {
+                        ref.read(userProvider.notifier).refresh();
+                      }
+                    },
+                  ),
+                if (vehicle != null)
+                  _headerChip(
+                    theme,
+                    icon: Icons.directions_car,
+                    label: '${vehicle.brand} ${vehicle.model}',
+                    bg: Colors.white.withValues(alpha: 0.18),
+                    fg: Colors.white,
+                  )
+                else
+                  _headerChip(
+                    theme,
+                    icon: Icons.add,
+                    label: 'Add your EV',
+                    bg: Colors.white.withValues(alpha: 0.18),
+                    fg: Colors.white,
+                    border: true,
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/setup/vehicle/add');
+                    },
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showLegalSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(PhosphorIcons.fileText(PhosphorIconsStyle.duotone)),
+              title: const Text('Terms of Use'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showDocumentDialog(context, 'Terms of Use', _termsText);
+              },
+            ),
+            ListTile(
+              leading:
+                  Icon(PhosphorIcons.handshake(PhosphorIconsStyle.duotone)),
+              title: const Text('Host Guidelines'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showDocumentDialog(
+                    context, 'Host Guidelines', _hostGuidelinesText);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                  PhosphorIcons.shieldWarning(PhosphorIconsStyle.duotone)),
+              title: const Text('Charging Safety Policy'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showDocumentDialog(
+                    context, 'Charging Safety Policy', _chargingSafetyPolicyText);
+              },
+            ),
+            ListTile(
+              leading:
+                  Icon(PhosphorIcons.shieldCheck(PhosphorIconsStyle.duotone)),
+              title: const Text('Privacy Policy'),
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showDocumentDialog(context, 'Privacy Policy', _privacyText);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final user = ref.watch(userProvider);
+    final vehicles = ref.watch(vehicleProvider);
+    final primaryVehicle = vehicles.isEmpty
+        ? null
+        : vehicles.firstWhere((v) => v.isPrimary,
+            orElse: () => vehicles.first);
 
     return Drawer(
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
-          // User Header
-          UserAccountsDrawerHeader(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  theme.colorScheme.primary,
-                  theme.colorScheme.primaryContainer,
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: theme.colorScheme.surface,
-              child: Text(
-                user?.name.isNotEmpty == true
-                    ? user!.name[0].toUpperCase()
-                    : 'U',
-                style: TextStyle(
-                  fontSize: 32,
-                  color: theme.colorScheme.primary,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            accountName: Row(
-              children: [
-                Text(
-                  user?.name ?? 'Guest',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                if (user != null) ...[
-                  const SizedBox(width: 8),
-                  PointsBadge(
-                    points: user.points,
-                    compact: true,
-                    color: Colors.white,
-                  ),
-                ],
-              ],
-            ),
-            accountEmail: Text(user?.email ?? ''),
-          ),
+          _buildHeader(context, theme, user, primaryVehicle),
+
+          _sectionLabel(theme, 'Account'),
 
           // Profile
           ListTile(
@@ -183,10 +435,12 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
             },
           ),
 
+          _sectionLabel(theme, 'Tools'),
+
           ListTile(
             leading: Icon(PhosphorIcons.houseLine(PhosphorIconsStyle.duotone)),
             title: const Text('Community Charging'),
-            subtitle: const Text('Private charger sharing and request coordination'),
+            subtitle: const Text('Share or request a charger'),
             onTap: () {
               Navigator.pop(context);
               context.push('/community-charging');
@@ -196,7 +450,7 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
           ListTile(
             leading: Icon(PhosphorIcons.carBattery(PhosphorIconsStyle.duotone)),
             title: const Text('OBD Scanner'),
-            subtitle: const Text('Scan, connect, and open live analytics'),
+            subtitle: const Text('Live data from your car'),
             onTap: () {
               Navigator.pop(context);
               openObdScanner(context);
@@ -220,6 +474,8 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
           ),
 
           const Divider(),
+
+          _sectionLabel(theme, 'Help & legal'),
 
           // About
           ListTile(
@@ -254,14 +510,6 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
                             const Text('• Community check-ins and reviews'),
                             const Text('• SOS assistance for emergencies'),
                             const Text('• Multi-vehicle support'),
-                            const SizedBox(height: 16),
-                            Text(
-                              'Version: $_appVersion',
-                              style: TextStyle(
-                                color: theme.colorScheme.secondary,
-                                fontSize: 14,
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -309,48 +557,12 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
           ),
 
           ListTile(
-            leading: Icon(PhosphorIcons.fileText(PhosphorIconsStyle.duotone)),
-            title: const Text('Terms of Use'),
+            leading: Icon(PhosphorIcons.scales(PhosphorIconsStyle.duotone)),
+            title: const Text('Legal & policies'),
+            subtitle: const Text('Terms, privacy, host & safety'),
             onTap: () {
               Navigator.pop(context);
-              _showDocumentDialog(context, 'Terms of Use', _termsText);
-            },
-          ),
-
-          ListTile(
-            leading: Icon(PhosphorIcons.handshake(PhosphorIconsStyle.duotone)),
-            title: const Text('Host Guidelines'),
-            onTap: () {
-              Navigator.pop(context);
-              _showDocumentDialog(
-                context,
-                'Host Guidelines',
-                _hostGuidelinesText,
-              );
-            },
-          ),
-
-          ListTile(
-            leading: Icon(PhosphorIcons.shieldWarning(PhosphorIconsStyle.duotone)),
-            title: const Text('Charging Safety Policy'),
-            onTap: () {
-              Navigator.pop(context);
-              _showDocumentDialog(
-                context,
-                'Charging Safety Policy',
-                _chargingSafetyPolicyText,
-              );
-            },
-          ),
-
-          ListTile(
-            leading: Icon(
-              PhosphorIcons.shieldCheck(PhosphorIconsStyle.duotone),
-            ),
-            title: const Text('Privacy Policy'),
-            onTap: () {
-              Navigator.pop(context);
-              _showDocumentDialog(context, 'Privacy Policy', _privacyText);
+              _showLegalSheet(context);
             },
           ),
 
@@ -363,7 +575,7 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
               child: Text(
                 'Version $_appVersion',
                 style: TextStyle(
-                  color: theme.colorScheme.secondary,
+                  color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 12,
                 ),
               ),

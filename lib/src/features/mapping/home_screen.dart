@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -14,6 +16,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'saved_chargers_list.dart';
 import '../community/gamification_widgets.dart';
 import '../authentication/user_provider.dart';
+import '../authentication/verification_gate.dart';
 import '../charge/charging_service.dart';
 import '../charge/charge_request_sheet.dart';
 
@@ -25,7 +28,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   GoogleMapController? _mapController;
   LatLng? _currentCameraPosition;
   double _currentZoom = 12.0;
@@ -36,17 +39,62 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Position? _devicePosition;
   late TabController _tabController;
 
+  // Debounces charger refetches while panning, plus a light periodic refresh so
+  // the "live chargers" count doesn't go stale while the map sits idle.
+  Timer? _cameraDebounce;
+  Timer? _autoRefreshTimer;
+  AppLifecycleState _appState = AppLifecycleState.resumed;
+  static const _autoRefreshInterval = Duration(seconds: 90);
+  static const _cameraDebounceDelay = Duration(milliseconds: 500);
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addObserver(this);
+    _startAutoRefresh();
     _bootstrapMapLocation();
   }
 
   @override
   void dispose() {
+    _cameraDebounce?.cancel();
+    _autoRefreshTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _tabController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appState = state;
+  }
+
+  void _startAutoRefresh() {
+    _autoRefreshTimer?.cancel();
+    _autoRefreshTimer = Timer.periodic(_autoRefreshInterval, (_) {
+      if (!mounted || _appState != AppLifecycleState.resumed) return;
+      // Skip if a fetch is already in flight (respects the 30 req/min cap).
+      if (ref.read(stationsProvider).isLoading) return;
+      ref.invalidate(stationsProvider);
+    });
+  }
+
+  // Commit the camera's resting position to the providers (which drives the
+  // charger refetch) only after the user pauses — avoids a request per frame
+  // while dragging and protects the backend rate limit.
+  void _scheduleCameraSync() {
+    _cameraDebounce?.cancel();
+    _cameraDebounce = Timer(_cameraDebounceDelay, () {
+      if (!mounted || _currentCameraPosition == null) return;
+      ref.read(mapCenterProvider.notifier).update(
+            ll.LatLng(
+              _currentCameraPosition!.latitude,
+              _currentCameraPosition!.longitude,
+            ),
+          );
+      ref.read(mapZoomProvider.notifier).update(_currentZoom);
+    });
   }
 
   Future<void> _bootstrapMapLocation({bool showErrors = false}) async {
@@ -290,96 +338,130 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                       _currentCameraPosition = position.target;
                       _currentZoom = position.zoom;
                     },
-                    onCameraIdle: () {
-                      if (_currentCameraPosition != null) {
-                        ref
-                            .read(mapCenterProvider.notifier)
-                            .update(
-                              ll.LatLng(
-                                _currentCameraPosition!.latitude,
-                                _currentCameraPosition!.longitude,
-                              ),
-                            );
-                        ref.read(mapZoomProvider.notifier).update(_currentZoom);
-                      }
-                    },
+                    onCameraIdle: _scheduleCameraSync,
                     myLocationEnabled: true,
                     myLocationButtonEnabled: false,
                   ),
 
-                  // Search + My Location Controls
+                  // My Location control
                   Positioned(
                     bottom: 90,
                     right: 12,
-                    child: Column(
-                      children: [
-                        FloatingActionButton.small(
-                          heroTag: 'map_search',
-                          tooltip: 'Search chargers by location',
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primaryContainer,
-                          foregroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
-                          elevation: 2,
-                          onPressed: () => context.push('/search'),
-                          child: Icon(
-                            PhosphorIcons.magnifyingGlass(
-                              PhosphorIconsStyle.bold,
-                            ),
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        FloatingActionButton.small(
-                          heroTag: 'map_my_location',
-                          tooltip: 'Center on my location',
-                          backgroundColor: Theme.of(context).colorScheme.surface,
-                          foregroundColor: Theme.of(context).colorScheme.primary,
-                          elevation: 2,
-                          onPressed: () => _bootstrapMapLocation(showErrors: true),
-                          child: const Icon(Icons.my_location, size: 20),
-                        ),
-                      ],
+                    child: FloatingActionButton.small(
+                      heroTag: 'map_my_location',
+                      tooltip: 'Center on my location',
+                      backgroundColor: Theme.of(context).colorScheme.surface,
+                      foregroundColor: Theme.of(context).colorScheme.primary,
+                      elevation: 2,
+                      onPressed: () => _bootstrapMapLocation(showErrors: true),
+                      child: const Icon(Icons.my_location, size: 20),
                     ),
                   ),
 
-                  // Streak Widget Overlay
-                  Positioned(
-                    top: 10,
-                    right: 16,
-                    child: Consumer(
-                      builder: (context, ref, child) {
-                        final user = ref.watch(userProvider);
-                        if (user == null || user.streak == 0) {
-                          return const SizedBox.shrink();
-                        }
-                        return StreakWidget(streak: user.streak);
-                      },
-                    ),
-                  ),
-
-                  // Top bar: charger count pill + filter pill
+                  // Top bar: prominent search + filter, then live count + streak
                   Positioned(
                     top: 8,
                     left: 12,
                     right: 12,
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
                             Expanded(
+                              child: Material(
+                                elevation: 2,
+                                borderRadius: BorderRadius.circular(16),
+                                color: theme.colorScheme.surface,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: () => context.push('/search'),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 13,
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          PhosphorIcons.magnifyingGlass(
+                                            PhosphorIconsStyle.bold,
+                                          ),
+                                          size: 18,
+                                          color:
+                                              theme.colorScheme.onSurfaceVariant,
+                                        ),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Text(
+                                            'Search chargers or a place',
+                                            style: theme.textTheme.bodyMedium
+                                                ?.copyWith(
+                                              color: theme
+                                                  .colorScheme.onSurfaceVariant,
+                                            ),
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _FilterIconButton(
+                              activeCount: activeFilterCount,
+                              onTap: () => _showFilterSheet(context),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () => ref.invalidate(stationsProvider),
                               child: _MapStatPill(
                                 icon: Icons.ev_station,
                                 label: '$availableCount live chargers nearby',
                               ),
                             ),
                             const SizedBox(width: 8),
-                            // Tappable filter icon button with badge
-                            _FilterIconButton(
-                              activeCount: activeFilterCount,
-                              onTap: () => _showFilterSheet(context),
+                            Material(
+                              color: theme.colorScheme.surface,
+                              shape: const CircleBorder(),
+                              elevation: 2,
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: () => ref.invalidate(stationsProvider),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(9),
+                                  child: stationsAsync.isLoading
+                                      ? SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: theme.colorScheme.primary,
+                                          ),
+                                        )
+                                      : Icon(
+                                          Icons.refresh,
+                                          size: 18,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Consumer(
+                              builder: (context, ref, child) {
+                                final user = ref.watch(userProvider);
+                                if (user == null || user.streak == 0) {
+                                  return const SizedBox.shrink();
+                                }
+                                return StreakWidget(streak: user.streak);
+                              },
                             ),
                           ],
                         ),
@@ -389,7 +471,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   // Loading Indicator Overlay
                   if (stationsAsync.isLoading)
                     Positioned(
-                      top: 72,
+                      top: 112,
                       left: 0,
                       right: 0,
                       child: Center(
@@ -413,6 +495,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                                 Text('Searching area...'),
                               ],
                             ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Empty state — a completed, error-free load with 0 chargers.
+                  if (!stationsAsync.isLoading &&
+                      !stationsAsync.hasError &&
+                      stations.isEmpty)
+                    Center(
+                      child: IgnorePointer(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 44),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 22,
+                            vertical: 18,
+                          ),
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.surface
+                                .withValues(alpha: 0.96),
+                            borderRadius: BorderRadius.circular(18),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.08),
+                                blurRadius: 14,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.ev_station_outlined,
+                                size: 34,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                'No chargers in this area',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                'Try moving the map or zooming out.',
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -486,7 +621,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 }
 
-class _StationDetailsSheet extends StatefulWidget {
+class _StationDetailsSheet extends ConsumerStatefulWidget {
   final StationModel station;
   final LatLng? referenceLocation;
 
@@ -496,10 +631,11 @@ class _StationDetailsSheet extends StatefulWidget {
   });
 
   @override
-  State<_StationDetailsSheet> createState() => _StationDetailsSheetState();
+  ConsumerState<_StationDetailsSheet> createState() =>
+      _StationDetailsSheetState();
 }
 
-class _StationDetailsSheetState extends State<_StationDetailsSheet> {
+class _StationDetailsSheetState extends ConsumerState<_StationDetailsSheet> {
   Map<String, dynamic>? _lastCheckIn;
   bool _isLoadingCheckIn = true;
 
@@ -568,6 +704,11 @@ class _StationDetailsSheetState extends State<_StationDetailsSheet> {
   }
 
   Future<void> _openChargeRequestSheet() async {
+    if (!await ensureVerifiedForHelp(context, ref,
+        action: 'request charging')) {
+      return;
+    }
+    if (!mounted) return;
     final created = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,

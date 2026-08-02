@@ -1,23 +1,71 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../vehicle_profile/vehicle_provider.dart';
 import 'content_service.dart';
 
-class ResourcesTab extends StatefulWidget {
+class ResourcesTab extends ConsumerStatefulWidget {
   const ResourcesTab({super.key});
 
   @override
-  State<ResourcesTab> createState() => _ResourcesTabState();
+  ConsumerState<ResourcesTab> createState() => _ResourcesTabState();
 }
 
-class _ResourcesTabState extends State<ResourcesTab> {
+class _ResourcesTabState extends ConsumerState<ResourcesTab> {
   final _contentService = ContentService();
+
+  /// Drop the Policies & Incentives section, and for the emergency hotlines
+  /// section keep only the entry matching the user's car brand (falling back to
+  /// all lines if there's no brand-specific one).
+  List<ResourceSectionModel> _personalize(
+    List<ResourceSectionModel> sections,
+    String? brand,
+  ) {
+    final result = <ResourceSectionModel>[];
+    for (final section in sections) {
+      final title = section.title.toLowerCase();
+      if (section.icon == 'bank' ||
+          title.contains('policies') ||
+          title.contains('incentive')) {
+        continue; // remove policies & incentives entirely
+      }
+
+      final isEmergency = section.icon == 'phone' ||
+          title.contains('emergency') ||
+          title.contains('hotline');
+      if (isEmergency && brand != null && brand.trim().isNotEmpty) {
+        final b = brand.toLowerCase();
+        final matches = section.items
+            .where((item) => item.title.toLowerCase().contains(b))
+            .toList();
+        if (matches.isNotEmpty) {
+          result.add(ResourceSectionModel(
+            id: section.id,
+            title: section.title,
+            description: section.description,
+            icon: section.icon,
+            tone: section.tone,
+            items: matches,
+          ));
+          continue;
+        }
+      }
+      result.add(section);
+    }
+    return result;
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final vehicles = ref.watch(vehicleProvider);
+    final brand = vehicles.isEmpty
+        ? null
+        : (vehicles.firstWhere((v) => v.isPrimary, orElse: () => vehicles.first))
+            .brand;
 
     return FutureBuilder<List<ResourceSectionModel>>(
       future: _contentService.getResources(),
@@ -44,7 +92,10 @@ class _ResourcesTabState extends State<ResourcesTab> {
           );
         }
 
-        final sections = snapshot.data ?? const <ResourceSectionModel>[];
+        final sections = _personalize(
+          snapshot.data ?? const <ResourceSectionModel>[],
+          brand,
+        );
         if (sections.isEmpty) {
           return _ResourcesState(
             icon: PhosphorIcons.bookmarksSimple(PhosphorIconsStyle.duotone),

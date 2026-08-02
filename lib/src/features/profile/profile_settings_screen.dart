@@ -2,7 +2,10 @@ import 'package:flutter/material.dart' hide Badge;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/theme.dart';
+import '../authentication/user_model.dart';
 import '../authentication/user_provider.dart';
+import '../authentication/verification_gate.dart';
 import '../community/gamification_widgets.dart';
 import '../community/gamification_service.dart';
 import '../vehicle_profile/vehicle_provider.dart';
@@ -63,29 +66,15 @@ class ProfileSettingsScreen extends ConsumerWidget {
                                         color: theme.colorScheme.onSurfaceVariant,
                                       ),
                                     ),
-                                    const Gap(4),
-                                    Row(
+                                    const Gap(10),
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
                                       children: [
-                                        Icon(
-                                          Icons.check_circle,
-                                          size: 16,
-                                          color:
-                                              user.isPhoneVerified
-                                                  ? Colors.blue
-                                                  : Colors.grey,
-                                        ),
-                                        const Gap(4),
-                                        Text(
-                                          user.isPhoneVerified
-                                              ? 'Verified'
-                                              : 'Unverified',
-                                          style: theme.textTheme.bodySmall
-                                              ?.copyWith(
-                                                color:
-                                                    user.isPhoneVerified
-                                                        ? Colors.blue
-                                                        : Colors.grey,
-                                              ),
+                                        _verifyChip(context, ref, theme, user),
+                                        PointsBadge(
+                                          points: user.points,
+                                          compact: true,
                                         ),
                                       ],
                                     ),
@@ -98,87 +87,14 @@ class ProfileSettingsScreen extends ConsumerWidget {
                               ),
                             ],
                           ),
-                          const Gap(24),
-
-                          // Stats Row
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Column(
-                                children: [
-                                  PointsBadge(points: user.points),
-                                  const Gap(4),
-                                  Text(
-                                    'Total Points',
-                                    style: theme.textTheme.bodySmall,
-                                  ),
-                                ],
-                              ),
-                              // Column(
-                              //   children: [
-                              //     StreakWidget(streak: user.streak),
-                              //     const Gap(4),
-                              //     Text(
-                              //       'Current Streak',
-                              //       style: theme.textTheme.bodySmall,
-                              //     ),
-                              //   ],
-                              // ),
-                            ],
-                          ),
-
-                          const Gap(24),
-                          const Divider(),
-                          const Gap(16),
-
-                          // Badges Section
-                          Text('Badges', style: theme.textTheme.titleMedium),
-                          const Gap(16),
-                          SizedBox(
-                            height: 100,
-                            child: FutureBuilder<List<Badge>>(
-                              future: GamificationService().getBadges(),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState ==
-                                    ConnectionState.waiting) {
-                                  return const Center(
-                                    child: CircularProgressIndicator(),
-                                  );
-                                }
-
-                                final allBadges = snapshot.data ?? [];
-                                final userBadgeIds = user.badges;
-
-                                if (allBadges.isEmpty) {
-                                  return const Center(
-                                    child: Text('No badges available'),
-                                  );
-                                }
-
-                                return ListView.separated(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: allBadges.length,
-                                  separatorBuilder:
-                                      (context, index) => const Gap(16),
-                                  itemBuilder: (context, index) {
-                                    final badge = allBadges[index];
-                                    final isUnlocked = userBadgeIds.contains(
-                                      badge.id,
-                                    );
-                                    return BadgeWidget(
-                                      badge: badge,
-                                      isLocked: !isUnlocked,
-                                    );
-                                  },
-                                );
-                              },
-                            ),
-                          ),
                         ],
                       ),
                     ),
                   ),
                   const Gap(16),
+
+                  // Badges — only shown when the user actually has badges.
+                  _badgesCard(context, theme, user),
 
                   // My Vehicles Section
                   Card(
@@ -248,33 +164,15 @@ class ProfileSettingsScreen extends ConsumerWidget {
                   const Gap(16),
 
                   Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Community Charging',
-                            style: theme.textTheme.titleLarge,
-                          ),
-                          const Gap(8),
-                          Text(
-                            'Share a private EV charger, accept temporary charging requests, and manage hosted sessions with simple manual payment coordination.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const Gap(12),
-                          SizedBox(
-                            width: double.infinity,
-                            child: FilledButton.icon(
-                              onPressed: () => context.push('/community-charging'),
-                              icon: const Icon(Icons.add_home_work_outlined),
-                              label: const Text('Open Community Charging'),
-                            ),
-                          ),
-                        ],
+                    child: ListTile(
+                      leading: Icon(
+                        Icons.add_home_work_outlined,
+                        color: theme.colorScheme.primary,
                       ),
+                      title: const Text('Community Charging'),
+                      subtitle: const Text('Share your charger or request one'),
+                      trailing: const Icon(Icons.chevron_right),
+                      onTap: () => context.push('/community-charging'),
                     ),
                   ),
                   const Gap(16),
@@ -320,6 +218,104 @@ class ProfileSettingsScreen extends ConsumerWidget {
                   ),
                 ],
               ),
+    );
+  }
+
+  Widget _chip({
+    required IconData icon,
+    required String label,
+    required Color bg,
+    required Color fg,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: fg),
+          const Gap(5),
+          Text(
+            label,
+            style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 12),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _verifyChip(
+    BuildContext context,
+    WidgetRef ref,
+    ThemeData theme,
+    UserProfile user,
+  ) {
+    if (user.isDoubleVerified) {
+      return _chip(
+        icon: Icons.verified,
+        label: 'Verified',
+        bg: AppTheme.electricLime,
+        fg: const Color(0xFF0A2E14),
+      );
+    }
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: () async {
+        final ok = await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (_) => const PhoneVerificationSheet(),
+        );
+        if (ok == true) ref.read(userProvider.notifier).refresh();
+      },
+      child: _chip(
+        icon: Icons.gpp_maybe_outlined,
+        label: 'Verify phone',
+        bg: theme.colorScheme.primaryContainer,
+        fg: theme.colorScheme.onPrimaryContainer,
+      ),
+    );
+  }
+
+  Widget _badgesCard(BuildContext context, ThemeData theme, UserProfile user) {
+    return FutureBuilder<List<Badge>>(
+      future: GamificationService().getBadges(),
+      builder: (context, snapshot) {
+        final allBadges = snapshot.data ?? const <Badge>[];
+        if (allBadges.isEmpty) return const SizedBox.shrink();
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Badges', style: theme.textTheme.titleMedium),
+                  const Gap(16),
+                  SizedBox(
+                    height: 100,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: allBadges.length,
+                      separatorBuilder: (context, index) => const Gap(16),
+                      itemBuilder: (context, index) {
+                        final badge = allBadges[index];
+                        final isUnlocked = user.badges.contains(badge.id);
+                        return BadgeWidget(badge: badge, isLocked: !isUnlocked);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -479,8 +475,9 @@ class _VehicleCard extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // Background image
-            if (vehicle.imageUrl != null || vehicle.photoUrl != null)
+            // Background: only a real user-uploaded photo becomes a full-bleed
+            // image. Template placeholder art stays a clean gradient instead.
+            if (vehicle.photoUrl != null)
               Positioned.fill(
                 child: ColorFiltered(
                   colorFilter: ColorFilter.mode(
@@ -693,10 +690,10 @@ class _VehicleCard extends StatelessWidget {
     );
   }
 
-  bool _hasImage() => vehicle.imageUrl != null || vehicle.photoUrl != null;
+  bool _hasImage() => vehicle.photoUrl != null;
 
   ImageProvider _getImageProvider() {
-    final url = vehicle.photoUrl ?? vehicle.imageUrl;
+    final url = vehicle.photoUrl;
     if (url != null && url.startsWith('http')) {
       return NetworkImage(url);
     } else if (url != null) {
