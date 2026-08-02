@@ -20,6 +20,7 @@ async def _verify_token(token: str) -> Dict[str, Any]:
         "token": token,
         "user_id": response.user.id,
         "email": response.user.email,
+        "email_verified": bool(getattr(response.user, "email_confirmed_at", None)),
         "metadata": response.user.user_metadata or {},
     }
 
@@ -45,6 +46,44 @@ async def require_auth(
 def ensure_same_user(auth_user: Dict[str, Any], user_id: str) -> None:
     if auth_user["user_id"] != user_id:
         raise HTTPException(status_code=403, detail="You are not allowed to act on behalf of another user")
+
+
+def is_phone_verified(user_id: str) -> bool:
+    """Read the phone-verification flag from the user's profile preferences."""
+    try:
+        profile_response = (
+            supabase.table("profiles")
+            .select("preferences")
+            .eq("id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        profile = profile_response.data if profile_response else None
+    except Exception as error:
+        raise HTTPException(
+            status_code=500, detail=f"Could not verify your account: {error}"
+        ) from error
+    preferences = (profile or {}).get("preferences") or {}
+    return bool(preferences.get("is_phone_verified", False))
+
+
+def require_double_verified(auth_user: Dict[str, Any]) -> None:
+    """Gate community help features (SOS, community charging) behind BOTH a
+    confirmed email and a verified phone number. Raises 403 otherwise.
+
+    Distinct messages let the client show which step is missing; the app also
+    surfaces its own verification sheet before the request is even sent.
+    """
+    if not auth_user.get("email_verified"):
+        raise HTTPException(
+            status_code=403,
+            detail="Please verify your email address to use community help features.",
+        )
+    if not is_phone_verified(auth_user["user_id"]):
+        raise HTTPException(
+            status_code=403,
+            detail="Please verify your phone number to use community help features.",
+        )
 
 
 def ensure_admin_user(auth_user: Dict[str, Any]) -> None:

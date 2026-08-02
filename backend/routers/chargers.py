@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from supabase_client import supabase, service_supabase
 import uuid
-from auth_utils import ensure_same_user, get_authenticated_user, require_auth
+from auth_utils import ensure_same_user, get_authenticated_user, require_auth, require_double_verified
 from utils.charger_aggregation import aggregate_chargers_nearby, _fetch_open_charge_map_nearby
 
 router = APIRouter()
@@ -600,6 +600,8 @@ async def create_or_update_host_station(
 ):
     try:
         ensure_same_user(auth_user, request.owner_id)
+        # Offering a charger to the community requires email + phone verification.
+        require_double_verified(auth_user)
 
         location_access_checks = _normalize_checkbox_object(
             request.location_access_checks,
@@ -760,6 +762,8 @@ async def create_charger_request(
 ):
     try:
         ensure_same_user(auth_user, request.requester_user_id)
+        # Asking for community charging requires email + phone verification.
+        require_double_verified(auth_user)
         station_response = (
             supabase.table("charging_stations")
             .select("*")
@@ -882,6 +886,8 @@ async def decide_charger_request(
 ):
     try:
         ensure_same_user(auth_user, decision.host_user_id)
+        # Accepting/managing help requests requires email + phone verification.
+        require_double_verified(auth_user)
         if decision.status not in {"accepted", "rejected"}:
             raise HTTPException(status_code=400, detail="Decision status must be accepted or rejected")
 

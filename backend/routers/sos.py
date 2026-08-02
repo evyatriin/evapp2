@@ -4,7 +4,7 @@ from typing import List, Optional
 from datetime import datetime
 from supabase import Client
 from supabase_client import supabase
-from auth_utils import get_authenticated_user, ensure_same_user
+from auth_utils import get_authenticated_user, ensure_same_user, require_double_verified
 import os
 
 router = APIRouter()
@@ -38,14 +38,8 @@ async def create_sos_alert(
 ):
     try:
         ensure_same_user(auth_user, request.user_id)
-        # Check if user has verified phone number
-        profile = supabase.table("profiles").select("preferences").eq("id", request.user_id).execute()
-        if not profile.data:
-             raise HTTPException(status_code=404, detail="User profile not found")
-             
-        prefs = profile.data[0].get("preferences", {})
-        if not prefs.get("is_phone_verified", False):
-             raise HTTPException(status_code=403, detail="Phone number not verified. Please verify your phone number to send SOS alerts.")
+        # Community help is gated behind email + phone verification.
+        require_double_verified(auth_user)
 
         data = request.dict()
         response = supabase.table("sos_alerts").insert(data).execute()
