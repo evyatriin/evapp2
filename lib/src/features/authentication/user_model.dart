@@ -5,6 +5,7 @@ class UserProfile {
   final String? profileImageUrl;
   final String? phoneNumber;
   final bool isPhoneVerified;
+  final bool isEmailVerified;
   final int points;
   final int streak;
   final List<String> badges;
@@ -16,10 +17,15 @@ class UserProfile {
     this.profileImageUrl,
     this.phoneNumber,
     this.isPhoneVerified = false,
+    this.isEmailVerified = false,
     this.points = 0,
     this.streak = 0,
     this.badges = const [],
   });
+
+  /// True only when BOTH email and phone are verified. Community help features
+  /// (SOS, community charging) require this.
+  bool get isDoubleVerified => isEmailVerified && isPhoneVerified;
 
   UserProfile copyWith({
     String? id,
@@ -28,6 +34,7 @@ class UserProfile {
     String? profileImageUrl,
     String? phoneNumber,
     bool? isPhoneVerified,
+    bool? isEmailVerified,
     int? points,
     int? streak,
     List<String>? badges,
@@ -39,6 +46,7 @@ class UserProfile {
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       isPhoneVerified: isPhoneVerified ?? this.isPhoneVerified,
+      isEmailVerified: isEmailVerified ?? this.isEmailVerified,
       points: points ?? this.points,
       streak: streak ?? this.streak,
       badges: badges ?? this.badges,
@@ -54,6 +62,7 @@ class UserProfile {
       profileImageUrl: json['profile_image_url'] as String?,
       phoneNumber: json['phone_number'] as String?,
       isPhoneVerified: json['is_phone_verified'] as bool? ?? false,
+      isEmailVerified: json['email_verified'] as bool? ?? false,
       points: json['points'] as int? ?? 0,
       streak: json['streak'] as int? ?? 0,
       badges: (json['badges'] as List<dynamic>?)?.map((e) => e.toString()).toList() ?? [],
@@ -68,6 +77,7 @@ class UserProfile {
       'profile_image_url': profileImageUrl,
       'phone_number': phoneNumber,
       'is_phone_verified': isPhoneVerified,
+      'email_verified': isEmailVerified,
       'points': points,
       'streak': streak,
       'badges': badges,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../authentication/auth_service.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -19,8 +20,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _checkOnboardingStatus() async {
-    // Add a small delay to show the splash screen
-    await Future.delayed(const Duration(seconds: 2));
+    // Supabase restores any persisted session in the background (recoverSession
+    // is not awaited by initialize). Wait for that to finish so a returning user
+    // isn't briefly seen as logged out and bounced to the login screen. This
+    // resolves within tens of milliseconds normally; the timeout is just a
+    // safety net so a new user never stalls on the splash.
+    final auth = Supabase.instance.client.auth;
+    if (auth.currentSession == null) {
+      try {
+        await auth.onAuthStateChange
+            .firstWhere((state) =>
+                state.event == AuthChangeEvent.initialSession ||
+                state.event == AuthChangeEvent.signedIn)
+            .timeout(const Duration(seconds: 3));
+      } catch (_) {
+        // Timed out or errored — proceed with whatever state we have.
+      }
+    }
+
+    if (!mounted) return;
 
     // Check authentication status
     final authService = AuthService();

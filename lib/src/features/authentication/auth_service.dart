@@ -2,19 +2,44 @@ import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/backend_service.dart';
-import '../../core/app_config.dart';
 import 'user_model.dart';
+
+/// Deep link Supabase redirects back to after an OAuth (Google/Apple) sign-in.
+/// Must be registered in the Android manifest, the iOS Info.plist, AND added to
+/// the Supabase dashboard's "Redirect URLs" allow-list. See OAUTH_SETUP.md.
+const String kOAuthRedirectUri = 'io.supabase.evraahein://login-callback/';
 
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
-  static bool _userStatsTableAvailable = true;
-  static bool _userBadgesTableAvailable = true;
+
+  // Kept only as an in-memory fallback for the current run. The source of
+  // truth is the persisted Supabase session (survives restarts + auto-refreshes).
   static String? _currentAuthToken;
-  static String? _currentRefreshToken;
   static String? _currentUserId;
 
-  /// Get the current auth token
-  String? getAuthToken() => _currentAuthToken;
+  /// Current access token — read from the persisted Supabase session first so
+  /// it stays valid across app restarts and after silent token refreshes.
+  String? getAuthToken() =>
+      _supabase.auth.currentSession?.accessToken ?? _currentAuthToken;
+
+  /// Persist the tokens returned by the backend into the Supabase client so the
+  /// session is saved to disk and auto-refreshed. Without this the user was
+  /// silently logged out on every relaunch.
+  Future<void> _persistSession({
+    required String? accessToken,
+    required String? refreshToken,
+    String? userId,
+  }) async {
+    _currentAuthToken = accessToken;
+    _currentUserId = userId;
+
+    if (accessToken == null || refreshToken == null) return;
+    try {
+      await _supabase.auth.setSession(refreshToken, accessToken: accessToken);
+    } catch (e) {
+      debugPrint('Supabase session persistence warning: $e');
+    }
+  }
 
   /// Sign up a new user via backend API
   Future<UserProfile?> signUp({
@@ -41,19 +66,11 @@ class AuthService {
         final sessionData = response['session'] as Map<String, dynamic>?;
 
         if (userData != null && sessionData != null) {
-          _currentAuthToken = sessionData['access_token'] as String?;
-          _currentRefreshToken = sessionData['refresh_token'] as String?;
-          _currentUserId = userData['id'] as String?;
-
-          // Sync Supabase Flutter client so currentSession is available
-          // to services (e.g. RemoteChargerService) that read it directly.
-          if (_currentAuthToken != null && _currentRefreshToken != null) {
-            try {
-              await _supabase.auth.setSession(_currentAuthToken!);
-            } catch (e) {
-              debugPrint('Supabase session sync warning (signup): $e');
-            }
-          }
+          await _persistSession(
+            accessToken: sessionData['access_token'] as String?,
+            refreshToken: sessionData['refresh_token'] as String?,
+            userId: userData['id'] as String?,
+          );
 
           debugPrint('Signup successful for user: ${userData['email']}');
           return UserProfile(
@@ -93,19 +110,11 @@ class AuthService {
         final sessionData = response['session'] as Map<String, dynamic>?;
 
         if (userData != null && sessionData != null) {
-          _currentAuthToken = sessionData['access_token'] as String?;
-          _currentRefreshToken = sessionData['refresh_token'] as String?;
-          _currentUserId = userData['id'] as String?;
-
-          // Sync Supabase Flutter client so currentSession is available
-          // to services (e.g. RemoteChargerService) that read it directly.
-          if (_currentAuthToken != null) {
-            try {
-              await _supabase.auth.setSession(_currentAuthToken!);
-            } catch (e) {
-              debugPrint('Supabase session sync warning (login): $e');
-            }
-          }
+          await _persistSession(
+            accessToken: sessionData['access_token'] as String?,
+            refreshToken: sessionData['refresh_token'] as String?,
+            userId: userData['id'] as String?,
+          );
 
           debugPrint('Login successful for user: ${userData['email']}');
           return UserProfile(
@@ -122,37 +131,49 @@ class AuthService {
     }
   }
 
+  /// Start an OAuth sign-in (Google / Apple) via Supabase.
+  ///
+  /// This launches the provider's sign-in page; the session is delivered back
+  /// asynchronously through the [kOAuthRedirectUri] deep link and surfaces via
+  /// `supabase.auth.onAuthStateChange` (listened to in the User provider).
+  /// Returns whether the auth flow was successfully launched.
+  Future<bool> signInWithOAuth(OAuthProvider provider) async {
+    return _supabase.auth.signInWithOAuth(
+      provider,
+      redirectTo: kIsWeb ? null : kOAuthRedirectUri,
+    );
+  }
+
   /// Sign out the current user
   Future<void> signOut() async {
+    final token = getAuthToken();
     try {
       debugPrint('Signing out user');
-      if (_currentAuthToken != null) {
+      if (token != null) {
         await BackendService.post(
           '/api/auth/logout',
           body: {},
           headers: {
-            'Authorization': 'Bearer $_currentAuthToken',
+            'Authorization': 'Bearer $token',
           },
         );
       }
-      _currentAuthToken = null;
-      _currentRefreshToken = null;
-      _currentUserId = null;
-      try { await _supabase.auth.signOut(); } catch (_) {}
     } catch (e) {
-      debugPrint('Sign out error: $e');
+      debugPrint('Sign out backend warning: $e');
+    } finally {
       _currentAuthToken = null;
-      _currentRefreshToken = null;
       _currentUserId = null;
-      try { await _supabase.auth.signOut(); } catch (_) {}
-      rethrow;
+      try {
+        await _supabase.auth.signOut();
+      } catch (_) {}
     }
   }
 
   /// Get the current authenticated user
   Future<UserProfile?> getCurrentUser() async {
+    final token = getAuthToken();
     try {
-      if (_currentAuthToken == null) {
+      if (token == null) {
         return null;
       }
 
@@ -161,46 +182,55 @@ class AuthService {
       final response = await BackendService.get(
         '/api/auth/user',
         headers: {
-          'Authorization': 'Bearer $_currentAuthToken',
+          'Authorization': 'Bearer $token',
         },
       );
 
       if (response is Map<String, dynamic>) {
         debugPrint('Current user fetched: ${response['email']}');
         _currentUserId = response['id'] as String?;
+        // Email is verified if the backend says so, or the persisted Supabase
+        // session shows a confirmed email (covers OAuth users too).
+        final emailVerified = (response['email_verified'] as bool? ?? false) ||
+            _supabase.auth.currentUser?.emailConfirmedAt != null;
         return UserProfile(
           id: response['id'] as String,
           email: response['email'] as String,
           name: response['name'] as String? ?? '',
+          profileImageUrl: response['profile_image_url'] as String?,
+          phoneNumber: response['phone_number'] as String?,
+          isPhoneVerified: response['is_phone_verified'] as bool? ?? false,
+          isEmailVerified: emailVerified,
         );
       }
       return null;
     } catch (e) {
       debugPrint('Get current user error: $e');
-      _currentAuthToken = null;
-      _currentUserId = null;
       return null;
     }
   }
 
   /// Check if user is authenticated
   bool isAuthenticated() {
-    return _currentAuthToken != null;
+    return _supabase.auth.currentSession != null || _currentAuthToken != null;
   }
 
-  /// Get current user ID (stored locally after login)
-  String? get currentUserId => _currentUserId;
+  /// Get current user ID (from the persisted session, falling back to memory)
+  String? get currentUserId =>
+      _supabase.auth.currentUser?.id ?? _currentUserId;
 
   /// Update user profile (name) via backend API.
   Future<UserProfile?> updateProfile({String? name, String? email}) async {
-    if (_currentAuthToken == null || _currentUserId == null) {
+    final token = getAuthToken();
+    final uid = currentUserId;
+    if (token == null || uid == null) {
       throw Exception('You must be signed in to update your profile.');
     }
     await BackendService.put(
       '/api/users/profile',
-      headers: {'Authorization': 'Bearer $_currentAuthToken'},
+      headers: {'Authorization': 'Bearer $token'},
       body: {
-        'user_id': _currentUserId,
+        'user_id': uid,
         if (name != null) 'name': name,
       },
     );
@@ -209,12 +239,13 @@ class AuthService {
 
   /// Change password via backend API (requires service role on backend).
   Future<void> changePassword(String newPassword) async {
-    if (_currentAuthToken == null) {
+    final token = getAuthToken();
+    if (token == null) {
       throw Exception('You must be signed in to change your password.');
     }
     await BackendService.post(
       '/api/auth/change-password',
-      headers: {'Authorization': 'Bearer $_currentAuthToken'},
+      headers: {'Authorization': 'Bearer $token'},
       body: {'new_password': newPassword},
     );
   }
@@ -229,14 +260,15 @@ class AuthService {
 
   /// Delete user account
   Future<void> deleteAccount() async {
+    final token = getAuthToken();
     try {
-      if (_currentAuthToken == null) {
+      if (token == null) {
         throw Exception('You must be signed in to delete your account.');
       }
 
       await BackendService.delete(
         '/api/users/me',
-        headers: {'Authorization': 'Bearer $_currentAuthToken'},
+        headers: {'Authorization': 'Bearer $token'},
       );
       await signOut();
     } catch (e) {
@@ -254,14 +286,15 @@ class AuthService {
     }
 
     try {
-      if (_currentAuthToken == null) {
+      final token = getAuthToken();
+      if (token == null) {
         throw Exception('You must be signed in to request phone verification.');
       }
 
       await BackendService.post(
         '/api/auth/request-phone-verification',
         body: {'phone_number': normalizedPhone},
-        headers: {'Authorization': 'Bearer $_currentAuthToken'},
+        headers: {'Authorization': 'Bearer $token'},
       );
       return normalizedPhone;
     } catch (e) {
@@ -283,7 +316,8 @@ class AuthService {
     }
 
     try {
-      if (_currentAuthToken == null) {
+      final token = getAuthToken();
+      if (token == null) {
         throw Exception('You must be signed in to verify phone OTP.');
       }
 
@@ -293,7 +327,7 @@ class AuthService {
           'phone_number': normalizedPhone,
           'otp': otp.trim(),
         },
-        headers: {'Authorization': 'Bearer $_currentAuthToken'},
+        headers: {'Authorization': 'Bearer $token'},
       );
     } catch (e) {
       debugPrint('Verify phone OTP error: $e');
@@ -318,10 +352,5 @@ class AuthService {
       return '+$numericOnly';
     }
     return null;
-  }
-
-  String? _cleanPhoneNumber(String? phoneNumber) {
-    final trimmed = phoneNumber?.trim();
-    return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
   }
 }

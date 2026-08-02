@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gap/gap.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -7,6 +6,7 @@ import 'sos_service.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../authentication/user_provider.dart';
+import '../authentication/verification_gate.dart';
 import '../vehicle_profile/vehicle_provider.dart';
 
 class SosScreen extends ConsumerStatefulWidget {
@@ -58,8 +58,9 @@ class _SosScreenState extends ConsumerState<SosScreen>
     final vehicles = ref.watch(vehicleProvider);
     final user = ref.watch(userProvider);
 
-    // Phone verification gate — backend requires is_phone_verified
-    if (user != null && !user.isPhoneVerified) {
+    // Double-verification gate — SOS needs a confirmed email + phone so nearby
+    // drivers can trust and reach the sender. Backend enforces this too.
+    if (user != null && !user.isDoubleVerified) {
       return Scaffold(
         appBar: AppBar(title: const Text('Emergency SOS'), centerTitle: true),
         body: Padding(
@@ -75,24 +76,29 @@ class _SosScreenState extends ConsumerState<SosScreen>
               ),
               const Gap(20),
               Text(
-                'Verify your phone first',
+                'Verify to send an SOS',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.headlineSmall
                     ?.copyWith(fontWeight: FontWeight.bold),
               ),
               const Gap(12),
               Text(
-                'SOS alerts go out to nearby drivers, who need a real number to reach you. Verify your phone to unlock emergency alerts.',
+                'SOS alerts go out to nearby drivers, who need to trust and reach you. Verify your email and phone to unlock emergency alerts.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium,
               ),
               const Gap(28),
               FilledButton.icon(
-                onPressed: () {
-                  context.push('/profile/edit');
+                onPressed: () async {
+                  final ok = await ensureVerifiedForHelp(
+                    context,
+                    ref,
+                    action: 'send an SOS',
+                  );
+                  if (ok && mounted) setState(() {});
                 },
                 icon: const Icon(Icons.verified_user_outlined),
-                label: const Text('Verify Phone Number'),
+                label: const Text('Verify now'),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),

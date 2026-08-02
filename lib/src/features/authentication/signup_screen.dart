@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../common_widgets/app_text_field.dart';
 import '../../common_widgets/app_button.dart';
+import 'oauth_buttons.dart';
 import 'user_provider.dart';
 
 class SignupScreen extends ConsumerStatefulWidget {
@@ -153,7 +154,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   ),
                   const Gap(8),
                   Text(
-                    'Create your account',
+                    'Plan EV trips, find live chargers, and never stress '
+                    'about range.',
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -238,7 +240,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     isLoading: _isLoading,
                     isFullWidth: true,
                   ),
-                  const Gap(16),
+                  const Gap(12),
+                  const OAuthButtons(),
+                  const Gap(8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [

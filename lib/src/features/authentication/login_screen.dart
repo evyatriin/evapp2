@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../common_widgets/app_text_field.dart';
 import '../../common_widgets/app_button.dart';
+import 'oauth_buttons.dart';
 import 'user_provider.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -98,7 +99,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const Gap(8),
                   Text(
-                    'Welcome back!',
+                    'Welcome back — your chargers and routes are waiting.',
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -146,11 +147,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     isLoading: _isLoading,
                     isFullWidth: true,
                   ),
-                  const Gap(16),
+                  const Gap(8),
                   TextButton(
                     onPressed: () => context.push('/forgot-password'),
                     child: const Text('Forgot Password?'),
                   ),
+                  const Gap(8),
+                  const OAuthButtons(),
                   const Gap(8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
