@@ -1,0 +1,24 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+  package="prof.ronny.bluetooth_serial_android">
+      <!-- Permissões básicas de Bluetooth -->
+    <uses-permission android:name="android.permission.BLUETOOTH" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+
+    <!-- Android 12+ -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+
+    <!-- Localização é obrigatória para descoberta de dispositivos (scan) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
+    <!-- Opcional, mas recomendado para Android 11+ -->
+    <queries>
+        <intent>
+            <action android:name="android.bluetooth.device.action.FOUND" />
+        </intent>
+    </queries>
+
+    <application
+        
+        android:allowBackup="false" />
+</manifest>
