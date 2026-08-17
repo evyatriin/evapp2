@@ -10,6 +10,14 @@ class AppConfig {
   static const String _supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
   );
+  static const bool sosEnabled = bool.fromEnvironment(
+    'SOS_ENABLED',
+    defaultValue: false,
+  );
+  static const bool releaseAdsEnabled = bool.fromEnvironment(
+    'ADS_ENABLED',
+    defaultValue: false,
+  );
 
   static const String _androidReleaseBannerAdUnitId = String.fromEnvironment(
     'ADMOB_BANNER_ANDROID',
@@ -63,7 +71,9 @@ class AppConfig {
       return 'Missing SUPABASE_ANON_KEY. Rebuild the app with a valid Supabase anon key.';
     }
     final uri = Uri.tryParse(_supabaseUrl);
-    if (uri == null || !uri.isAbsolute || !_supabaseUrl.startsWith('https://')) {
+    if (uri == null ||
+        !uri.isAbsolute ||
+        !_supabaseUrl.startsWith('https://')) {
       return 'SUPABASE_URL is invalid. Rebuild the app with a valid https://<project>.supabase.co URL.';
     }
     return null;
@@ -71,6 +81,7 @@ class AppConfig {
 
   static bool get adsEnabled {
     if (kDebugMode) return true;
+    if (!releaseAdsEnabled) return false;
 
     return Platform.isAndroid
         ? _androidReleaseBannerAdUnitId.isNotEmpty

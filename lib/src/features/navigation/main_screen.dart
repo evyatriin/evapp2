@@ -7,14 +7,12 @@ import '../../core/ad_banner_widget.dart';
 import '../authentication/user_provider.dart';
 import '../community/gamification_widgets.dart';
 import '../vehicle_profile/vehicle_provider.dart';
+import '../../core/app_config.dart';
 
 class MainScreen extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
 
-  const MainScreen({
-    super.key,
-    required this.navigationShell,
-  });
+  const MainScreen({super.key, required this.navigationShell});
 
   void _goBranch(int index) {
     navigationShell.goBranch(
@@ -28,27 +26,28 @@ class MainScreen extends ConsumerWidget {
     final user = ref.watch(userProvider);
     final vehicles = ref.watch(vehicleProvider);
     final showVehicleSetupBadge = user != null && vehicles.isEmpty;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('EVraahein'),
         centerTitle: false,
         toolbarHeight: 44,
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 4),
-            child: FilledButton.icon(
-              onPressed: () => context.push('/sos'),
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-                foregroundColor: Theme.of(context).colorScheme.onError,
-                minimumSize: Size.zero,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          if (AppConfig.sosEnabled)
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: FilledButton.icon(
+                onPressed: () => context.push('/sos'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                ),
+                icon: const Icon(Icons.sos, size: 20),
+                label: const Text('SOS'),
               ),
-              label: const Text('SOS'),
             ),
-          ),
           // Points Badge - shows user's current points
           if (user != null)
             Padding(
@@ -110,10 +109,7 @@ class MainScreen extends ConsumerWidget {
       ),
       drawer: const AppDrawer(),
       body: Column(
-        children: [
-          Expanded(child: navigationShell),
-          const AdBannerWidget(),
-        ],
+        children: [Expanded(child: navigationShell), const AdBannerWidget()],
       ),
       bottomNavigationBar: NavigationBar(
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
@@ -122,7 +118,9 @@ class MainScreen extends ConsumerWidget {
         destinations: [
           NavigationDestination(
             icon: Icon(PhosphorIcons.mapTrifold(PhosphorIconsStyle.duotone)),
-            selectedIcon: Icon(PhosphorIcons.mapTrifold(PhosphorIconsStyle.fill)),
+            selectedIcon: Icon(
+              PhosphorIcons.mapTrifold(PhosphorIconsStyle.fill),
+            ),
             label: 'Find',
           ),
           NavigationDestination(
@@ -132,12 +130,16 @@ class MainScreen extends ConsumerWidget {
           ),
           NavigationDestination(
             icon: Icon(PhosphorIcons.lightning(PhosphorIconsStyle.duotone)),
-            selectedIcon: Icon(PhosphorIcons.lightning(PhosphorIconsStyle.fill)),
+            selectedIcon: Icon(
+              PhosphorIcons.lightning(PhosphorIconsStyle.fill),
+            ),
             label: 'Charge',
           ),
           NavigationDestination(
             icon: Icon(PhosphorIcons.usersThree(PhosphorIconsStyle.duotone)),
-            selectedIcon: Icon(PhosphorIcons.usersThree(PhosphorIconsStyle.fill)),
+            selectedIcon: Icon(
+              PhosphorIcons.usersThree(PhosphorIconsStyle.fill),
+            ),
             label: 'Community',
           ),
         ],

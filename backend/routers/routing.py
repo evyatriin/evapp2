@@ -4,12 +4,13 @@ from typing import Any, Optional
 
 import flexpolyline
 import httpx
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from config import settings
+from auth_utils import require_auth
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -330,7 +331,11 @@ def _haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> f
 
 @router.post("/")
 @limiter.limit("20/minute")
-async def calculate_route(request: Request, route_req: RouteRequest):
+async def calculate_route(
+    request: Request,
+    route_req: RouteRequest,
+    _auth=Depends(require_auth),
+):
     if not settings.HERE_API_KEY:
         raise HTTPException(status_code=503, detail="HERE routing is not configured")
 

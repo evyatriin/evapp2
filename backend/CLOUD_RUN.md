@@ -1,6 +1,7 @@
-# Cloud Run Deployment
+# EVraahein Cloud Run Deployment
 
-This backend is ready to run on Google Cloud Run as a containerized FastAPI service.
+The production backend runs as `evraahein-backend` in the `evraahein-prod`
+Google Cloud project and `asia-south1` region.
 
 ## Required environment variables
 
@@ -16,30 +17,13 @@ Optional:
 - `APP_ENV=production`
 - `OPENCHARGEMAP_API_KEY`
 
-## One-time setup
+## Runtime secrets
 
-```bash
-gcloud config set project YOUR_PROJECT_ID
-gcloud services enable run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com
-```
+Production credentials are stored in Google Secret Manager and exposed only to
+`evraahein-backend-runtime@evraahein-prod.iam.gserviceaccount.com`.
 
-## Deploy from source
-
-```bash
-cd /Users/kk/apps/ev_router_app2
-gcloud run deploy ev-ranger-backend \
-  --source backend \
-  --region asia-south1 \
-  --platform managed \
-  --allow-unauthenticated \
-  --port 8080 \
-  --memory 512Mi \
-  --cpu 1 \
-  --min-instances 0 \
-  --max-instances 3 \
-  --set-env-vars APP_ENV=production,ALLOWED_ORIGINS=* \
-  --set-env-vars SUPABASE_URL=YOUR_SUPABASE_URL,SUPABASE_KEY=YOUR_SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY=YOUR_SUPABASE_SERVICE_ROLE_KEY,GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY,HERE_API_KEY=YOUR_HERE_API_KEY,OPENCHARGEMAP_API_KEY=YOUR_OPTIONAL_OPENCHARGEMAP_KEY
-```
+GitHub Actions authenticates through the `github-actions/github` workload
+identity provider. Do not add a service-account JSON key to repository secrets.
 
 ## Health checks
 
@@ -52,7 +36,7 @@ Rebuild the Flutter app with:
 
 ```bash
 flutter build apk --release --split-per-abi \
-  --dart-define=BACKEND_URL=https://YOUR_CLOUD_RUN_URL \
+  --dart-define=BACKEND_URL=https://evraahein-backend-187759131948.asia-south1.run.app \
   --dart-define=SUPABASE_URL=https://YOUR_SUPABASE_PROJECT.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=YOUR_SUPABASE_ANON_KEY
 ```

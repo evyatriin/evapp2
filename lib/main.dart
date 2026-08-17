@@ -9,15 +9,12 @@ import 'src/core/router.dart';
 import 'src/core/theme.dart';
 
 Future<void> main() async {
-  await SentryFlutter.init(
-    (options) {
-      options.dsn = const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
-      options.environment = kReleaseMode ? 'production' : 'debug';
-      options.tracesSampleRate = kReleaseMode ? 0.2 : 0.0;
-      options.attachScreenshot = true;
-    },
-    appRunner: () => _boot(),
-  );
+  await SentryFlutter.init((options) {
+    options.dsn = const String.fromEnvironment('SENTRY_DSN', defaultValue: '');
+    options.environment = kReleaseMode ? 'production' : 'debug';
+    options.tracesSampleRate = kReleaseMode ? 0.2 : 0.0;
+    options.attachScreenshot = true;
+  }, appRunner: () => _boot());
 }
 
 Future<void> _boot() async {
@@ -27,7 +24,8 @@ Future<void> _boot() async {
     await MobileAds.instance.initialize();
   }
 
-  final configError = AppConfig.supabaseConfigError;
+  final configError =
+      AppConfig.backendConfigError ?? AppConfig.supabaseConfigError;
   if (configError != null) {
     runApp(_ConfigurationErrorApp(message: configError));
     return;
@@ -45,7 +43,7 @@ Future<void> _boot() async {
       _ConfigurationErrorApp(
         message:
             'App services could not be reached. Check BACKEND_URL, SUPABASE_URL, and your network connection, then rebuild the app.',
-        details: error.toString(),
+        details: kDebugMode ? error.toString() : null,
       ),
     );
   }
@@ -96,10 +94,7 @@ class _ConfigurationErrorApp extends StatelessWidget {
                   const Text(
                     'Configuration Needed',
                     textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
                   Text(

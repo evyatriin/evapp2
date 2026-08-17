@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 import os
 import time
@@ -6,7 +7,7 @@ import time
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.httpx import HttpxIntegration
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -27,6 +28,7 @@ from routers import (
     content,
 )
 from config import settings
+from supabase_client import service_supabase
 
 sentry_sdk.init(
     dsn=os.getenv("SENTRY_DSN", ""),
@@ -38,7 +40,7 @@ sentry_sdk.init(
 
 limiter = Limiter(key_func=get_remote_address)
 
-_SKIP_METRICS = {"/", "/health", "/ready", "/api/admin/dashboard"}
+_SKIP_METRICS = {"/", "/health", "/ready", "/reset-password", "/api/admin/dashboard"}
 
 
 class _MetricsMiddleware(BaseHTTPMiddleware):
@@ -86,7 +88,8 @@ app.include_router(chargers.router, prefix="/api/chargers", tags=["Chargers"])
 app.include_router(vehicles.router, prefix="/api/vehicles", tags=["Vehicles"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(routes.router, prefix="/api/routes", tags=["Saved Routes"])
-app.include_router(sos.router, prefix="/api/sos", tags=["SOS"])
+if settings.FEATURE_SOS_ENABLED:
+    app.include_router(sos.router, prefix="/api/sos", tags=["SOS"])
 app.include_router(users.router, prefix="/api/users", tags=["Users"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(gamification.router, prefix="/api/gamification", tags=["Gamification"])
@@ -106,11 +109,43 @@ def health_check():
     return {"status": "ok"}
 
 
+@app.get("/reset-password")
+async def reset_password_landing():
+    return await auth.password_reset_page()
+
+
 @app.get("/ready")
-def readiness_check():
+async def readiness_check():
+    missing = []
+    if not settings.SUPABASE_URL or not settings.SUPABASE_KEY:
+        missing.append("supabase")
+    if not settings.SUPABASE_SERVICE_ROLE_KEY:
+        missing.append("supabase_service_role")
+    if not settings.HERE_API_KEY:
+        missing.append("here")
+    if not settings.GOOGLE_MAPS_API_KEY:
+        missing.append("google_maps")
+    if missing:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Missing production configuration: {', '.join(missing)}",
+        )
+    if not service_supabase:
+        raise HTTPException(status_code=503, detail="Database client is unavailable")
+    try:
+        await asyncio.wait_for(
+            asyncio.to_thread(
+                lambda: service_supabase.table("profiles")
+                .select("id")
+                .limit(1)
+                .execute()
+            ),
+            timeout=5,
+        )
+    except Exception as error:
+        logging.getLogger(__name__).warning("Readiness database check failed: %s", error)
+        raise HTTPException(status_code=503, detail="Database is unavailable") from error
     return {
         "status": "ready",
-        "supabase_configured": bool(settings.SUPABASE_URL and settings.SUPABASE_KEY),
-        "here_configured": bool(settings.HERE_API_KEY),
-        "google_maps_configured": bool(settings.GOOGLE_MAPS_API_KEY),
+        "database": "connected",
     }

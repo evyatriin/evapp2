@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/app_config.dart';
 import '../../core/backend_service.dart';
 import '../authentication/user_provider.dart';
 import '../authentication/auth_service.dart';
@@ -226,9 +227,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       );
 
       await BackendService.put(
-        '/api/users/profile',
+        '/api/users/me',
         body: {
-          'user_id': user.id,
           'phone_number': _phoneController.text.trim(),
           'is_phone_verified':
               _isPhoneVerified &&
@@ -333,40 +333,44 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 }
               },
             ),
-            const Gap(12),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _isPhoneVerified ? Icons.check_circle : Icons.info_outline,
-                    color:
-                        _isPhoneVerified
-                            ? Colors.green
-                            : Theme.of(context).colorScheme.primary,
-                  ),
-                  const Gap(12),
-                  Expanded(
-                    child: Text(
+            if (AppConfig.sosEnabled) ...[
+              const Gap(12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
                       _isPhoneVerified
-                          ? 'Phone verified for SOS and community support.'
-                          : 'Phone not verified yet. Verify it here whenever you want faster help from nearby drivers and hosts.',
+                          ? Icons.check_circle
+                          : Icons.info_outline,
+                      color:
+                          _isPhoneVerified
+                              ? Colors.green
+                              : Theme.of(context).colorScheme.primary,
                     ),
-                  ),
-                  const Gap(12),
-                  FilledButton.tonal(
-                    onPressed: _isLoading ? null : _verifyPhone,
-                    child: Text(_isPhoneVerified ? 'Verified' : 'Verify'),
-                  ),
-                ],
+                    const Gap(12),
+                    Expanded(
+                      child: Text(
+                        _isPhoneVerified
+                            ? 'Phone verified for SOS and community support.'
+                            : 'Verify your phone before using SOS and community support.',
+                      ),
+                    ),
+                    const Gap(12),
+                    FilledButton.tonal(
+                      onPressed: _isLoading ? null : _verifyPhone,
+                      child: Text(_isPhoneVerified ? 'Verified' : 'Verify'),
+                    ),
+                  ],
+                ),
               ),
-            ),
+            ],
             const Gap(32),
             FilledButton(
               onPressed: _isLoading ? null : _saveProfile,

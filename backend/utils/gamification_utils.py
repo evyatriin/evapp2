@@ -1,9 +1,8 @@
 import logging
 
-from supabase_client import get_supabase
+from supabase_client import supabase
 from datetime import datetime
 
-supabase = get_supabase()
 logger = logging.getLogger(__name__)
 
 async def award_points_internal(user_id: str, points: int, action_type: str):

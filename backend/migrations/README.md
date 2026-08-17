@@ -41,6 +41,12 @@ psql -h your-db-host -U postgres -d postgres -f migrations/001_create_station_ch
 - `010_content_catalog.sql` - Seeds the content catalog used for community guides and resources
 - `011_create_obd_sessions.sql` - Creates OBD session storage with RLS policies
 - `012_create_canonical_chargers.sql` - Adds PostGIS-backed canonical charger/source tables for backend aggregation
+- `013_add_private_charger_requests.sql` - Adds private charger request support
+- `014_expand_vehicle_templates.sql` - Seeds the broader India EV vehicle template list
+- `015_add_checkin_charging_details.sql` - Adds charging-session details to station check-ins
+- `015_hosted_charger_safety_and_trust.sql` - Adds hosted-charger safety, trust, and availability fields
+- `016_admin_metrics_tables.sql` - Adds admin API/user metrics tables and supporting indexes
+- `017_expand_vehicle_template_catalog_fields.sql` - Adds variant-level EV catalog fields such as battery, range cycle, charging, pricing, source, freshness, and confidence metadata
 
 ## Rollback
 

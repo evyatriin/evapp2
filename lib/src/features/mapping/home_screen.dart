@@ -283,7 +283,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     onMapCreated: (controller) {
                       _mapController = controller;
                       if (_devicePosition != null) {
-                        _moveMapToPosition(_devicePosition!, zoom: _currentZoom);
+                        _moveMapToPosition(
+                          _devicePosition!,
+                          zoom: _currentZoom,
+                        );
                       }
                     },
                     onCameraMove: (position) {
@@ -316,12 +319,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         FloatingActionButton.small(
                           heroTag: 'map_search',
                           tooltip: 'Search chargers by location',
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primaryContainer,
-                          foregroundColor: Theme.of(
-                            context,
-                          ).colorScheme.onPrimaryContainer,
+                          backgroundColor:
+                              Theme.of(context).colorScheme.primaryContainer,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.onPrimaryContainer,
                           elevation: 2,
                           onPressed: () => context.push('/search'),
                           child: Icon(
@@ -335,10 +336,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         FloatingActionButton.small(
                           heroTag: 'map_my_location',
                           tooltip: 'Center on my location',
-                          backgroundColor: Theme.of(context).colorScheme.surface,
-                          foregroundColor: Theme.of(context).colorScheme.primary,
+                          backgroundColor:
+                              Theme.of(context).colorScheme.surface,
+                          foregroundColor:
+                              Theme.of(context).colorScheme.primary,
                           elevation: 2,
-                          onPressed: () => _bootstrapMapLocation(showErrors: true),
+                          onPressed:
+                              () => _bootstrapMapLocation(showErrors: true),
                           child: const Icon(Icons.my_location, size: 20),
                         ),
                       ],
@@ -450,8 +454,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                               ),
                               const SizedBox(width: 8),
                               TextButton(
-                                onPressed: () =>
-                                    ref.invalidate(stationsProvider),
+                                onPressed:
+                                    () => ref.invalidate(stationsProvider),
                                 style: TextButton.styleFrom(
                                   foregroundColor:
                                       theme.colorScheme.onErrorContainer,
@@ -490,10 +494,7 @@ class _StationDetailsSheet extends StatefulWidget {
   final StationModel station;
   final LatLng? referenceLocation;
 
-  const _StationDetailsSheet({
-    required this.station,
-    this.referenceLocation,
-  });
+  const _StationDetailsSheet({required this.station, this.referenceLocation});
 
   @override
   State<_StationDetailsSheet> createState() => _StationDetailsSheetState();
@@ -599,14 +600,13 @@ class _StationDetailsSheetState extends State<_StationDetailsSheet> {
       _InfoItem(
         icon: PhosphorIcons.plug(PhosphorIconsStyle.duotone),
         label: 'Connectors',
-        value: station.connectors.isNotEmpty
-            ? station.connectors.join(', ')
-            : 'Not specified',
+        value:
+            station.connectors.isNotEmpty
+                ? station.connectors.join(', ')
+                : 'Not specified',
       ),
       _InfoItem(
-        icon: PhosphorIcons.clockCounterClockwise(
-          PhosphorIconsStyle.duotone,
-        ),
+        icon: PhosphorIcons.clockCounterClockwise(PhosphorIconsStyle.duotone),
         label: 'Updated',
         value: _isLoadingCheckIn ? '--' : _formatLastCharged(),
       ),
@@ -808,11 +808,7 @@ class _StationDetailsSheetState extends State<_StationDetailsSheet> {
           const SizedBox(height: 16),
 
           // Info Grid
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: infoItems,
-          ),
+          Wrap(spacing: 10, runSpacing: 10, children: infoItems),
 
           const SizedBox(height: 24),
 
@@ -906,9 +902,10 @@ class _FilterIconButton extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: isActive
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.surface.withValues(alpha: 0.94),
+              color:
+                  isActive
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.surface.withValues(alpha: 0.94),
               borderRadius: BorderRadius.circular(999),
               boxShadow: [
                 BoxShadow(
@@ -921,9 +918,10 @@ class _FilterIconButton extends StatelessWidget {
             child: Icon(
               Icons.tune,
               size: 20,
-              color: isActive
-                  ? theme.colorScheme.onPrimary
-                  : theme.colorScheme.primary,
+              color:
+                  isActive
+                      ? theme.colorScheme.onPrimary
+                      : theme.colorScheme.primary,
             ),
           ),
           if (isActive)
@@ -959,17 +957,14 @@ class _FilterIconButton extends StatelessWidget {
 class _MapStatPill extends StatelessWidget {
   final IconData icon;
   final String label;
-  final bool active;
 
-  const _MapStatPill({required this.icon, required this.label, this.active = false});
+  const _MapStatPill({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final bg = active
-        ? theme.colorScheme.primaryContainer.withValues(alpha: 0.97)
-        : theme.colorScheme.surface.withValues(alpha: 0.94);
-    final fg = active ? theme.colorScheme.onPrimaryContainer : theme.colorScheme.primary;
+    final bg = theme.colorScheme.surface.withValues(alpha: 0.94);
+    final fg = theme.colorScheme.primary;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -1048,9 +1043,12 @@ class _StationFilterSheet extends ConsumerWidget {
               children: [
                 Icon(Icons.tune, color: theme.colorScheme.primary),
                 const SizedBox(width: 10),
-                Text('Filter Chargers',
-                    style: theme.textTheme.titleLarge
-                        ?.copyWith(fontWeight: FontWeight.bold)),
+                Text(
+                  'Filter Chargers',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const Spacer(),
                 if (totalActive > 0)
                   TextButton(
@@ -1070,8 +1068,8 @@ class _StationFilterSheet extends ConsumerWidget {
               label: 'Connector Type',
               chips: const ['CCS2', 'Type 2', 'CHAdeMO', 'GB/T'],
               selected: connectors,
-              onToggle: (v) =>
-                  ref.read(connectorFilterProvider.notifier).toggle(v),
+              onToggle:
+                  (v) => ref.read(connectorFilterProvider.notifier).toggle(v),
             ),
             const SizedBox(height: 16),
 
@@ -1086,10 +1084,11 @@ class _StationFilterSheet extends ConsumerWidget {
                 ref.read(speedFilterProvider.notifier).toggle(key);
               },
               chipLabel: (chip) => chip, // already descriptive
-              isSelected: (chip) =>
-                  chip.startsWith('DC')
-                      ? speed.contains('DC Fast')
-                      : speed.contains('AC'),
+              isSelected:
+                  (chip) =>
+                      chip.startsWith('DC')
+                          ? speed.contains('DC Fast')
+                          : speed.contains('AC'),
             ),
             const SizedBox(height: 16),
 
@@ -1098,8 +1097,7 @@ class _StationFilterSheet extends ConsumerWidget {
               label: 'Price',
               chips: const ['Free', 'Paid', 'Community'],
               selected: price,
-              onToggle: (v) =>
-                  ref.read(priceFilterProvider.notifier).toggle(v),
+              onToggle: (v) => ref.read(priceFilterProvider.notifier).toggle(v),
             ),
             const SizedBox(height: 16),
 
@@ -1108,32 +1106,43 @@ class _StationFilterSheet extends ConsumerWidget {
               label: 'Access',
               chips: const ['Public', 'Community Hosted'],
               selected: access,
-              onToggle: (v) =>
-                  ref.read(accessFilterProvider.notifier).toggle(v),
+              onToggle:
+                  (v) => ref.read(accessFilterProvider.notifier).toggle(v),
             ),
             const SizedBox(height: 16),
 
             // ── Availability toggle ─────────────────────────────────────────
             Container(
               decoration: BoxDecoration(
-                color: availableNow
-                    ? theme.colorScheme.primaryContainer.withValues(alpha: 0.4)
-                    : theme.colorScheme.surfaceContainerHighest,
+                color:
+                    availableNow
+                        ? theme.colorScheme.primaryContainer.withValues(
+                          alpha: 0.4,
+                        )
+                        : theme.colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: SwitchListTile(
                 value: availableNow,
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                title: const Text('Available now only',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 2,
+                ),
+                title: const Text(
+                  'Available now only',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
                 subtitle: const Text('Hide busy and offline stations'),
-                secondary: Icon(Icons.bolt,
-                    color: availableNow
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.outline),
-                onChanged: (_) =>
-                    ref.read(availableNowFilterProvider.notifier).toggle(),
+                secondary: Icon(
+                  Icons.bolt,
+                  color:
+                      availableNow
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.outline,
+                ),
+                onChanged:
+                    (_) =>
+                        ref.read(availableNowFilterProvider.notifier).toggle(),
               ),
             ),
           ],
@@ -1166,27 +1175,34 @@ class _FilterSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: theme.textTheme.labelLarge
-                ?.copyWith(color: theme.colorScheme.secondary)),
+        Text(
+          label,
+          style: theme.textTheme.labelLarge?.copyWith(
+            color: theme.colorScheme.secondary,
+          ),
+        ),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 6,
-          children: chips.map((chip) {
-            final sel = isSelected != null
-                ? isSelected!(chip)
-                : selected.contains(chip);
-            final display = chipLabel != null ? chipLabel!(chip) : chip;
-            return FilterChip(
-              label: Text(display),
-              selected: sel,
-              onSelected: (_) => onToggle(chip),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity:
-                  const VisualDensity(horizontal: -1, vertical: -1),
-            );
-          }).toList(),
+          children:
+              chips.map((chip) {
+                final sel =
+                    isSelected != null
+                        ? isSelected!(chip)
+                        : selected.contains(chip);
+                final display = chipLabel != null ? chipLabel!(chip) : chip;
+                return FilterChip(
+                  label: Text(display),
+                  selected: sel,
+                  onSelected: (_) => onToggle(chip),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: const VisualDensity(
+                    horizontal: -1,
+                    vertical: -1,
+                  ),
+                );
+              }).toList(),
         ),
       ],
     );
@@ -1212,7 +1228,9 @@ class _InfoItem extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(
+            alpha: 0.45,
+          ),
           borderRadius: BorderRadius.circular(14),
         ),
         child: Column(

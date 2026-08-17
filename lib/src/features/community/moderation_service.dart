@@ -10,10 +10,7 @@ class ModerationService {
   }) async {
     await BackendService.post(
       '/api/users/block',
-      body: {
-        'blocker_id': blockerId,
-        'blocked_id': blockedId,
-      },
+      body: {'blocked_id': blockedId},
       headers: {'Authorization': 'Bearer $authToken'},
     );
   }
@@ -28,7 +25,6 @@ class ModerationService {
     await BackendService.post(
       '/api/users/report',
       body: {
-        'reporter_id': reporterId,
         'reported_user_id': reportedUserId,
         'reason': reason,
         if (details != null && details.isNotEmpty) 'details': details,

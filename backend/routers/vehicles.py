@@ -54,7 +54,21 @@ class VehicleTemplate(BaseModel):
     model: str
     variant: str
     range_efficiency: float
+    battery_kwh: Optional[float] = None
+    certified_range_km: Optional[float] = None
+    range_cycle: Optional[str] = None
+    real_world_range_km: Optional[float] = None
+    dc_fast_charge_kw: Optional[float] = None
+    ac_charge_kw: Optional[float] = None
+    connector_type: Optional[str] = None
+    price_min: Optional[float] = None
+    price_max: Optional[float] = None
+    launch_status: str = "available"
     image_url: str
+    source_url: Optional[str] = None
+    last_seen_at: Optional[str] = None
+    verified_at: Optional[str] = None
+    confidence_score: float = 0.6
     preferred_charging_networks: List[str]
 
 
@@ -166,13 +180,53 @@ def _coerce_template(item: Dict[str, Any]) -> VehicleTemplate:
     if not isinstance(networks, list) or not networks:
         networks = _default_networks(brand)
 
+    certified_range_km = _coerce_float(item.get("certified_range_km"))
+    if certified_range_km is None:
+        certified_range_km = _coerce_float(item.get("range_wltp_km"))
+
+    dc_fast_charge_kw = _coerce_float(item.get("dc_fast_charge_kw"))
+    if dc_fast_charge_kw is None:
+        dc_fast_charge_kw = _coerce_float(item.get("max_charging_power_kw"))
+
+    connector_type = str(item.get("connector_type") or "").strip() or None
+    connectors = item.get("connectors")
+    if connector_type is None and isinstance(connectors, list):
+        connector_type = ", ".join(
+            str(connector).strip()
+            for connector in connectors
+            if str(connector).strip()
+        ) or None
+
+    launch_status = str(item.get("launch_status") or "available").strip().lower()
+    if launch_status not in {"available", "upcoming", "discontinued"}:
+        launch_status = "available"
+
+    confidence_score = _coerce_float(item.get("confidence_score"))
+    if confidence_score is None:
+        confidence_score = 0.6
+    confidence_score = max(0, min(1, confidence_score))
+
     return VehicleTemplate(
         id=_normalized_template_id(brand, model, variant, item.get("id")),
         brand=brand,
         model=model,
         variant=variant,
         range_efficiency=range_efficiency,
+        battery_kwh=_coerce_float(item.get("battery_kwh")) or _coerce_float(item.get("battery_capacity_kwh")),
+        certified_range_km=certified_range_km,
+        range_cycle=str(item.get("range_cycle") or "").strip() or None,
+        real_world_range_km=_coerce_float(item.get("real_world_range_km")),
+        dc_fast_charge_kw=dc_fast_charge_kw,
+        ac_charge_kw=_coerce_float(item.get("ac_charge_kw")),
+        connector_type=connector_type,
+        price_min=_coerce_float(item.get("price_min")),
+        price_max=_coerce_float(item.get("price_max")),
+        launch_status=launch_status,
         image_url=image_url,
+        source_url=str(item.get("source_url") or "").strip() or None,
+        last_seen_at=str(item.get("last_seen_at") or "").strip() or None,
+        verified_at=str(item.get("verified_at") or "").strip() or None,
+        confidence_score=confidence_score,
         preferred_charging_networks=[str(network).strip() for network in networks if str(network).strip()],
     )
 
@@ -221,7 +275,12 @@ def _template(
         model=model,
         variant=variant,
         range_efficiency=_range_to_efficiency(range_km),
+        certified_range_km=range_km,
+        range_cycle="ARAI",
+        real_world_range_km=range_km,
+        launch_status="available",
         image_url=_vehicle_image_url(brand, model),
+        confidence_score=0.5,
         preferred_charging_networks=_default_networks(brand),
     )
 

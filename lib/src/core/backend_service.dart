@@ -1,16 +1,32 @@
 import 'dart:async';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_config.dart';
 
-class BackendService {
-  static final _client = http.Client();
+class BackendException implements Exception {
+  const BackendException({
+    required this.statusCode,
+    required this.message,
+    this.code,
+    this.fieldErrors,
+  });
 
-  // Route calculation calls external APIs (HERE routing, elevation, chargers) — needs 60s
-  static const _timeout = Duration(seconds: 60);
-  static const _retryDelay = Duration(seconds: 3);
+  final int statusCode;
+  final String message;
+  final String? code;
+  final Map<String, dynamic>? fieldErrors;
+
+  @override
+  String toString() => message;
+}
+
+class BackendService {
+  static final http.Client _client = http.Client();
+  static const Duration _timeout = Duration(seconds: 60);
+  static const Duration _retryDelay = Duration(seconds: 2);
 
   static String get baseUrl => AppConfig.backendBaseUrl;
 
@@ -18,107 +34,134 @@ class BackendService {
     String endpoint, {
     Map<String, String>? queryParams,
     Map<String, String>? headers,
-  }) =>
-      _getWithRetry(endpoint, queryParams: queryParams, headers: headers);
-
-  static Future<dynamic> _getWithRetry(
-    String endpoint, {
-    Map<String, String>? queryParams,
-    Map<String, String>? headers,
-    int attempt = 1,
-  }) async {
-    final uri = Uri.parse('$baseUrl$endpoint').replace(queryParameters: queryParams);
-    debugPrint('[BackendService] GET $uri (attempt $attempt)');
-    try {
-      final response = await _client.get(uri, headers: headers).timeout(_timeout);
-      debugPrint('[BackendService] Response: ${response.statusCode} (${response.body.length} bytes)');
-      if (response.statusCode == 503 && attempt < 2) {
-        await Future<void>.delayed(_retryDelay);
-        return _getWithRetry(endpoint, queryParams: queryParams, headers: headers, attempt: 2);
-      }
-      return _decode(response);
-    } on TimeoutException {
-      debugPrint('[BackendService] TIMEOUT: $uri');
-      throw Exception('Request timed out. Check your connection and try again.');
-    } catch (e) {
-      debugPrint('[BackendService] ERROR: $uri => $e');
-      throw Exception('Network Error: $e');
-    }
+    bool authenticated = true,
+  }) {
+    final uri = Uri.parse(
+      '$baseUrl$endpoint',
+    ).replace(queryParameters: queryParams);
+    return _send(
+      () async => _client.get(
+        uri,
+        headers: await _headers(headers, authenticated: authenticated),
+      ),
+      authenticated: authenticated,
+    );
   }
 
   static Future<dynamic> post(
     String endpoint, {
     required Map<String, dynamic> body,
     Map<String, String>? headers,
-  }) =>
-      _postWithRetry(endpoint, body: body, headers: headers);
-
-  static Future<dynamic> _postWithRetry(
-    String endpoint, {
-    required Map<String, dynamic> body,
-    Map<String, String>? headers,
-    int attempt = 1,
-  }) async {
+    bool authenticated = true,
+  }) {
     final uri = Uri.parse('$baseUrl$endpoint');
-    try {
-      final response = await _client
-          .post(
-            uri,
-            headers: {'Content-Type': 'application/json', ...?headers},
-            body: jsonEncode(body),
-          )
-          .timeout(_timeout);
-      if (response.statusCode == 503 && attempt < 2) {
-        await Future<void>.delayed(_retryDelay);
-        return _postWithRetry(endpoint, body: body, headers: headers, attempt: 2);
-      }
-      return _decode(response);
-    } on TimeoutException {
-      throw Exception('Request timed out. Check your connection and try again.');
-    } catch (e) {
-      throw Exception('Network Error: $e');
-    }
+    return _send(
+      () async => _client.post(
+        uri,
+        headers: await _headers({
+          'Content-Type': 'application/json',
+          ...?headers,
+        }, authenticated: authenticated),
+        body: jsonEncode(body),
+      ),
+      authenticated: authenticated,
+    );
   }
 
   static Future<dynamic> put(
     String endpoint, {
     required Map<String, dynamic> body,
     Map<String, String>? headers,
-  }) async {
+    bool authenticated = true,
+  }) {
     final uri = Uri.parse('$baseUrl$endpoint');
-    try {
-      final response = await _client
-          .put(
-            uri,
-            headers: {'Content-Type': 'application/json', ...?headers},
-            body: jsonEncode(body),
-          )
-          .timeout(_timeout);
-      return _decode(response);
-    } on TimeoutException {
-      throw Exception('Request timed out. Check your connection and try again.');
-    } catch (e) {
-      throw Exception('Network Error: $e');
-    }
+    return _send(
+      () async => _client.put(
+        uri,
+        headers: await _headers({
+          'Content-Type': 'application/json',
+          ...?headers,
+        }, authenticated: authenticated),
+        body: jsonEncode(body),
+      ),
+      authenticated: authenticated,
+    );
   }
 
   static Future<dynamic> delete(
     String endpoint, {
     Map<String, String>? headers,
-  }) async {
+    bool authenticated = true,
+  }) {
     final uri = Uri.parse('$baseUrl$endpoint');
+    return _send(
+      () async => _client.delete(
+        uri,
+        headers: await _headers(headers, authenticated: authenticated),
+      ),
+      authenticated: authenticated,
+    );
+  }
+
+  static Future<Map<String, String>> _headers(
+    Map<String, String>? headers, {
+    required bool authenticated,
+  }) async {
+    final result = <String, String>{...?headers};
+    if (!authenticated || result.containsKey('Authorization')) return result;
+
+    final session = Supabase.instance.client.auth.currentSession;
+    if (session != null) {
+      result['Authorization'] = 'Bearer ${session.accessToken}';
+    }
+    return result;
+  }
+
+  static Future<dynamic> _send(
+    Future<http.Response> Function() request, {
+    required bool authenticated,
+  }) async {
     try {
-      final response = await _client
-          .delete(uri, headers: headers)
-          .timeout(_timeout);
-      if (response.statusCode == 204 || response.body.trim().isEmpty) {
-        return null;
+      var response = await request().timeout(_timeout);
+
+      if (response.statusCode == 401 && authenticated) {
+        final currentSession = Supabase.instance.client.auth.currentSession;
+        if (currentSession != null) {
+          try {
+            await Supabase.instance.client.auth.refreshSession();
+            response = await request().timeout(_timeout);
+          } on AuthException {
+            await Supabase.instance.client.auth.signOut(
+              scope: SignOutScope.local,
+            );
+          }
+        }
       }
+
+      if (response.statusCode == 503) {
+        await Future<void>.delayed(_retryDelay);
+        response = await request().timeout(_timeout);
+      }
+
       return _decode(response);
+    } on BackendException {
+      rethrow;
     } on TimeoutException {
-      throw Exception('Request timed out. Check your connection and try again.');
-    } catch (e) {
-      throw Exception('Network Error: $e');
+      throw const BackendException(
+        statusCode: 408,
+        message: 'The request timed out. Check your connection and try again.',
+      );
+    } on AuthException {
+      throw const BackendException(
+        statusCode: 401,
+        message: 'Your session expired. Please sign in again.',
+      );
+    } catch (_) {
+      throw const BackendException(
+        statusCode: 0,
+        message:
+            'Unable to reach EVraahein. Check your connection and try again.',
+      );
     }
   }
 
@@ -127,6 +170,30 @@ class BackendService {
       if (response.body.trim().isEmpty) return null;
       return jsonDecode(response.body);
     }
-    throw Exception('Backend Error: ${response.statusCode} - ${response.body}');
+
+    String message = 'Something went wrong. Please try again.';
+    String? code;
+    Map<String, dynamic>? fieldErrors;
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        final detail = decoded['detail'];
+        if (detail is String && detail.isNotEmpty) message = detail;
+        if (decoded['message'] is String) {
+          message = decoded['message'] as String;
+        }
+        code = decoded['code'] as String?;
+        fieldErrors = decoded['field_errors'] as Map<String, dynamic>?;
+      }
+    } catch (_) {
+      // Keep the generic user-safe message for non-JSON upstream errors.
+    }
+
+    throw BackendException(
+      statusCode: response.statusCode,
+      message: message,
+      code: code,
+      fieldErrors: fieldErrors,
+    );
   }
 }

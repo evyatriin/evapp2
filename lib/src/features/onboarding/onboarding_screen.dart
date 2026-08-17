@@ -66,11 +66,15 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         return;
       }
     }
-    
+
     if (permission == LocationPermission.deniedForever) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permissions are permanently denied, we cannot request permissions.')),
+          const SnackBar(
+            content: Text(
+              'Location permissions are permanently denied, we cannot request permissions.',
+            ),
+          ),
         );
       }
       return;
@@ -90,11 +94,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         throw Exception('Please log in again to complete setup');
       }
 
-      await ref.read(userProvider.notifier).completeOnboarding(
-        phoneNumber: '',
-        isPhoneVerified: false,
-        vehicleDetails: {}, // Vehicle will be added via vehicle selection screen
-      );
+      await ref
+          .read(userProvider.notifier)
+          .completeOnboarding(name: _nameController.text.trim());
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('onboarding_completed', true);
@@ -119,7 +121,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   Widget build(BuildContext context) {
     // Watch the provider to keep it alive
     ref.watch(userProvider);
-    
+
     return Scaffold(
       body: SafeArea(
         child: Column(
@@ -133,10 +135,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     _currentPage = index;
                   });
                 },
-                children: [
-                  _buildProfileStep(),
-                  _buildLocationStep(),
-                ],
+                children: [_buildProfileStep(), _buildLocationStep()],
               ),
             ),
             // Bottom Navigation
@@ -154,9 +153,12 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                         height: 8,
                         width: _currentPage == index ? 24 : 8,
                         decoration: BoxDecoration(
-                          color: _currentPage == index
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.surfaceContainerHighest,
+                          color:
+                              _currentPage == index
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
@@ -165,29 +167,31 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   // Button
                   if (_currentPage == 1)
                     FilledButton(
-                      onPressed: (_isLoading || !_locationGranted)
-                          ? null
-                          : _completeOnboarding,
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : Text(_locationGranted
-                              ? 'Get Started'
-                              : 'Allow Location First'),
+                      onPressed: _isLoading ? null : _completeOnboarding,
+                      child:
+                          _isLoading
+                              ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                              : const Text('Get Started'),
                     )
                   else
                     FilledButton.tonal(
                       onPressed: () {
                         // Validation logic for profile step
                         if (_nameController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please enter your name')));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please enter your name'),
+                            ),
+                          );
                           return;
                         }
-                        // Navigate to vehicle selection screen
-                        context.push('/onboarding/vehicle-select');
                         _nextPage();
                       },
                       child: const Text('Next'),
@@ -208,16 +212,24 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Gap(40),
-          Icon(PhosphorIcons.userCircle(PhosphorIconsStyle.duotone), size: 64, color: Theme.of(context).colorScheme.primary),
+          Icon(
+            PhosphorIcons.userCircle(PhosphorIconsStyle.duotone),
+            size: 64,
+            color: Theme.of(context).colorScheme.primary,
+          ),
           const Gap(24),
           Text(
             'Let\'s get to know you',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const Gap(8),
           Text(
-            'We need a few details to set up your profile.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            'Add your name now. You can add a vehicle from Profile at any time.',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
           const Gap(32),
           TextField(
@@ -232,7 +244,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.35),
+              color: Theme.of(
+                context,
+              ).colorScheme.primaryContainer.withValues(alpha: 0.35),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -248,14 +262,14 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Phone verification moved to profile settings',
+                        'Vehicle setup is optional',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const Gap(4),
                       Text(
-                        'You can finish setup faster now and add your phone later from Profile when you want SOS and community help enabled.',
+                        'Start exploring immediately, then add a vehicle later for more accurate range planning.',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -271,24 +285,31 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     );
   }
 
-
   Widget _buildLocationStep() {
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(PhosphorIcons.mapPin(PhosphorIconsStyle.duotone), size: 80, color: Theme.of(context).colorScheme.primary),
+          Icon(
+            PhosphorIcons.mapPin(PhosphorIconsStyle.duotone),
+            size: 80,
+            color: Theme.of(context).colorScheme.primary,
+          ),
           const Gap(32),
           Text(
             'Enable Location',
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           const Gap(16),
           Text(
-            'We need your location to find nearby charging stations and plan routes from your current position.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            'Location helps find nearby chargers and plan from your current position. You can skip this and enable it later.',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
             textAlign: TextAlign.center,
           ),
           const Gap(48),
@@ -297,17 +318,36 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               children: [
                 Icon(Icons.check_circle, color: Colors.green, size: 64),
                 Gap(8),
-                Text('Location Access Granted!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 18)),
+                Text(
+                  'Location Access Granted!',
+                  style: TextStyle(
+                    color: Colors.green,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
+                ),
               ],
             )
           else
-            FilledButton.icon(
-              onPressed: _requestLocation,
-              icon: const Icon(Icons.location_on),
-              label: const Text('Grant Location Access'),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-              ),
+            Column(
+              children: [
+                FilledButton.icon(
+                  onPressed: _requestLocation,
+                  icon: const Icon(Icons.location_on),
+                  label: const Text('Enable Location'),
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                  ),
+                ),
+                const Gap(12),
+                Text(
+                  'Optional. You can continue without location access.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
             ),
         ],
       ),

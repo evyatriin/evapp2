@@ -20,9 +20,7 @@ class ProfileSettingsScreen extends ConsumerWidget {
     final vehicles = ref.watch(vehicleProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile & Settings'),
-      ),
+      appBar: AppBar(title: const Text('Profile & Settings')),
       body:
           user == null
               ? const Center(child: Text('Please login'))
@@ -40,7 +38,8 @@ class ProfileSettingsScreen extends ConsumerWidget {
                             children: [
                               CircleAvatar(
                                 radius: 30,
-                                backgroundColor: theme.colorScheme.primaryContainer,
+                                backgroundColor:
+                                    theme.colorScheme.primaryContainer,
                                 child: Text(
                                   user.name.isNotEmpty
                                       ? user.name[0].toUpperCase()
@@ -59,9 +58,13 @@ class ProfileSettingsScreen extends ConsumerWidget {
                                     ),
                                     Text(
                                       user.email,
-                                      style: theme.textTheme.bodyMedium?.copyWith(
-                                        color: theme.colorScheme.onSurfaceVariant,
-                                      ),
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color:
+                                                theme
+                                                    .colorScheme
+                                                    .onSurfaceVariant,
+                                          ),
                                     ),
                                     const Gap(4),
                                     Row(
@@ -268,7 +271,8 @@ class ProfileSettingsScreen extends ConsumerWidget {
                           SizedBox(
                             width: double.infinity,
                             child: FilledButton.icon(
-                              onPressed: () => context.push('/community-charging'),
+                              onPressed:
+                                  () => context.push('/community-charging'),
                               icon: const Icon(Icons.add_home_work_outlined),
                               label: const Text('Open Community Charging'),
                             ),
@@ -696,12 +700,10 @@ class _VehicleCard extends StatelessWidget {
   bool _hasImage() => vehicle.imageUrl != null || vehicle.photoUrl != null;
 
   ImageProvider _getImageProvider() {
-    final url = vehicle.photoUrl ?? vehicle.imageUrl;
-    if (url != null && url.startsWith('http')) {
+    final url = (vehicle.photoUrl ?? vehicle.imageUrl)!;
+    if (url.startsWith('http')) {
       return NetworkImage(url);
-    } else if (url != null) {
-      return FileImage(File(url));
     }
-    return const AssetImage('assets/placeholder.png');
+    return FileImage(File(url));
   }
 }

@@ -1,6 +1,6 @@
 import os
 from datetime import date, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -42,6 +42,197 @@ class BanRequest(BaseModel):
     user_id: str
     reason: str
 
+
+class VehicleTemplateCreate(BaseModel):
+    id: Optional[str] = None
+    brand: str
+    model: str
+    variant: str
+    battery_kwh: Optional[float] = None
+    certified_range_km: Optional[float] = None
+    range_cycle: Optional[str] = None
+    real_world_range_km: Optional[float] = None
+    dc_fast_charge_kw: Optional[float] = None
+    ac_charge_kw: Optional[float] = None
+    connector_type: Optional[str] = None
+    price_min: Optional[float] = None
+    price_max: Optional[float] = None
+    launch_status: Optional[str] = "available"
+    image_url: Optional[str] = None
+    source_url: Optional[str] = None
+    last_seen_at: Optional[str] = None
+    verified_at: Optional[str] = None
+    confidence_score: Optional[float] = None
+    preferred_charging_networks: Optional[List[str]] = None
+    is_active: Optional[bool] = True
+    sort_order: Optional[int] = 0
+    # Deprecated admin payload aliases kept so older dashboard builds do not fail.
+    battery_capacity_kwh: Optional[float] = None
+    max_charging_power_kw: Optional[float] = None
+    connectors: Optional[List[str]] = None
+    range_wltp_km: Optional[float] = None
+    efficiency_wh_km: Optional[float] = None
+
+
+class VehicleTemplateUpdate(BaseModel):
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    variant: Optional[str] = None
+    battery_kwh: Optional[float] = None
+    certified_range_km: Optional[float] = None
+    range_cycle: Optional[str] = None
+    real_world_range_km: Optional[float] = None
+    dc_fast_charge_kw: Optional[float] = None
+    ac_charge_kw: Optional[float] = None
+    connector_type: Optional[str] = None
+    price_min: Optional[float] = None
+    price_max: Optional[float] = None
+    launch_status: Optional[str] = None
+    image_url: Optional[str] = None
+    source_url: Optional[str] = None
+    last_seen_at: Optional[str] = None
+    verified_at: Optional[str] = None
+    confidence_score: Optional[float] = None
+    preferred_charging_networks: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+    sort_order: Optional[int] = None
+    # Deprecated admin payload aliases kept so older dashboard builds do not fail.
+    battery_capacity_kwh: Optional[float] = None
+    max_charging_power_kw: Optional[float] = None
+    connectors: Optional[List[str]] = None
+    range_wltp_km: Optional[float] = None
+    efficiency_wh_km: Optional[float] = None
+
+
+class ContentSectionCreate(BaseModel):
+    id: str
+    title: str
+    description: Optional[str] = None
+    icon: str = "book-open"
+    tone: str = "primary"
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class ContentSectionUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    tone: Optional[str] = None
+    sort_order: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+class ContentResourceCreate(BaseModel):
+    id: str
+    section_id: str
+    title: str
+    subtitle: Optional[str] = None
+    url: str
+    sort_order: int = 0
+    is_active: bool = True
+
+
+class ContentResourceUpdate(BaseModel):
+    section_id: Optional[str] = None
+    title: Optional[str] = None
+    subtitle: Optional[str] = None
+    url: Optional[str] = None
+    sort_order: Optional[int] = None
+    is_active: Optional[bool] = None
+
+
+def _admin_table(table_name: str):
+    client = service_supabase or supabase
+    if not client:
+        raise HTTPException(status_code=503, detail="Database client is unavailable")
+    return client.table(table_name)
+
+
+def _model_payload(model: BaseModel) -> Dict[str, Any]:
+    if hasattr(model, "model_dump"):
+        data = model.model_dump(exclude_none=True)
+    else:
+        data = model.dict(exclude_none=True)
+    return {
+        key: value
+        for key, value in data.items()
+        if value != "" and value != []
+    }
+
+
+def _normalized_vehicle_template_id(brand: str, model: str, variant: str) -> str:
+    raw_id = f"{brand}-{model}-{variant}".lower()
+    normalized_id = "".join(ch if ch.isalnum() else "-" for ch in raw_id).strip("-")
+    while "--" in normalized_id:
+        normalized_id = normalized_id.replace("--", "-")
+    return normalized_id
+
+
+def _normalize_vehicle_payload(
+    payload: Dict[str, Any],
+    *,
+    generate_id: bool = False,
+) -> Dict[str, Any]:
+    connectors = payload.get("connectors")
+    if isinstance(connectors, str):
+        connectors = [
+            item.strip()
+            for item in connectors.split(",")
+            if item.strip()
+        ]
+    if connectors and not payload.get("connector_type"):
+        payload["connector_type"] = ", ".join(str(item).strip() for item in connectors if str(item).strip())
+    payload.pop("connectors", None)
+
+    if payload.get("battery_kwh") is None and payload.get("battery_capacity_kwh") is not None:
+        payload["battery_kwh"] = payload["battery_capacity_kwh"]
+    payload.pop("battery_capacity_kwh", None)
+
+    if payload.get("dc_fast_charge_kw") is None and payload.get("max_charging_power_kw") is not None:
+        payload["dc_fast_charge_kw"] = payload["max_charging_power_kw"]
+    payload.pop("max_charging_power_kw", None)
+
+    if payload.get("certified_range_km") is None and payload.get("range_wltp_km") is not None:
+        payload["certified_range_km"] = payload["range_wltp_km"]
+        payload["range_cycle"] = payload.get("range_cycle") or "WLTP"
+    payload.pop("range_wltp_km", None)
+    payload.pop("efficiency_wh_km", None)
+
+    launch_status = payload.get("launch_status")
+    if isinstance(launch_status, str):
+        payload["launch_status"] = launch_status.strip().lower() or "available"
+
+    confidence_score = payload.get("confidence_score")
+    if confidence_score is not None:
+        payload["confidence_score"] = max(0, min(1, float(confidence_score)))
+
+    if generate_id and not payload.get("id") and all(payload.get(key) for key in ("brand", "model", "variant")):
+        payload["id"] = _normalized_vehicle_template_id(
+            str(payload["brand"]),
+            str(payload["model"]),
+            str(payload["variant"]),
+        )
+
+    return payload
+
+
+def _list_rows(table_name: str, order: str, limit: int):
+    return (
+        _admin_table(table_name)
+        .select("*")
+        .order(order)
+        .limit(limit)
+        .execute()
+    ).data or []
+
+
+def _single_written_row(response, missing_message: str):
+    rows = response.data or []
+    if not rows:
+        raise HTTPException(status_code=404, detail=missing_message)
+    return rows[0]
+
 # ---------------------------------------------------------------------------
 # Existing admin endpoints
 # ---------------------------------------------------------------------------
@@ -51,6 +242,8 @@ async def get_reports(auth_user: Dict[str, Any] = Depends(get_authenticated_user
         ensure_admin_user(auth_user)
         response = supabase.table("user_reports").select("*").eq("status", "Open").execute()
         return response.data
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -77,6 +270,8 @@ async def moderate_content(
             "target_id": request.content_id,
         }).execute()
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -91,7 +286,17 @@ async def ban_user(
     try:
         ensure_admin_user(auth_user)
         request.admin_id = auth_user["user_id"]
-        supabase.table("profiles").update({"is_banned": True}).eq("id", request.user_id).execute()
+        try:
+            supabase.table("profiles").update(
+                {"is_banned": True}
+            ).eq("id", request.user_id).execute()
+        except Exception as exc:
+            if "Could not find the 'is_banned' column" not in str(exc):
+                raise
+            raise HTTPException(
+                status_code=503,
+                detail="Admin ban requires the profiles.is_banned migration.",
+            )
         supabase.table("admin_audit_logs").insert({
             "admin_id": request.admin_id,
             "action": "ban_user",
@@ -99,6 +304,198 @@ async def ban_user(
             "details": {"reason": request.reason},
         }).execute()
         return {"status": "success", "message": "User banned"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Catalog and content management
+# ---------------------------------------------------------------------------
+@router.get("/vehicle-templates")
+async def list_vehicle_templates(
+    limit: int = 200,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    ensure_admin_user(auth_user)
+    try:
+        return _list_rows("vehicle_templates", "brand", limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/vehicle-templates")
+async def create_vehicle_template(
+    vehicle: VehicleTemplateCreate,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    ensure_admin_user(auth_user)
+    try:
+        payload = _normalize_vehicle_payload(_model_payload(vehicle), generate_id=True)
+        response = _admin_table("vehicle_templates").insert(payload).execute()
+        return _single_written_row(response, "Vehicle template was not created")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/vehicle-templates/{template_id}")
+async def update_vehicle_template(
+    template_id: str,
+    vehicle: VehicleTemplateUpdate,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    ensure_admin_user(auth_user)
+    try:
+        payload = _normalize_vehicle_payload(_model_payload(vehicle))
+        if not payload:
+            raise HTTPException(status_code=400, detail="No update fields supplied")
+        response = _admin_table("vehicle_templates").update(payload).eq("id", template_id).execute()
+        return _single_written_row(response, "Vehicle template not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/vehicle-templates/{template_id}")
+async def delete_vehicle_template(
+    template_id: str,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    ensure_admin_user(auth_user)
+    try:
+        response = _admin_table("vehicle_templates").delete().eq("id", template_id).execute()
+        _single_written_row(response, "Vehicle template not found")
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/content/sections")
+async def list_content_sections(
+    limit: int = 100,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    ensure_admin_user(auth_user)
+    try:
+        return _list_rows("app_resource_sections", "sort_order", limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/content/sections")
+async def create_content_section(
+    section: ContentSectionCreate,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    ensure_admin_user(auth_user)
+    try:
+        response = _admin_table("app_resource_sections").insert(_model_payload(section)).execute()
+        return _single_written_row(response, "Content section was not created")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/content/sections/{section_id}")
+async def update_content_section(
+    section_id: str,
+    section: ContentSectionUpdate,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    ensure_admin_user(auth_user)
+    try:
+        payload = _model_payload(section)
+        if not payload:
+            raise HTTPException(status_code=400, detail="No update fields supplied")
+        response = _admin_table("app_resource_sections").update(payload).eq("id", section_id).execute()
+        return _single_written_row(response, "Content section not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/content/sections/{section_id}")
+async def delete_content_section(
+    section_id: str,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    ensure_admin_user(auth_user)
+    try:
+        response = _admin_table("app_resource_sections").delete().eq("id", section_id).execute()
+        _single_written_row(response, "Content section not found")
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/content/resources")
+async def list_content_resources(
+    limit: int = 200,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    ensure_admin_user(auth_user)
+    try:
+        return _list_rows("app_resources", "sort_order", limit)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/content/resources")
+async def create_content_resource(
+    resource: ContentResourceCreate,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    ensure_admin_user(auth_user)
+    try:
+        response = _admin_table("app_resources").insert(_model_payload(resource)).execute()
+        return _single_written_row(response, "Content resource was not created")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.put("/content/resources/{resource_id}")
+async def update_content_resource(
+    resource_id: str,
+    resource: ContentResourceUpdate,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    ensure_admin_user(auth_user)
+    try:
+        payload = _model_payload(resource)
+        if not payload:
+            raise HTTPException(status_code=400, detail="No update fields supplied")
+        response = _admin_table("app_resources").update(payload).eq("id", resource_id).execute()
+        return _single_written_row(response, "Content resource not found")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/content/resources/{resource_id}")
+async def delete_content_resource(
+    resource_id: str,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    ensure_admin_user(auth_user)
+    try:
+        response = _admin_table("app_resources").delete().eq("id", resource_id).execute()
+        _single_written_row(response, "Content resource not found")
+        return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -273,9 +670,7 @@ async def get_metrics(days: int = 30, auth_user: Dict[str, Any] = Depends(get_au
 # Dashboard HTML (requires admin authentication)
 # ---------------------------------------------------------------------------
 @router.get("/dashboard", response_class=HTMLResponse)
-async def admin_dashboard(auth_user: Dict[str, Any] = Depends(get_authenticated_user)):
-    # CRITICAL FIX: Add authentication requirement
-    ensure_admin_user(auth_user)
+async def admin_dashboard():
     html_path = os.path.join(os.path.dirname(__file__), "..", "templates", "admin_dashboard.html")
     try:
         with open(html_path, encoding="utf-8") as f:

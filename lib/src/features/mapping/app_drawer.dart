@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/navigation_helpers.dart';
 import '../authentication/user_provider.dart';
 import '../community/gamification_widgets.dart';
+import '../../core/app_config.dart';
 
 class AppDrawer extends ConsumerStatefulWidget {
   const AppDrawer({super.key});
@@ -186,7 +187,9 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
           ListTile(
             leading: Icon(PhosphorIcons.houseLine(PhosphorIconsStyle.duotone)),
             title: const Text('Community Charging'),
-            subtitle: const Text('Private charger sharing and request coordination'),
+            subtitle: const Text(
+              'Private charger sharing and request coordination',
+            ),
             onTap: () {
               Navigator.pop(context);
               context.push('/community-charging');
@@ -205,19 +208,57 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
 
           ListTile(
             leading: Icon(
-              PhosphorIcons.warningCircle(PhosphorIconsStyle.duotone),
-              color: theme.colorScheme.error,
+              PhosphorIcons.plugsConnected(PhosphorIconsStyle.duotone),
+              color: theme.colorScheme.primary,
             ),
-            title: Text(
-              'Emergency SOS',
-              style: TextStyle(color: theme.colorScheme.error),
+            title: Row(
+              children: [
+                const Flexible(child: Text('Open Network')),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 7,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    'SOON',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onPrimary,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 9,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            subtitle: const Text('Get help fast in an emergency'),
+            subtitle: const Text('Discover & charge on Beckn · UEI'),
             onTap: () {
               Navigator.pop(context);
-              context.push('/sos');
+              context.push('/open-network');
             },
           ),
+
+          if (AppConfig.sosEnabled)
+            ListTile(
+              leading: Icon(
+                PhosphorIcons.warningCircle(PhosphorIconsStyle.duotone),
+                color: theme.colorScheme.error,
+              ),
+              title: Text(
+                'Emergency SOS',
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
+              subtitle: const Text('Get help fast in an emergency'),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/sos');
+              },
+            ),
 
           const Divider(),
 
@@ -331,7 +372,9 @@ class _AppDrawerState extends ConsumerState<AppDrawer> {
           ),
 
           ListTile(
-            leading: Icon(PhosphorIcons.shieldWarning(PhosphorIconsStyle.duotone)),
+            leading: Icon(
+              PhosphorIcons.shieldWarning(PhosphorIconsStyle.duotone),
+            ),
             title: const Text('Charging Safety Policy'),
             onTap: () {
               Navigator.pop(context);

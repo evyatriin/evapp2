@@ -2,7 +2,7 @@ import logging
 from urllib.parse import urlparse
 
 from fastapi import APIRouter, HTTPException, Depends, Header
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import httpx
 
@@ -17,19 +17,16 @@ logger = logging.getLogger(__name__)
 # Supabase Setup - using centralized client
 
 class BlockRequest(BaseModel):
-    blocker_id: str
     blocked_id: str
 
 class ReportRequest(BaseModel):
-    reporter_id: str
     reported_user_id: str
     reason: str
     details: Optional[str] = None
 
 class UpdateProfileRequest(BaseModel):
-    user_id: str
     name: Optional[str] = None
-    preferences: Optional[Dict[str, Any]] = {}
+    preferences: Dict[str, Any] = Field(default_factory=dict)
     phone_number: Optional[str] = None
     is_phone_verified: Optional[bool] = None
     vehicle_details: Optional[Dict[str, Any]] = None
@@ -153,32 +150,50 @@ async def _delete_supabase_auth_user(user_id: str):
         )
 
 @router.post("/block")
-async def block_user(request: BlockRequest):
+async def block_user(
+    request: BlockRequest,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     try:
-        data = request.dict()
+        if request.blocked_id == auth_user["user_id"]:
+            raise HTTPException(status_code=400, detail="You cannot block yourself")
+        data = {
+            "blocker_id": auth_user["user_id"],
+            "blocked_id": request.blocked_id,
+        }
         supabase.table("user_blocks").insert(data).execute()
         return {"status": "success", "message": "User blocked"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning("block_user failed: %s", e)
+        raise HTTPException(status_code=500, detail="Could not block user")
 
 @router.post("/report")
-async def report_user(request: ReportRequest):
+async def report_user(
+    request: ReportRequest,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     try:
-        data = request.dict()
+        data = {
+            **request.model_dump(),
+            "reporter_id": auth_user["user_id"],
+        }
         supabase.table("user_reports").insert(data).execute()
         return {"status": "success", "message": "User reported"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning("report_user failed: %s", e)
+        raise HTTPException(status_code=500, detail="Could not submit report")
 
-@router.put("/profile")
+@router.put("/me")
 async def update_profile(
     request: UpdateProfileRequest,
     auth_user: Dict[str, Any] = Depends(get_authenticated_user),
 ):
     try:
-        ensure_same_user(auth_user, request.user_id)
+        user_id = auth_user["user_id"]
         # Fetch existing profile to merge preferences
-        current = supabase.table("profiles").select("preferences").eq("id", request.user_id).execute()
+        current = supabase.table("profiles").select("preferences").eq("id", user_id).execute()
         current_prefs = current.data[0].get("preferences", {}) if current.data else {}
         
         # Update preferences with new data
@@ -194,15 +209,33 @@ async def update_profile(
         update_payload: Dict[str, Any] = {"preferences": current_prefs}
         if request.name:
             update_payload["name"] = request.name
-        supabase.table("profiles").update(update_payload).eq("id", request.user_id).execute()
+        try:
+            supabase.table("profiles").update(update_payload).eq("id", user_id).execute()
+        except Exception as exc:
+            if (
+                "Could not find the 'name' column" not in str(exc)
+                or "name" not in update_payload
+            ):
+                raise
+            current_prefs["name"] = request.name
+            supabase.table("profiles").update(
+                {"preferences": current_prefs}
+            ).eq("id", user_id).execute()
         return {"status": "success", "message": "Profile updated"}
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.warning("update_profile failed for %s: %s", auth_user["user_id"], e)
+        raise HTTPException(status_code=500, detail="Could not update profile")
 
 @router.get("/profile/{user_id}")
-async def get_profile(user_id: str):
+async def get_profile(
+    user_id: str,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     """Get full user profile including stats and badges"""
     try:
+        ensure_same_user(auth_user, user_id)
         # 1. Get basic profile
         profile_response = supabase.table("profiles").select("*").eq("id", user_id).execute()
         profile = profile_response.data[0] if profile_response.data else {}
@@ -225,13 +258,20 @@ async def get_profile(user_id: str):
             "stats": stats,
             "badges": badges
         }
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching profile: {str(e)}")
+        logger.exception("Error fetching profile for user %s", user_id)
+        raise HTTPException(status_code=500, detail="Could not load profile") from e
 
 @router.get("/{user_id}/statistics")
-async def get_user_statistics(user_id: str):
+async def get_user_statistics(
+    user_id: str,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     """Get user trip statistics with CO2 savings calculations"""
     try:
+        ensure_same_user(auth_user, user_id)
         # 1. Get check-ins count
         checkins_response = supabase.table("station_checkins").select("id", count="exact").eq("user_id", user_id).execute()
         total_check_ins = checkins_response.count or 0
@@ -243,9 +283,26 @@ async def get_user_statistics(user_id: str):
         total_trips = len(trips)
         
         # 3. Get charging sessions for kWh
-        sessions_response = supabase.table("charging_sessions").select("kwh_charged").eq("user_id", user_id).execute()
+        try:
+            sessions_response = (
+                supabase.table("charging_sessions")
+                .select("kwh_charged")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            kwh_key = "kwh_charged"
+        except Exception as exc:
+            if "charging_sessions.kwh_charged does not exist" not in str(exc):
+                raise
+            sessions_response = (
+                supabase.table("charging_sessions")
+                .select("kwh_added")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            kwh_key = "kwh_added"
         sessions = sessions_response.data or []
-        total_kwh = sum(s.get("kwh_charged", 0) or 0 for s in sessions)
+        total_kwh = sum(s.get(kwh_key, 0) or 0 for s in sessions)
         
         # 4. Calculate CO2 saved vs petrol car
         # Average petrol car: 120g CO2/km
@@ -267,9 +324,11 @@ async def get_user_statistics(user_id: str):
             "total_check_ins": total_check_ins,
             "total_trips": total_trips
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error fetching statistics for user %s", user_id)
-        raise HTTPException(status_code=500, detail=f"Error fetching statistics: {e}")
+        raise HTTPException(status_code=500, detail="Could not load statistics") from e
 
 @router.delete("/me")
 async def delete_my_account(auth_user: Dict[str, Any] = Depends(get_authenticated_user)):
@@ -280,7 +339,8 @@ async def delete_my_account(auth_user: Dict[str, Any] = Depends(get_authenticate
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Account deletion failed: {e}")
+        logger.exception("Account deletion failed for %s", auth_user["user_id"])
+        raise HTTPException(status_code=500, detail="Account deletion failed") from e
 
     return {
         "status": "success",

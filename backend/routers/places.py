@@ -1,12 +1,13 @@
 import asyncio
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 import httpx
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from config import settings
 from metrics_tracker import track_external_api
+from auth_utils import require_auth
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -31,7 +32,11 @@ def _require_google_maps_api_key() -> str:
 
 @router.post("/nearby")
 @limiter.limit("60/minute")
-async def get_nearby_places(request: Request, body: PlacesRequest):
+async def get_nearby_places(
+    request: Request,
+    body: PlacesRequest,
+    _auth=Depends(require_auth),
+):
     api_key = _require_google_maps_api_key()
 
     url = "https://places.googleapis.com/v1/places:searchNearby"
@@ -72,7 +77,11 @@ async def get_nearby_places(request: Request, body: PlacesRequest):
 
 @router.post("/food-nearby")
 @limiter.limit("60/minute")
-async def get_nearby_food_places(request: Request, body: FoodNearbyRequest):
+async def get_nearby_food_places(
+    request: Request,
+    body: FoodNearbyRequest,
+    _auth=Depends(require_auth),
+):
     api_key = _require_google_maps_api_key()
 
     url = "https://places.googleapis.com/v1/places:searchNearby"
@@ -168,7 +177,11 @@ async def _fetch_place_phone_number(
 
 @router.get("/autocomplete")
 @limiter.limit("60/minute")
-async def autocomplete(request: Request, input: str):
+async def autocomplete(
+    request: Request,
+    input: str,
+    _auth=Depends(require_auth),
+):
     if not settings.GOOGLE_MAPS_API_KEY:
         raise HTTPException(
             status_code=503,
@@ -194,7 +207,11 @@ async def autocomplete(request: Request, input: str):
 
 @router.get("/details")
 @limiter.limit("60/minute")
-async def place_details(request: Request, place_id: str):
+async def place_details(
+    request: Request,
+    place_id: str,
+    _auth=Depends(require_auth),
+):
     if not settings.GOOGLE_MAPS_API_KEY:
         raise HTTPException(
             status_code=503,

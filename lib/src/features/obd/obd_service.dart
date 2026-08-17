@@ -33,6 +33,7 @@ class ObdCommandRequest {
   final ObdResponseParser parser;
   final Duration timeout;
   final ObdEcuConfig? ecuConfig;
+  final int? mode01Pid;
 
   const ObdCommandRequest({
     required this.key,
@@ -40,6 +41,7 @@ class ObdCommandRequest {
     required this.parser,
     this.timeout = const Duration(seconds: 2),
     this.ecuConfig,
+    this.mode01Pid,
   });
 }
 
@@ -52,10 +54,10 @@ class ObdEnhancedProbe {
 
 /// Per-ECU CAN configuration: request header + ISO-TP flow control settings.
 class ObdEcuConfig {
-  final String txHeader;     // ATSH value, e.g. '7E4'
-  final String? fcHeader;   // ATFCSH value for multi-frame ISO-TP responses
-  final String? fcData;     // ATFCSD value (flow control data, e.g. '300000')
-  final bool fcMode1;       // whether to send ATFCSM1
+  final String txHeader; // ATSH value, e.g. '7E4'
+  final String? fcHeader; // ATFCSH value for multi-frame ISO-TP responses
+  final String? fcData; // ATFCSD value (flow control data, e.g. '300000')
+  final bool fcMode1; // whether to send ATFCSM1
 
   const ObdEcuConfig({
     required this.txHeader,
@@ -150,10 +152,14 @@ class ObdService {
   static final Guid _hm10Characteristic = Guid(
     '0000FFE1-0000-1000-8000-00805F9B34FB',
   );
-  static final Guid _vlinkService = Guid('000018F0-0000-1000-8000-00805F9B34FB');
+  static final Guid _vlinkService = Guid(
+    '000018F0-0000-1000-8000-00805F9B34FB',
+  );
   static final Guid _vlinkWrite = Guid('00002AF0-0000-1000-8000-00805F9B34FB');
   static final Guid _vlinkNotify = Guid('00002AF1-0000-1000-8000-00805F9B34FB');
-  static final Guid _nexasService = Guid('0000FFF0-0000-1000-8000-00805F9B34FB');
+  static final Guid _nexasService = Guid(
+    '0000FFF0-0000-1000-8000-00805F9B34FB',
+  );
   static final Guid _nexasWrite = Guid('0000FFF1-0000-1000-8000-00805F9B34FB');
   static final Guid _nexasNotify = Guid('0000FFF2-0000-1000-8000-00805F9B34FB');
   static final Guid _microchipService = Guid(
@@ -213,12 +219,78 @@ class ObdService {
       name: 'Hyundai/Kia EV (Ioniq5/6, Kona, EV6, Niro)',
       brandMatchers: ['hyundai', 'kia'],
       probes: [
-        ObdEnhancedProbe(key: 'batteryPercent',    requests: [ObdCommandRequest(key: 'batteryPercent',    command: '220101', ecuConfig: ObdEcuConfig.standard, timeout: const Duration(seconds: 5), parser: _parseHkSoc)]),
-        ObdEnhancedProbe(key: 'stateOfHealth',     requests: [ObdCommandRequest(key: 'stateOfHealth',     command: '220105', ecuConfig: ObdEcuConfig.standard, timeout: const Duration(seconds: 5), parser: _parseHkSoh)]),
-        ObdEnhancedProbe(key: 'batteryPackVoltage',requests: [ObdCommandRequest(key: 'batteryPackVoltage',command: '220101', ecuConfig: ObdEcuConfig.standard, timeout: const Duration(seconds: 5), parser: _parseHkVoltage)]),
-        ObdEnhancedProbe(key: 'batteryCurrent',    requests: [ObdCommandRequest(key: 'batteryCurrent',    command: '220101', ecuConfig: ObdEcuConfig.standard, timeout: const Duration(seconds: 5), parser: _parseHkCurrent)]),
-        ObdEnhancedProbe(key: 'batteryTempC',      requests: [ObdCommandRequest(key: 'batteryTempC',      command: '220101', ecuConfig: ObdEcuConfig.standard, timeout: const Duration(seconds: 5), parser: _parseHkTemp)]),
-        ObdEnhancedProbe(key: 'cellDeltaMv',       requests: [ObdCommandRequest(key: 'cellDeltaMv',       command: '220102', ecuConfig: ObdEcuConfig.standard, timeout: const Duration(seconds: 5), parser: _parseHkCellDelta)]),
+        ObdEnhancedProbe(
+          key: 'batteryPercent',
+          requests: [
+            ObdCommandRequest(
+              key: 'batteryPercent',
+              command: '220101',
+              ecuConfig: ObdEcuConfig.standard,
+              timeout: const Duration(seconds: 5),
+              parser: _parseHkSoc,
+            ),
+          ],
+        ),
+        ObdEnhancedProbe(
+          key: 'stateOfHealth',
+          requests: [
+            ObdCommandRequest(
+              key: 'stateOfHealth',
+              command: '220105',
+              ecuConfig: ObdEcuConfig.standard,
+              timeout: const Duration(seconds: 5),
+              parser: _parseHkSoh,
+            ),
+          ],
+        ),
+        ObdEnhancedProbe(
+          key: 'batteryPackVoltage',
+          requests: [
+            ObdCommandRequest(
+              key: 'batteryPackVoltage',
+              command: '220101',
+              ecuConfig: ObdEcuConfig.standard,
+              timeout: const Duration(seconds: 5),
+              parser: _parseHkVoltage,
+            ),
+          ],
+        ),
+        ObdEnhancedProbe(
+          key: 'batteryCurrent',
+          requests: [
+            ObdCommandRequest(
+              key: 'batteryCurrent',
+              command: '220101',
+              ecuConfig: ObdEcuConfig.standard,
+              timeout: const Duration(seconds: 5),
+              parser: _parseHkCurrent,
+            ),
+          ],
+        ),
+        ObdEnhancedProbe(
+          key: 'batteryTempC',
+          requests: [
+            ObdCommandRequest(
+              key: 'batteryTempC',
+              command: '220101',
+              ecuConfig: ObdEcuConfig.standard,
+              timeout: const Duration(seconds: 5),
+              parser: _parseHkTemp,
+            ),
+          ],
+        ),
+        ObdEnhancedProbe(
+          key: 'cellDeltaMv',
+          requests: [
+            ObdCommandRequest(
+              key: 'cellDeltaMv',
+              command: '220102',
+              ecuConfig: ObdEcuConfig.standard,
+              timeout: const Duration(seconds: 5),
+              parser: _parseHkCellDelta,
+            ),
+          ],
+        ),
       ],
     ),
 
@@ -228,11 +300,66 @@ class ObdService {
       name: 'MG ZS EV / MG Comet',
       brandMatchers: ['mg'],
       probes: [
-        ObdEnhancedProbe(key: 'batteryPercent',    requests: [ObdCommandRequest(key: 'batteryPercent',    command: '22B046', ecuConfig: ObdEcuConfig.mgBms, timeout: const Duration(seconds: 5), parser: _parseMgSoc)]),
-        ObdEnhancedProbe(key: 'stateOfHealth',     requests: [ObdCommandRequest(key: 'stateOfHealth',     command: '22B061', ecuConfig: ObdEcuConfig.mgBms, timeout: const Duration(seconds: 5), parser: _parseMgSoh)]),
-        ObdEnhancedProbe(key: 'batteryPackVoltage',requests: [ObdCommandRequest(key: 'batteryPackVoltage',command: '22B042', ecuConfig: ObdEcuConfig.mgBms, timeout: const Duration(seconds: 5), parser: _parseMgVoltage)]),
-        ObdEnhancedProbe(key: 'batteryCurrent',    requests: [ObdCommandRequest(key: 'batteryCurrent',    command: '22B043', ecuConfig: ObdEcuConfig.mgBms, timeout: const Duration(seconds: 5), parser: _parseMgCurrent)]),
-        ObdEnhancedProbe(key: 'batteryTempC',      requests: [ObdCommandRequest(key: 'batteryTempC',      command: '22B05C', ecuConfig: ObdEcuConfig.mgBms, timeout: const Duration(seconds: 5), parser: _parseMgTemp)]),
+        ObdEnhancedProbe(
+          key: 'batteryPercent',
+          requests: [
+            ObdCommandRequest(
+              key: 'batteryPercent',
+              command: '22B046',
+              ecuConfig: ObdEcuConfig.mgBms,
+              timeout: const Duration(seconds: 5),
+              parser: _parseMgSoc,
+            ),
+          ],
+        ),
+        ObdEnhancedProbe(
+          key: 'stateOfHealth',
+          requests: [
+            ObdCommandRequest(
+              key: 'stateOfHealth',
+              command: '22B061',
+              ecuConfig: ObdEcuConfig.mgBms,
+              timeout: const Duration(seconds: 5),
+              parser: _parseMgSoh,
+            ),
+          ],
+        ),
+        ObdEnhancedProbe(
+          key: 'batteryPackVoltage',
+          requests: [
+            ObdCommandRequest(
+              key: 'batteryPackVoltage',
+              command: '22B042',
+              ecuConfig: ObdEcuConfig.mgBms,
+              timeout: const Duration(seconds: 5),
+              parser: _parseMgVoltage,
+            ),
+          ],
+        ),
+        ObdEnhancedProbe(
+          key: 'batteryCurrent',
+          requests: [
+            ObdCommandRequest(
+              key: 'batteryCurrent',
+              command: '22B043',
+              ecuConfig: ObdEcuConfig.mgBms,
+              timeout: const Duration(seconds: 5),
+              parser: _parseMgCurrent,
+            ),
+          ],
+        ),
+        ObdEnhancedProbe(
+          key: 'batteryTempC',
+          requests: [
+            ObdCommandRequest(
+              key: 'batteryTempC',
+              command: '22B05C',
+              ecuConfig: ObdEcuConfig.mgBms,
+              timeout: const Duration(seconds: 5),
+              parser: _parseMgTemp,
+            ),
+          ],
+        ),
       ],
     ),
 
@@ -242,8 +369,30 @@ class ObdService {
       name: 'BYD Atto 3 / Dolphin / Seal',
       brandMatchers: ['byd'],
       probes: [
-        ObdEnhancedProbe(key: 'batteryPercent', requests: [ObdCommandRequest(key: 'batteryPercent', command: '221FFC', ecuConfig: ObdEcuConfig.bydBms, timeout: const Duration(seconds: 5), parser: _parseBydSoc)]),
-        ObdEnhancedProbe(key: 'batteryTempC',   requests: [ObdCommandRequest(key: 'batteryTempC',   command: '220032', ecuConfig: ObdEcuConfig.bydBms, timeout: const Duration(seconds: 5), parser: _parseBydTemp)]),
+        ObdEnhancedProbe(
+          key: 'batteryPercent',
+          requests: [
+            ObdCommandRequest(
+              key: 'batteryPercent',
+              command: '221FFC',
+              ecuConfig: ObdEcuConfig.bydBms,
+              timeout: const Duration(seconds: 5),
+              parser: _parseBydSoc,
+            ),
+          ],
+        ),
+        ObdEnhancedProbe(
+          key: 'batteryTempC',
+          requests: [
+            ObdCommandRequest(
+              key: 'batteryTempC',
+              command: '220032',
+              ecuConfig: ObdEcuConfig.bydBms,
+              timeout: const Duration(seconds: 5),
+              parser: _parseBydTemp,
+            ),
+          ],
+        ),
       ],
     ),
 
@@ -287,6 +436,8 @@ class ObdService {
   Completer<String>? _pendingResponse;
   final StringBuffer _responseBuffer = StringBuffer();
   String? _activeHeader;
+  Set<int>? _supportedMode01Pids;
+  bool _supportedMode01PidsLoaded = false;
 
   late void Function(List<ObdScanDevice>) _onScanResults;
   late void Function(bool) _onScanningChanged;
@@ -305,29 +456,35 @@ class ObdService {
   /// Generic UDS probes — tries multiple CAN headers (7E4 → 7E2 → 7E7).
   /// Used for Tata/Mahindra where no confirmed PIDs are published.
   static List<ObdEnhancedProbe> _buildGenericEvProbes() {
-    ObdCommandRequest req(String key, String cmd, ObdResponseParser parser, String header) =>
-        ObdCommandRequest(
-          key: key,
-          command: cmd,
-          ecuConfig: ObdEcuConfig(txHeader: header, fcHeader: null),
-          timeout: const Duration(seconds: 3),
-          parser: parser,
-        );
+    ObdCommandRequest req(
+      String key,
+      String cmd,
+      ObdResponseParser parser,
+      String header,
+    ) => ObdCommandRequest(
+      key: key,
+      command: cmd,
+      ecuConfig: ObdEcuConfig(txHeader: header, fcHeader: null),
+      timeout: const Duration(milliseconds: 1500),
+      parser: parser,
+    );
 
-    probe(String key, String cmd, ObdResponseParser parser) =>
-        ObdEnhancedProbe(key: key, requests: [
-          req(key, cmd, parser, '7E4'),
-          req(key, cmd, parser, '7E2'),
-          req(key, cmd, parser, '7E7'),
-        ]);
+    probe(String key, String cmd, ObdResponseParser parser) => ObdEnhancedProbe(
+      key: key,
+      requests: [
+        req(key, cmd, parser, '7E4'),
+        req(key, cmd, parser, '7E2'),
+        req(key, cmd, parser, '7E7'),
+      ],
+    );
 
     return [
-      probe('batteryPercent',     '220101', _parseExperimentalPercent),
+      probe('batteryPercent', '220101', _parseExperimentalPercent),
       probe('batteryPackVoltage', '220102', _parseExperimentalVoltage),
-      probe('batteryCurrent',     '220103', _parseExperimentalCurrent),
-      probe('batteryTempC',       '220104', _parseExperimentalTemperature),
-      probe('stateOfHealth',      '220105', _parseExperimentalPercent),
-      probe('cellDeltaMv',        '220106', _parseExperimentalCellDelta),
+      probe('batteryCurrent', '220103', _parseExperimentalCurrent),
+      probe('batteryTempC', '220104', _parseExperimentalTemperature),
+      probe('stateOfHealth', '220105', _parseExperimentalPercent),
+      probe('cellDeltaMv', '220106', _parseExperimentalCellDelta),
     ];
   }
 
@@ -523,7 +680,11 @@ class ObdService {
 
   Future<void> stopScan() async {
     _emitDiagnostic('scan', 'Stopping active scan.');
-    await FlutterBluePlus.stopScan();
+    try {
+      await FlutterBluePlus.stopScan();
+    } catch (e) {
+      _emitDiagnostic('scan', 'BLE scan stop failed: $e');
+    }
   }
 
   Future<void> connect(ObdScanDevice device) async {
@@ -533,23 +694,34 @@ class ObdService {
       'Opening ${device.transportLabel} link to ${device.name}.',
     );
 
-    if (device.transport == ObdTransport.classicBluetooth) {
-      await _connectClassic(device);
-      return;
-    }
+    try {
+      if (device.transport == ObdTransport.classicBluetooth) {
+        await _connectClassic(device);
+        return;
+      }
 
-    await _connectBle(device);
+      await _connectBle(device);
+    } catch (_) {
+      await _cleanupConnection();
+      rethrow;
+    }
   }
 
   Future<void> disconnect() async {
     _emitDiagnostic('connect', 'Disconnecting from adapter.');
-    _pendingResponse?.completeError(
+    await _cleanupConnection();
+  }
+
+  Future<void> _cleanupConnection() async {
+    _completePendingResponseError(
       StateError('Disconnected before the adapter replied.'),
     );
     _pendingResponse = null;
     _responseBuffer.clear();
     _activeHeader = null;
     _activeFcHeader = null;
+    _supportedMode01Pids = null;
+    _supportedMode01PidsLoaded = false;
 
     await _valueSubscription?.cancel();
     await _connectionSubscription?.cancel();
@@ -557,11 +729,22 @@ class ObdService {
     _connectionSubscription = null;
 
     if (_bleDevice != null && _bleDevice!.isConnected) {
-      await _bleDevice!.disconnect();
+      try {
+        await _bleDevice!.disconnect();
+      } catch (e) {
+        _emitDiagnostic('connect', 'BLE disconnect failed during cleanup: $e');
+      }
     }
 
     if (_activeTransport == ObdTransport.classicBluetooth) {
-      await FlutterBluetoothSerial.disconnect();
+      try {
+        await FlutterBluetoothSerial.disconnect();
+      } catch (e) {
+        _emitDiagnostic(
+          'classic',
+          'Classic Bluetooth disconnect failed during cleanup: $e',
+        );
+      }
     }
 
     _bleDevice = null;
@@ -572,87 +755,102 @@ class ObdService {
 
   Future<List<ObdCommandResult>> pollStandardTelemetry() async {
     _emitDiagnostic('poll', 'Polling standard OBD-II telemetry.');
-    final requests = <ObdCommandRequest>[
-      ObdCommandRequest(
-        key: 'speedKph',
-        command: '010D',
-        parser:
-            (response) => _parsePidValue(
-              response,
-              '010D',
-              (bytes) => bytes[0].toDouble(),
-            ),
-      ),
-      ObdCommandRequest(
-        key: 'rpm',
-        command: '010C',
-        parser:
-            (response) => _parsePidValue(
-              response,
-              '010C',
-              (bytes) => ((bytes[0] * 256) + bytes[1]) / 4,
-            ),
-      ),
-      ObdCommandRequest(
-        key: 'throttlePercent',
-        command: '0111',
-        parser:
-            (response) => _parsePidValue(
-              response,
-              '0111',
-              (bytes) => bytes[0] * 100 / 255,
-            ),
-      ),
-      ObdCommandRequest(
-        key: 'engineLoadPercent',
-        command: '0104',
-        parser:
-            (response) => _parsePidValue(
-              response,
-              '0104',
-              (bytes) => bytes[0] * 100 / 255,
-            ),
-      ),
-      ObdCommandRequest(
-        key: 'coolantTempC',
-        command: '0105',
-        parser:
-            (response) =>
-                _parsePidValue(response, '0105', (bytes) => bytes[0] - 40),
-      ),
-      ObdCommandRequest(
-        key: 'intakeTempC',
-        command: '010F',
-        parser:
-            (response) =>
-                _parsePidValue(response, '010F', (bytes) => bytes[0] - 40),
-      ),
-      ObdCommandRequest(
-        key: 'controlModuleVoltage',
-        command: '0142',
-        parser:
-            (response) => _parsePidValue(
-              response,
-              '0142',
-              (bytes) => ((bytes[0] * 256) + bytes[1]) / 1000,
-            ),
-      ),
-      ObdCommandRequest(
-        key: 'batteryPercent',
-        command: '015B',
-        parser:
-            (response) => _parsePidValue(
-              response,
-              '015B',
-              (bytes) => bytes[0] * 100 / 255,
-            ),
-      ),
-      ObdCommandRequest(
-        key: 'controlModuleVoltage',
-        command: 'ATRV',
-        parser: _parseVoltageString,
-      ),
-    ];
+    final supportedMode01Pids = await _ensureSupportedMode01Pids();
+    final requests =
+        <ObdCommandRequest>[
+          ObdCommandRequest(
+            key: 'speedKph',
+            command: '010D',
+            mode01Pid: 0x0D,
+            parser:
+                (response) => _parsePidValue(
+                  response,
+                  '010D',
+                  (bytes) => bytes[0].toDouble(),
+                ),
+          ),
+          ObdCommandRequest(
+            key: 'rpm',
+            command: '010C',
+            mode01Pid: 0x0C,
+            parser:
+                (response) => _parsePidValue(
+                  response,
+                  '010C',
+                  (bytes) => ((bytes[0] * 256) + bytes[1]) / 4,
+                ),
+          ),
+          ObdCommandRequest(
+            key: 'throttlePercent',
+            command: '0111',
+            mode01Pid: 0x11,
+            parser:
+                (response) => _parsePidValue(
+                  response,
+                  '0111',
+                  (bytes) => bytes[0] * 100 / 255,
+                ),
+          ),
+          ObdCommandRequest(
+            key: 'engineLoadPercent',
+            command: '0104',
+            mode01Pid: 0x04,
+            parser:
+                (response) => _parsePidValue(
+                  response,
+                  '0104',
+                  (bytes) => bytes[0] * 100 / 255,
+                ),
+          ),
+          ObdCommandRequest(
+            key: 'coolantTempC',
+            command: '0105',
+            mode01Pid: 0x05,
+            parser:
+                (response) =>
+                    _parsePidValue(response, '0105', (bytes) => bytes[0] - 40),
+          ),
+          ObdCommandRequest(
+            key: 'intakeTempC',
+            command: '010F',
+            mode01Pid: 0x0F,
+            parser:
+                (response) =>
+                    _parsePidValue(response, '010F', (bytes) => bytes[0] - 40),
+          ),
+          ObdCommandRequest(
+            key: 'controlModuleVoltage',
+            command: '0142',
+            mode01Pid: 0x42,
+            parser:
+                (response) => _parsePidValue(
+                  response,
+                  '0142',
+                  (bytes) => ((bytes[0] * 256) + bytes[1]) / 1000,
+                ),
+          ),
+          ObdCommandRequest(
+            key: 'batteryPercent',
+            command: '015B',
+            mode01Pid: 0x5B,
+            parser:
+                (response) => _parsePidValue(
+                  response,
+                  '015B',
+                  (bytes) => bytes[0] * 100 / 255,
+                ),
+          ),
+          ObdCommandRequest(
+            key: 'controlModuleVoltage',
+            command: 'ATRV',
+            parser: _parseVoltageString,
+          ),
+        ].where((request) {
+          final pid = request.mode01Pid;
+          return pid == null ||
+              supportedMode01Pids == null ||
+              supportedMode01Pids.contains(pid);
+        }).toList();
 
     final results = <ObdCommandResult>[];
     for (final request in requests) {
@@ -682,16 +880,35 @@ class ObdService {
       vehicleModel: vehicleModel,
     );
     if (profile == null) {
+      final hasVehicleIdentity =
+          (vehicleBrand?.trim().isNotEmpty ?? false) ||
+          (vehicleModel?.trim().isNotEmpty ?? false);
+      if (!hasVehicleIdentity) {
+        _emitDiagnostic(
+          'profile',
+          'No vehicle profile is selected yet; skipping EV-specific UDS probes.',
+        );
+        return const [];
+      }
       _emitDiagnostic(
         'profile',
-        'No enhanced EV battery profile matched this vehicle.',
+        'No enhanced EV battery profile matched this vehicle; trying generic EV battery probes.',
       );
-      return const [];
+      return _pollGenericEnhancedTelemetry();
     }
     _emitDiagnostic('profile', 'Using enhanced profile ${profile.name}.');
 
     final results = <ObdCommandResult>[];
     for (final probe in profile.probes) {
+      results.add(await _resolveEnhancedProbe(probe));
+    }
+    await _applyDefaultHeader();
+    return results;
+  }
+
+  Future<List<ObdCommandResult>> _pollGenericEnhancedTelemetry() async {
+    final results = <ObdCommandResult>[];
+    for (final probe in _buildGenericEvProbes()) {
       results.add(await _resolveEnhancedProbe(probe));
     }
     await _applyDefaultHeader();
@@ -758,7 +975,11 @@ class ObdService {
   void dispose() {
     _scanSubscription?.cancel();
     _isScanningSubscription?.cancel();
-    unawaited(disconnect());
+    unawaited(
+      disconnect().catchError(
+        (Object e) => _emitDiagnostic('connect', 'Dispose cleanup failed: $e'),
+      ),
+    );
   }
 
   Future<List<ObdScanDevice>> _startBleScan() async {
@@ -1036,18 +1257,24 @@ class ObdService {
       'ATS0',
       'ATH0',
       'ATAT2',
-      'ATCAF0',
+      'ATCAF1',
+      'ATCFC1',
       'ATAL',
-      'ATSP0',
+      'ATSP6',
     ]) {
       try {
         await _sendCommand(command);
       } catch (_) {
-        _emitDiagnostic('elm', 'Adapter ignored optional init command $command.');
+        _emitDiagnostic(
+          'elm',
+          'Adapter ignored optional init command $command.',
+        );
         // Cheap adapters vary a lot; keep going when a tuning command is ignored.
       }
     }
     await _applyDefaultHeader();
+    _supportedMode01Pids = await _refreshSupportedMode01Pids();
+    _supportedMode01PidsLoaded = true;
     _emitDiagnostic('elm', 'ELM327 initialization completed.');
   }
 
@@ -1063,9 +1290,7 @@ class ObdService {
       timeout: request.timeout,
     );
     final normalized = _normalizeResponse(response);
-    if (normalized.isEmpty ||
-        normalized.contains('NO DATA') ||
-        normalized.contains('ERROR')) {
+    if (_isAdapterNegativeResponse(normalized)) {
       _emitDiagnostic(
         'command',
         '${request.command} returned ${normalized.isEmpty ? 'empty response' : normalized}.',
@@ -1098,21 +1323,34 @@ class ObdService {
 
   Future<void> _configureEcu(ObdEcuConfig config) async {
     final needHeader = _activeHeader != config.txHeader;
-    final needFc = config.fcHeader != null && _activeFcHeader != config.fcHeader;
+    final needFc =
+        config.fcHeader != null && _activeFcHeader != config.fcHeader;
 
     if (!needHeader && !needFc) return;
 
     if (needHeader) {
       _emitDiagnostic('elm', 'Switching CAN header to ${config.txHeader}.');
-      await _sendCommand('ATSH${config.txHeader}', timeout: const Duration(seconds: 1));
+      await _sendCommand(
+        'ATSH${config.txHeader}',
+        timeout: const Duration(seconds: 1),
+      );
       _activeHeader = config.txHeader;
     }
 
     if (config.fcHeader != null && needFc) {
-      _emitDiagnostic('elm', 'Setting ISO-TP flow control to ${config.fcHeader}.');
-      await _sendCommand('ATFCSH${config.fcHeader}', timeout: const Duration(seconds: 1));
+      _emitDiagnostic(
+        'elm',
+        'Setting ISO-TP flow control to ${config.fcHeader}.',
+      );
+      await _sendCommand(
+        'ATFCSH${config.fcHeader}',
+        timeout: const Duration(seconds: 1),
+      );
       if (config.fcData != null) {
-        await _sendCommand('ATFCSD${config.fcData}', timeout: const Duration(seconds: 1));
+        await _sendCommand(
+          'ATFCSD${config.fcData}',
+          timeout: const Duration(seconds: 1),
+        );
       }
       if (config.fcMode1) {
         await _sendCommand('ATFCSM1', timeout: const Duration(seconds: 1));
@@ -1121,30 +1359,105 @@ class ObdService {
     }
   }
 
+  Future<Set<int>?> _ensureSupportedMode01Pids() async {
+    if (!_supportedMode01PidsLoaded) {
+      _supportedMode01Pids = await _refreshSupportedMode01Pids();
+      _supportedMode01PidsLoaded = true;
+    }
+    return _supportedMode01Pids;
+  }
+
+  Future<Set<int>?> _refreshSupportedMode01Pids() async {
+    try {
+      await _applyDefaultHeader();
+      final supported = <int>{};
+      var nextRangeCommand = '0100';
+
+      for (var guard = 0; guard < 5; guard++) {
+        final response = await _sendCommand(
+          nextRangeCommand,
+          timeout: const Duration(seconds: 3),
+        );
+        final normalized = _normalizeResponse(response);
+        if (_isAdapterNegativeResponse(normalized)) {
+          _emitDiagnostic(
+            'pid',
+            '$nextRangeCommand is not advertised by this EV; skipping unsupported standard PID polling.',
+          );
+          return supported;
+        }
+
+        final rangePid = int.parse(nextRangeCommand.substring(2), radix: 16);
+        final parsed = _parseSupportedPidRange(normalized, rangePid);
+        if (parsed.isEmpty) {
+          _emitDiagnostic(
+            'pid',
+            'Could not parse $nextRangeCommand PID bitmap from "$normalized"; falling back to direct polling.',
+          );
+          return null;
+        }
+
+        supported.addAll(parsed);
+        final nextRangePid = rangePid + 0x20;
+        if (!supported.contains(nextRangePid) || nextRangePid > 0xA0) {
+          break;
+        }
+        final nextRangeHex =
+            nextRangePid.toRadixString(16).padLeft(2, '0').toUpperCase();
+        nextRangeCommand = '01$nextRangeHex';
+      }
+
+      if (supported.isEmpty) {
+        _emitDiagnostic(
+          'pid',
+          'Vehicle did not advertise standard PID support; standard Mode 01 polling will be skipped.',
+        );
+      }
+
+      _emitDiagnostic(
+        'pid',
+        'Vehicle advertised ${supported.length} standard Mode 01 PID(s).',
+      );
+      return supported;
+    } catch (e) {
+      _emitDiagnostic(
+        'pid',
+        'Could not read supported PID map; falling back to direct polling: $e',
+      );
+      return null;
+    }
+  }
+
+  static Set<int> _parseSupportedPidRange(String response, int rangePid) {
+    final data = _modeResponseDataBytes(response, 0x01, rangePid);
+    if (data.length < 4) return const {};
+
+    final supported = <int>{};
+    for (var byteIndex = 0; byteIndex < 4; byteIndex++) {
+      final mask = data[byteIndex];
+      for (var bit = 0; bit < 8; bit++) {
+        if ((mask & (0x80 >> bit)) != 0) {
+          supported.add(rangePid + (byteIndex * 8) + bit + 1);
+        }
+      }
+    }
+    return supported;
+  }
+
   double? _parsePidValue(
     String response,
     String command,
     double Function(List<int> bytes) parser,
   ) {
-    final pid = command.substring(2);
-    final match = RegExp(
-      '41\\s*$pid\\s*([0-9A-F ]+)',
-      caseSensitive: false,
-    ).firstMatch(response);
-    if (match == null) return null;
-
-    final bytes =
-        match
-            .group(1)!
-            .trim()
-            .split(RegExp(r'\s+'))
-            .where((value) => value.isNotEmpty)
-            .map((value) => int.tryParse(value, radix: 16))
-            .whereType<int>()
-            .toList();
-
+    final pid = int.tryParse(command.substring(2), radix: 16);
+    if (pid == null) return null;
+    final bytes = _modeResponseDataBytes(response, 0x01, pid);
     if (bytes.isEmpty) return null;
-    return parser(bytes);
+    try {
+      return parser(bytes);
+    } on RangeError {
+      return null;
+    }
   }
 
   double? _parseVoltageString(String response) {
@@ -1159,44 +1472,44 @@ class ObdService {
     String command, {
     Duration timeout = const Duration(seconds: 2),
   }) async {
-    _pendingResponse?.completeError(
+    _completePendingResponseError(
       StateError('A new command was sent before the previous one completed.'),
     );
     _pendingResponse = Completer<String>();
     _responseBuffer.clear();
 
-    if (_activeTransport == ObdTransport.classicBluetooth) {
-      await FlutterBluetoothSerial.write('$command\r');
-      final response = await _readClassicResponse(timeout, command);
+    try {
+      if (_activeTransport == ObdTransport.classicBluetooth) {
+        await FlutterBluetoothSerial.write('$command\r');
+        return await _readClassicResponse(timeout, command);
+      }
+
+      final characteristic = _writeCharacteristic;
+      if (characteristic == null) {
+        throw StateError('No writable characteristic available.');
+      }
+
+      final bytes = ascii.encode('$command\r');
+      await characteristic.write(
+        bytes,
+        withoutResponse: characteristic.properties.writeWithoutResponse,
+      );
+
+      return await _pendingResponse!.future.timeout(
+        timeout,
+        onTimeout: () {
+          _emitDiagnostic(
+            'command',
+            '$command timed out waiting for adapter response over BLE.',
+          );
+          throw TimeoutException(
+            'BLE adapter timed out while waiting for $command.',
+          );
+        },
+      );
+    } finally {
       _pendingResponse = null;
-      return response;
     }
-
-    final characteristic = _writeCharacteristic;
-    if (characteristic == null) {
-      throw StateError('No writable characteristic available.');
-    }
-
-    final bytes = ascii.encode('$command\r');
-    await characteristic.write(
-      bytes,
-      withoutResponse: characteristic.properties.writeWithoutResponse,
-    );
-
-    final response = await _pendingResponse!.future.timeout(
-      timeout,
-      onTimeout: () {
-        _emitDiagnostic(
-          'command',
-          '$command timed out waiting for adapter response over BLE.',
-        );
-        throw TimeoutException(
-          'BLE adapter timed out while waiting for $command.',
-        );
-      },
-    );
-    _pendingResponse = null;
-    return response;
   }
 
   Future<String> _readClassicResponse(Duration timeout, String command) async {
@@ -1223,8 +1536,17 @@ class ObdService {
   void _handleValue(List<int> bytes) {
     final chunk = ascii.decode(bytes, allowInvalid: true);
     _responseBuffer.write(chunk);
-    if (_pendingResponse != null && _responseBuffer.toString().contains('>')) {
+    if (_pendingResponse != null &&
+        !_pendingResponse!.isCompleted &&
+        _responseBuffer.toString().contains('>')) {
       _pendingResponse!.complete(_responseBuffer.toString());
+    }
+  }
+
+  void _completePendingResponseError(Object error) {
+    final pending = _pendingResponse;
+    if (pending != null && !pending.isCompleted) {
+      pending.completeError(error);
     }
   }
 
@@ -1232,20 +1554,33 @@ class ObdService {
     return response
         .replaceAll('\r', '\n')
         .split('\n')
-        .map((line) => line.trim())
+        .map((line) => line.trim().toUpperCase())
         .where(
           (line) =>
               line.isNotEmpty &&
               line != '>' &&
               line != 'OK' &&
-              line != '?' &&
               !line.startsWith('AT'),
         )
         .join(' ')
         .replaceAll('SEARCHING...', '')
-        .replaceAll('STOPPED', '')
         .trim()
-        .toUpperCase();
+        .replaceAll(RegExp(r'\s+'), ' ');
+  }
+
+  static bool _isAdapterNegativeResponse(String response) {
+    final compact = response.replaceAll(RegExp(r'\s+'), '');
+    return compact.isEmpty ||
+        compact == '?' ||
+        compact.contains('NODATA') ||
+        compact.contains('UNABLETOCONNECT') ||
+        compact.contains('BUSINIT') ||
+        compact.contains('CANERROR') ||
+        compact.contains('BUFFERFULL') ||
+        compact.contains('RXERROR') ||
+        compact.contains('STOPPED') ||
+        compact.contains('ERROR') ||
+        compact.contains('DATAERROR');
   }
 
   static double? _parseExperimentalPercent(String response) {
@@ -1322,43 +1657,152 @@ class ObdService {
   }
 
   static List<int> _extractDiagnosticBytes(String response) {
-    final tokens =
-        response
-            .split(RegExp(r'\s+'))
-            .where((token) => RegExp(r'^[0-9A-F]{2}$').hasMatch(token))
-            .toList();
-    final bytes =
-        tokens
-            .map((token) => int.tryParse(token, radix: 16))
-            .whereType<int>()
-            .toList();
-    if (bytes.length >= 3 && bytes.first == 0x62) {
-      return bytes.sublist(3);
+    final bytes = _payloadBytesFromResponse(response);
+    for (var i = 0; i <= bytes.length - 3; i++) {
+      if (bytes[i] == 0x62) {
+        return bytes.sublist(i + 3);
+      }
     }
-    if (bytes.length >= 2 && bytes.first == 0x41) {
-      return bytes.sublist(2);
+    for (var i = 0; i <= bytes.length - 2; i++) {
+      if (bytes[i] == 0x41) {
+        return bytes.sublist(i + 2);
+      }
     }
     return bytes;
   }
 
-  static String? _parseVin(String response) {
-    final tokens =
+  static List<int> _modeResponseDataBytes(
+    String response,
+    int service,
+    int pid,
+  ) {
+    final positiveService = service + 0x40;
+    final bytes = _payloadBytesFromResponse(response);
+
+    for (var i = 0; i <= bytes.length - 2; i++) {
+      if (bytes[i] == positiveService && bytes[i + 1] == pid) {
+        return bytes.sublist(i + 2);
+      }
+    }
+    return const [];
+  }
+
+  static List<int> _payloadBytesFromResponse(String response) {
+    final lines =
         response
-            .split(RegExp(r'\s+'))
-            .where((token) => RegExp(r'^[0-9A-F]{2}$').hasMatch(token))
+            .toUpperCase()
+            .split(RegExp(r'[\r\n]+'))
+            .map((line) => line.trim())
+            .where((line) => line.isNotEmpty)
             .toList();
-    if (tokens.isEmpty) {
+
+    if (lines.length > 1) {
+      final frames = <int>[];
+      for (final line in lines) {
+        frames.addAll(_hexBytesFromLine(line));
+      }
+      return _stripIsoTpFrameBytes(frames);
+    }
+
+    final bytes = _hexBytesFromLine(response);
+    return _stripIsoTpFrameBytes(bytes);
+  }
+
+  static List<int> _hexBytesFromLine(String line) {
+    final tokenized =
+        line
+            .toUpperCase()
+            .split(RegExp(r'[^0-9A-F]+'))
+            .where((token) => token.isNotEmpty)
+            .toList();
+    if (tokenized.length > 1) {
+      final bytes = <int>[];
+      for (final token in tokenized) {
+        if (token.length == 3 ||
+            (token.length == 8 && token.startsWith(RegExp(r'18D[AB]')))) {
+          continue;
+        }
+        final evenLength = token.length - (token.length % 2);
+        for (var i = 0; i < evenLength; i += 2) {
+          final value = int.tryParse(token.substring(i, i + 2), radix: 16);
+          if (value != null) {
+            bytes.add(value);
+          }
+        }
+      }
+      return bytes;
+    }
+
+    var compact = line
+        .toUpperCase()
+        .replaceAll(RegExp(r'[^0-9A-F]'), '');
+    if (compact.length >= 12 && compact.startsWith(RegExp(r'18D[AB]'))) {
+      compact = compact.substring(8);
+    } else if (compact.length.isOdd && compact.length >= 5) {
+      compact = compact.substring(3);
+    }
+    if (compact.length < 2) return const [];
+
+    final evenLength = compact.length - (compact.length % 2);
+    final bytes = <int>[];
+    for (var i = 0; i < evenLength; i += 2) {
+      final value = int.tryParse(compact.substring(i, i + 2), radix: 16);
+      if (value != null) {
+        bytes.add(value);
+      }
+    }
+    return bytes;
+  }
+
+  static List<int> _stripIsoTpFrameBytes(List<int> bytes) {
+    if (bytes.isEmpty) return const [];
+
+    final firstFrameType = bytes.first & 0xF0;
+    if (firstFrameType == 0x00) {
+      final payloadLength = bytes.first & 0x0F;
+      final available = math.min(payloadLength, bytes.length - 1);
+      return bytes.sublist(1, 1 + available);
+    }
+    if (firstFrameType != 0x10) {
+      return bytes;
+    }
+
+    final stripped = <int>[];
+    stripped.addAll(bytes.sublist(2, math.min(8, bytes.length)));
+    for (var i = 8; i < bytes.length;) {
+      final frameType = bytes[i] & 0xF0;
+      if (frameType == 0x20) {
+        stripped.addAll(bytes.sublist(i + 1, math.min(i + 8, bytes.length)));
+        i += math.min(8, bytes.length - i);
+      } else {
+        stripped.add(bytes[i]);
+        i += 1;
+      }
+    }
+    return stripped;
+  }
+
+  static String? _parseVin(String response) {
+    final bytes = _payloadBytesFromResponse(response);
+    if (bytes.isEmpty) {
       return null;
     }
 
     final vinBytes = <int>[];
-    for (var i = 0; i <= tokens.length - 3; i++) {
-      if (tokens[i] == '49' && tokens[i + 1] == '02') {
+    for (var i = 0; i <= bytes.length - 3; i++) {
+      if (bytes[i] == 0x49 && bytes[i + 1] == 0x02) {
         i += 2;
-        while (i + 1 < tokens.length &&
-            !(tokens[i] == '49' && tokens[i + 1] == '02')) {
-          final value = int.tryParse(tokens[i], radix: 16);
-          if (value != null && value >= 32 && value <= 126) {
+        if (i < bytes.length && bytes[i] >= 0x01 && bytes[i] <= 0x05) {
+          i += 1; // skip Mode 09 frame index byte
+        }
+        while (i < bytes.length) {
+          if (i + 1 < bytes.length &&
+              bytes[i] == 0x49 &&
+              bytes[i + 1] == 0x02) {
+            break;
+          }
+          final value = bytes[i];
+          if (value >= 32 && value <= 126) {
             vinBytes.add(value);
           }
           i++;

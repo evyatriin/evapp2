@@ -2,12 +2,12 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime, date
-from supabase_client import get_supabase
+from supabase_client import supabase
+from auth_utils import ensure_same_user, get_authenticated_user
 
-router = APIRouter(prefix="/gamification", tags=["Gamification"])
-supabase = get_supabase()
+router = APIRouter()
 logger = logging.getLogger(__name__)
 
 # --- Models ---
@@ -48,20 +48,16 @@ class LeaderboardEntry(BaseModel):
     badge_count: int
     rank: int
 
-class AwardPointsRequest(BaseModel):
-    user_id: str
-    points: int
-    action_type: str # 'check_in', 'route', 'referral', etc.
-
-class UpdateStreakRequest(BaseModel):
-    user_id: str
-
 # --- Endpoints ---
 
 @router.get("/stats/{user_id}", response_model=UserStats)
-async def get_user_stats(user_id: str):
+async def get_user_stats(
+    user_id: str,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     """Get gamification stats for a specific user."""
     try:
+        ensure_same_user(auth_user, user_id)
         response = supabase.table("user_stats").select("*").eq("user_id", user_id).execute()
         
         if not response.data:
@@ -80,8 +76,11 @@ async def get_user_stats(user_id: str):
             raise HTTPException(status_code=404, detail="User stats not found and could not be created")
             
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching user stats: {str(e)}")
+        logger.exception("Error fetching user stats")
+        raise HTTPException(status_code=500, detail="Error fetching user stats") from e
 
 @router.get("/leaderboard", response_model=List[LeaderboardEntry])
 async def get_leaderboard():
@@ -110,68 +109,6 @@ async def get_user_badges(user_id: str):
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error fetching user badges: {str(e)}")
-
-from utils.gamification_utils import award_points_internal
-
-@router.post("/points/award")
-async def award_points(request: AwardPointsRequest):
-    """
-    Award points to a user. 
-    This should be called internally by other services or secured endpoints.
-    """
-    try:
-        new_total = await award_points_internal(request.user_id, request.points, request.action_type)
-        if new_total is None:
-             raise HTTPException(status_code=500, detail="Failed to award points")
-        
-        return {"message": "Points awarded successfully", "new_total": new_total}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error awarding points: {str(e)}")
-
-@router.post("/streak/update")
-async def update_streak(request: UpdateStreakRequest):
-    """Update user's daily streak."""
-    try:
-        stats_response = supabase.table("user_stats").select("*").eq("user_id", request.user_id).execute()
-        
-        if not stats_response.data:
-            # Initialize
-            supabase.table("user_stats").insert({"user_id": request.user_id, "current_streak": 1, "last_active_date": datetime.now().date().isoformat()}).execute()
-            return {"message": "Streak started", "current_streak": 1}
-            
-        stats = stats_response.data[0]
-        last_active = datetime.strptime(stats["last_active_date"], "%Y-%m-%d").date() if stats["last_active_date"] else None
-        today = datetime.now().date()
-        
-        if last_active == today:
-            return {"message": "Already active today", "current_streak": stats["current_streak"]}
-            
-        if last_active and (today - last_active).days == 1:
-            # Consecutive day
-            new_streak = stats["current_streak"] + 1
-            longest = max(stats["longest_streak"], new_streak)
-            supabase.table("user_stats").update({
-                "current_streak": new_streak,
-                "longest_streak": longest,
-                "last_active_date": today.isoformat()
-            }).eq("user_id", request.user_id).execute()
-            
-            # Check streak badge
-            await _check_streak_badge(request.user_id, new_streak)
-            
-            return {"message": "Streak updated", "current_streak": new_streak}
-        else:
-            # Streak broken
-            supabase.table("user_stats").update({
-                "current_streak": 1,
-                "last_active_date": today.isoformat()
-            }).eq("user_id", request.user_id).execute()
-            return {"message": "Streak reset", "current_streak": 1}
-            
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error updating streak: {str(e)}")
-
-
 
 async def _check_streak_badge(user_id: str, streak: int):
     """Check specifically for streak badges."""

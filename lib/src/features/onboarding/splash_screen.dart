@@ -19,11 +19,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _checkOnboardingStatus() async {
-    // Add a small delay to show the splash screen
-    await Future.delayed(const Duration(seconds: 2));
-
-    // Check authentication status
     final authService = AuthService();
+    await authService.restoreSession();
     final isAuthenticated = authService.isAuthenticated();
 
     if (mounted) {

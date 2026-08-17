@@ -48,6 +48,14 @@ def _require_supabase():
             detail="Saved routes are temporarily unavailable because the database is not configured.",
         )
 
+
+def _normalize_saved_route(row: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = dict(row)
+    normalized.setdefault("charging_stops", 0)
+    normalized.setdefault("is_favorite", False)
+    return normalized
+
+
 @router.get("/", response_model=List[SavedRoute])
 async def get_saved_routes(
     user_id: str,
@@ -59,7 +67,7 @@ async def get_saved_routes(
     
     try:
         response = supabase.table("saved_routes").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
-        return response.data
+        return [_normalize_saved_route(item) for item in response.data]
     except HTTPException:
         raise
     except Exception as e:
@@ -79,7 +87,22 @@ async def save_route(
         if not data.get("created_at"):
             data["created_at"] = datetime.now().isoformat()
             
-        response = supabase.table("saved_routes").insert(data).execute()
+        response = None
+        missing_route_columns = ("charging_stops", "is_favorite")
+        for _ in range(len(missing_route_columns) + 1):
+            try:
+                response = supabase.table("saved_routes").insert(data).execute()
+                break
+            except Exception as exc:
+                message = str(exc)
+                removed = False
+                for column in missing_route_columns:
+                    if f"Could not find the '{column}' column" in message:
+                        data.pop(column, None)
+                        removed = True
+                        break
+                if not removed:
+                    raise
         
         if response.data:
             # Award points for planning/saving a route
@@ -89,7 +112,7 @@ async def save_route(
             except Exception as e:
                 logger.warning("Error awarding points for route save: %s", e)
 
-            return response.data[0]
+            return _normalize_saved_route(response.data[0])
         else:
             raise HTTPException(status_code=500, detail="Failed to save route")
     except HTTPException:
@@ -118,11 +141,6 @@ async def delete_route(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete route: {e}")
 
-# Support for GET delete for compatibility if needed, but DELETE is preferred
-@router.get("/{route_id}/delete")
-async def delete_route_get(route_id: str):
-    return await delete_route(route_id)
-
 @router.post("/{route_id}/favorite")
 async def toggle_favorite(
     route_id: str,
@@ -138,7 +156,16 @@ async def toggle_favorite(
         if not route:
             raise HTTPException(status_code=404, detail="Route not found")
         ensure_same_user(auth_user, route["user_id"])
-        supabase.table("saved_routes").update({"is_favorite": update.is_favorite}).eq("id", route_id).execute()
+        try:
+            supabase.table("saved_routes").update(
+                {"is_favorite": update.is_favorite}
+            ).eq("id", route_id).execute()
+        except Exception as exc:
+            if "Could not find the 'is_favorite' column" not in str(exc):
+                raise
+            logger.warning(
+                "saved_routes.is_favorite is missing; favorite state was not persisted"
+            )
         return {"message": "Favorite updated"}
     except HTTPException:
         raise

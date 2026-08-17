@@ -555,12 +555,18 @@ class ChargingService {
 
   Future<String?> uploadHostedChargerImage(String filePath) async {
     try {
+      final token = _authService.getAuthToken();
+      if (token == null) {
+        throw Exception('You must be signed in to upload charger images.');
+      }
+
       final request = http.MultipartRequest(
         'POST',
         Uri.parse(
           '${BackendService.baseUrl}/api/chargers/upload-hosted-charger-image',
         ),
       );
+      request.headers['Authorization'] = 'Bearer $token';
 
       request.files.add(await http.MultipartFile.fromPath('file', filePath));
       final response = await request.send();

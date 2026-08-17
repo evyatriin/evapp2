@@ -156,6 +156,7 @@ async def get_resources(limit: int = Query(12, ge=1, le=50)):
         sections_response = (
             supabase.table("app_resource_sections")
             .select("*")
+            .eq("is_active", True)
             .order("sort_order")
             .limit(limit)
             .execute()
@@ -169,6 +170,7 @@ async def get_resources(limit: int = Query(12, ge=1, le=50)):
             supabase.table("app_resources")
             .select("*")
             .in_("section_id", section_ids)
+            .eq("is_active", True)
             .order("sort_order")
             .execute()
         )

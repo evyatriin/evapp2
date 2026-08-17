@@ -7,6 +7,12 @@ on:
       - backend/**
       - .github/workflows/deploy_backend.yml
 
+env:
+  GCP_PROJECT_ID: evraahein-prod
+  GCP_REGION: asia-south1
+  CLOUD_RUN_SERVICE: evraahein-backend
+  RUNTIME_SERVICE_ACCOUNT: evraahein-backend-runtime@evraahein-prod.iam.gserviceaccount.com
+
 jobs:
   deploy:
     name: Build & deploy
@@ -18,39 +24,61 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate backend
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+          python -m compileall .
+          python -c "import main; assert len(main.app.routes) > 0"
+          pytest -q
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: projects/187759131948/locations/global/workloadIdentityPools/github-actions/providers/github
+          service_account: github-cloud-run-deployer@evraahein-prod.iam.gserviceaccount.com
 
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
 
       - name: Deploy to Cloud Run
         run: |
-          gcloud run deploy ev-ranger-backend \
+          gcloud run deploy "$CLOUD_RUN_SERVICE" \
             --source backend \
-            --region asia-south1 \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
             --platform managed \
             --allow-unauthenticated \
+            --service-account "$RUNTIME_SERVICE_ACCOUNT" \
             --port 8080 \
             --memory 512Mi \
             --cpu 1 \
             --min-instances 1 \
             --max-instances 5 \
-            --set-env-vars "APP_ENV=production,\
-          ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }},\
-          SUPABASE_URL=${{ secrets.SUPABASE_URL }},\
-          SUPABASE_KEY=${{ secrets.SUPABASE_KEY }},\
-          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }},\
-          GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }},\
-          HERE_API_KEY=${{ secrets.HERE_API_KEY }},\
-          SENTRY_DSN=${{ secrets.SENTRY_DSN }}"
+            --concurrency 10 \
+            --set-env-vars "^@^APP_ENV=production@ALLOWED_ORIGINS=https://evraahein.app,https://www.evraahein.app@FEATURE_SOS_ENABLED=false@ELEVATION_ENABLED=true@ELEVATION_API_TIMEOUT_SECONDS=30@PASSWORD_RESET_REDIRECT_URL=https://evraahein-backend-187759131948.asia-south1.run.app/reset-password" \
+            --set-secrets "SUPABASE_URL=supabase-url:latest,SUPABASE_KEY=supabase-anon-key:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-role-key:latest,GOOGLE_MAPS_API_KEY=google-maps-api-key:latest,HERE_API_KEY=here-api-key:latest"
 
       - name: Verify deployment health
         run: |
-          URL=$(gcloud run services describe ev-ranger-backend \
-            --region asia-south1 \
+          URL=$(gcloud run services describe "$CLOUD_RUN_SERVICE" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
             --format='value(status.url)')
           echo "Deployed to: $URL"
           curl --fail --max-time 15 "$URL/ready"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            --max-time 15 "$URL/api/auth/user")" = "401"
+
+          LOGIN_RESPONSE=$(curl --silent --show-error --max-time 20 \
+            --request POST "$URL/api/auth/login" \
+            --header "Content-Type: application/json" \
+            --data "{\"email\":\"deployment-smoke-${GITHUB_RUN_ID}@example.com\",\"password\":\"NotARealPassword123!\"}")
+          echo "$LOGIN_RESPONSE" | grep -q "Invalid login credentials"

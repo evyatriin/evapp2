@@ -118,16 +118,4 @@ class GamificationService {
       return [];
     }
   }
-
-  Future<void> updateStreak(String userId) async {
-    try {
-      await http.post(
-        Uri.parse('$_baseUrl/streak/update'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'user_id': userId}),
-      );
-    } catch (e) {
-      debugPrint('Error updating streak: $e');
-    }
-  }
 }

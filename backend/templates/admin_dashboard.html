@@ -15,12 +15,18 @@
     th { color: #94a3b8; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 12px; text-align: left; border-bottom: 1px solid #334155; }
     td { padding: 8px 12px; border-bottom: 1px solid #1e293b; font-size: 0.875rem; }
     tr:hover td { background: #1e293b55; }
-    input { background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; color: #e2e8f0; padding: 10px 14px; width: 100%; }
-    input:focus { outline: 2px solid #22c55e; }
+    input, select, textarea { background: #1e293b; border: 1px solid #334155; border-radius: 0.5rem; color: #e2e8f0; padding: 10px 14px; width: 100%; }
+    input:focus, select:focus, textarea:focus { outline: 2px solid #22c55e; }
     .btn { padding: 10px 20px; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
     .btn:hover { opacity: 0.85; }
     .btn-green { background: #16a34a; color: white; }
     .btn-ghost { background: #334155; color: #cbd5e1; }
+    .btn-red { background: #7f1d1d; color: #fecaca; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    .wide { grid-column: 1 / -1; }
+    .status { min-height: 20px; font-size: .8rem; color: #94a3b8; }
+    .status.error { color: #fca5a5; }
+    .status.ok { color: #86efac; }
     ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: #0f172a; }
     ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
   </style>
@@ -156,6 +162,114 @@
       <canvas id="costChart" height="80"></canvas>
     </div>
 
+    <!-- Catalog Management -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <section class="card p-4">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <p class="font-semibold text-slate-200">Vehicle Catalog</p>
+          <button class="btn btn-ghost text-sm py-1.5" onclick="resetVehicleForm()">New</button>
+        </div>
+        <form id="vehicleForm" class="form-grid mb-4" onsubmit="saveVehicleTemplate(event)">
+          <input type="hidden" name="id" />
+          <input name="brand" placeholder="Brand" required />
+          <input name="model" placeholder="Model" required />
+          <input name="variant" placeholder="Variant" required />
+          <input name="battery_kwh" placeholder="Battery kWh" type="number" step="0.1" />
+          <input name="certified_range_km" placeholder="Certified range km" type="number" step="1" />
+          <select name="range_cycle">
+            <option value="">Range cycle</option>
+            <option value="ARAI">ARAI</option>
+            <option value="WLTP">WLTP</option>
+            <option value="MIDC">MIDC</option>
+            <option value="EPA">EPA</option>
+            <option value="NEDC">NEDC</option>
+          </select>
+          <input name="real_world_range_km" placeholder="Real range km" type="number" step="1" />
+          <input name="dc_fast_charge_kw" placeholder="DC fast charge kW" type="number" step="1" />
+          <input name="ac_charge_kw" placeholder="AC charge kW" type="number" step="0.1" />
+          <input name="connector_type" placeholder="Connector type" />
+          <input name="price_min" placeholder="Min price" type="number" step="1" />
+          <input name="price_max" placeholder="Max price" type="number" step="1" />
+          <select name="launch_status">
+            <option value="available">Available</option>
+            <option value="upcoming">Upcoming</option>
+            <option value="discontinued">Discontinued</option>
+          </select>
+          <input name="confidence_score" placeholder="Confidence 0-1" type="number" min="0" max="1" step="0.01" />
+          <input class="wide" name="image_url" placeholder="Image URL" />
+          <input class="wide" name="source_url" placeholder="Source URL" />
+          <div class="wide flex items-center gap-3">
+            <button class="btn btn-green" type="submit">Save Vehicle</button>
+            <span id="vehicleStatus" class="status"></span>
+          </div>
+        </form>
+        <div class="overflow-x-auto">
+          <table>
+            <thead><tr><th>Vehicle</th><th>Range</th><th>Battery</th><th>Charging</th><th>Status</th><th></th></tr></thead>
+            <tbody id="vehicle-table"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card p-4">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <p class="font-semibold text-slate-200">Content Sections</p>
+          <button class="btn btn-ghost text-sm py-1.5" onclick="resetSectionForm()">New</button>
+        </div>
+        <form id="sectionForm" class="form-grid mb-4" onsubmit="saveContentSection(event)">
+          <input name="id" placeholder="ID" required />
+          <input name="title" placeholder="Title" required />
+          <input name="icon" placeholder="Icon" value="book-open" />
+          <input name="tone" placeholder="Tone" value="primary" />
+          <input name="sort_order" placeholder="Sort" type="number" step="1" value="0" />
+          <select name="is_active">
+            <option value="true">Active</option>
+            <option value="false">Inactive</option>
+          </select>
+          <textarea class="wide" name="description" rows="2" placeholder="Description"></textarea>
+          <div class="wide flex items-center gap-3">
+            <button class="btn btn-green" type="submit">Save Section</button>
+            <span id="sectionStatus" class="status"></span>
+          </div>
+        </form>
+        <div class="overflow-x-auto">
+          <table>
+            <thead><tr><th>Section</th><th>Tone</th><th>Sort</th><th>Status</th><th></th></tr></thead>
+            <tbody id="section-table"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <section class="card p-4">
+      <div class="flex items-center justify-between gap-3 mb-3">
+        <p class="font-semibold text-slate-200">Content Resources</p>
+        <button class="btn btn-ghost text-sm py-1.5" onclick="resetResourceForm()">New</button>
+      </div>
+      <form id="resourceForm" class="form-grid mb-4" onsubmit="saveContentResource(event)">
+        <input name="id" placeholder="ID" required />
+        <select name="section_id" required></select>
+        <input name="title" placeholder="Title" required />
+        <input name="subtitle" placeholder="Subtitle" />
+        <input name="sort_order" placeholder="Sort" type="number" step="1" value="0" />
+        <select name="is_active">
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+        <input class="wide" name="url" placeholder="URL" required />
+        <div class="wide flex items-center gap-3">
+          <button class="btn btn-green" type="submit">Save Resource</button>
+          <span id="resourceStatus" class="status"></span>
+        </div>
+      </form>
+      <div class="overflow-x-auto">
+        <table>
+          <thead><tr><th>Resource</th><th>Section</th><th>URL</th><th>Sort</th><th>Status</th><th></th></tr></thead>
+          <tbody id="resource-table"></tbody>
+        </table>
+      </div>
+    </section>
+
   </main>
 </div>
 
@@ -163,11 +277,65 @@
 const BASE = '';  // same origin
 let token = sessionStorage.getItem('ev_admin_token');
 let callsChart, userChart, costChart;
+let vehicleTemplates = [];
+let contentSections = [];
+let contentResources = [];
 
 function fmt(n) { return n == null ? '—' : n.toLocaleString(); }
 function usd(v) { return v == null ? '—' : '$' + v.toFixed(2); }
 function ms(v)  { return v == null ? '—' : v + ' ms'; }
 function pct(v) { return v == null ? '—' : v.toFixed(2) + '%'; }
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[ch]));
+}
+function setStatus(id, text, type = '') {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'status ' + type;
+}
+function formPayload(form) {
+  const data = Object.fromEntries(new FormData(form).entries());
+  Object.keys(data).forEach(key => {
+    if (data[key] === '') delete data[key];
+  });
+  [
+    'battery_kwh',
+    'certified_range_km',
+    'real_world_range_km',
+    'dc_fast_charge_kw',
+    'ac_charge_kw',
+    'price_min',
+    'price_max',
+    'confidence_score',
+  ].forEach(key => {
+    if (data[key] != null) data[key] = Number(data[key]);
+  });
+  ['sort_order'].forEach(key => {
+    if (data[key] != null) data[key] = parseInt(data[key], 10);
+  });
+  if (data.is_active != null) data.is_active = data.is_active === 'true';
+  return data;
+}
+async function adminFetch(path, options = {}) {
+  const res = await fetch(BASE + path, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token,
+      ...(options.headers || {}),
+    },
+  });
+  if (res.status === 401 || res.status === 403) {
+    doLogout();
+    throw new Error('Admin session expired.');
+  }
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : null;
+  if (!res.ok) throw new Error(data?.detail || 'Request failed');
+  return data;
+}
 
 async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
@@ -202,6 +370,7 @@ function showDash() {
   document.getElementById('login-wrap').classList.add('hidden');
   document.getElementById('dash-wrap').classList.remove('hidden');
   loadData();
+  loadCatalogData();
 }
 
 async function loadData() {
@@ -273,6 +442,223 @@ async function loadData() {
       <td class="text-slate-400">${ms(ep.avg_latency_ms)}</td>
     </tr>`;
   });
+}
+
+async function loadCatalogData() {
+  try {
+    [vehicleTemplates, contentSections, contentResources] = await Promise.all([
+      adminFetch('/api/admin/vehicle-templates'),
+      adminFetch('/api/admin/content/sections'),
+      adminFetch('/api/admin/content/resources'),
+    ]);
+    renderVehicles();
+    renderSections();
+    renderResources();
+    setStatus('vehicleStatus', `${vehicleTemplates.length} vehicles loaded`, 'ok');
+    setStatus('sectionStatus', `${contentSections.length} sections loaded`, 'ok');
+    setStatus('resourceStatus', `${contentResources.length} resources loaded`, 'ok');
+  } catch (e) {
+    setStatus('vehicleStatus', e.message, 'error');
+    setStatus('sectionStatus', e.message, 'error');
+    setStatus('resourceStatus', e.message, 'error');
+  }
+}
+
+function renderVehicles() {
+  const tbody = document.getElementById('vehicle-table');
+  tbody.innerHTML = '';
+  vehicleTemplates.forEach(v => {
+    const range = v.real_world_range_km || v.certified_range_km || '—';
+    const cycle = v.range_cycle ? ` ${v.range_cycle}` : '';
+    const charging = [
+      v.dc_fast_charge_kw ? esc(`${v.dc_fast_charge_kw} kW DC`) : null,
+      v.ac_charge_kw ? esc(`${v.ac_charge_kw} kW AC`) : null,
+      v.connector_type ? esc(v.connector_type) : null,
+    ].filter(Boolean).join('<br>');
+    tbody.innerHTML += `<tr>
+      <td><span class="font-medium">${esc(v.brand)} ${esc(v.model)}</span><br><span class="text-slate-500 text-xs">${esc(v.variant)}</span></td>
+      <td>${esc(range)}${esc(cycle)}</td>
+      <td>${esc(v.battery_kwh || '—')}</td>
+      <td>${charging || '—'}</td>
+      <td>${esc(v.launch_status || 'available')}<br><span class="text-slate-500 text-xs">${esc(v.confidence_score ?? '—')}</span></td>
+      <td class="text-right whitespace-nowrap">
+        <button class="btn btn-ghost text-xs py-1.5 px-3" onclick="editVehicle('${esc(v.id)}')">Edit</button>
+        <button class="btn btn-red text-xs py-1.5 px-3" onclick="deleteVehicle('${esc(v.id)}')">Delete</button>
+      </td>
+    </tr>`;
+  });
+}
+
+function renderSections() {
+  const tbody = document.getElementById('section-table');
+  tbody.innerHTML = '';
+  contentSections.forEach(section => {
+    tbody.innerHTML += `<tr>
+      <td><span class="font-medium">${esc(section.title)}</span><br><span class="text-slate-500 text-xs">${esc(section.id)}</span></td>
+      <td>${esc(section.tone)}</td>
+      <td>${esc(section.sort_order)}</td>
+      <td>${section.is_active ? '<span class="pill-green">Active</span>' : '<span class="pill-red">Inactive</span>'}</td>
+      <td class="text-right whitespace-nowrap">
+        <button class="btn btn-ghost text-xs py-1.5 px-3" onclick="editSection('${esc(section.id)}')">Edit</button>
+        <button class="btn btn-red text-xs py-1.5 px-3" onclick="deleteSection('${esc(section.id)}')">Delete</button>
+      </td>
+    </tr>`;
+  });
+
+  const select = document.querySelector('#resourceForm [name="section_id"]');
+  const selected = select.value;
+  select.innerHTML = contentSections.map(section =>
+    `<option value="${esc(section.id)}">${esc(section.title)}</option>`
+  ).join('');
+  if (selected) select.value = selected;
+}
+
+function renderResources() {
+  const tbody = document.getElementById('resource-table');
+  tbody.innerHTML = '';
+  const sectionTitleById = Object.fromEntries(contentSections.map(section => [section.id, section.title]));
+  contentResources.forEach(resource => {
+    tbody.innerHTML += `<tr>
+      <td><span class="font-medium">${esc(resource.title)}</span><br><span class="text-slate-500 text-xs">${esc(resource.id)}</span></td>
+      <td>${esc(sectionTitleById[resource.section_id] || resource.section_id)}</td>
+      <td class="font-mono text-xs">${esc(resource.url)}</td>
+      <td>${esc(resource.sort_order)}</td>
+      <td>${resource.is_active ? '<span class="pill-green">Active</span>' : '<span class="pill-red">Inactive</span>'}</td>
+      <td class="text-right whitespace-nowrap">
+        <button class="btn btn-ghost text-xs py-1.5 px-3" onclick="editResource('${esc(resource.id)}')">Edit</button>
+        <button class="btn btn-red text-xs py-1.5 px-3" onclick="deleteResource('${esc(resource.id)}')">Delete</button>
+      </td>
+    </tr>`;
+  });
+}
+
+function fillForm(formId, row) {
+  const form = document.getElementById(formId);
+  Object.keys(row).forEach(key => {
+    const input = form.elements[key];
+    if (!input) return;
+    input.value = Array.isArray(row[key]) ? row[key].join(', ') : (row[key] ?? '');
+  });
+}
+
+function resetVehicleForm() {
+  document.getElementById('vehicleForm').reset();
+  document.querySelector('#vehicleForm [name="id"]').value = '';
+  setStatus('vehicleStatus', '');
+}
+function editVehicle(id) {
+  const row = vehicleTemplates.find(item => item.id === id);
+  if (row) fillForm('vehicleForm', row);
+}
+async function saveVehicleTemplate(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const payload = formPayload(form);
+  const id = payload.id;
+  delete payload.id;
+  try {
+    await adminFetch(id ? `/api/admin/vehicle-templates/${encodeURIComponent(id)}` : '/api/admin/vehicle-templates', {
+      method: id ? 'PUT' : 'POST',
+      body: JSON.stringify(payload),
+    });
+    resetVehicleForm();
+    setStatus('vehicleStatus', 'Saved', 'ok');
+    await loadCatalogData();
+  } catch (e) {
+    setStatus('vehicleStatus', e.message, 'error');
+  }
+}
+async function deleteVehicle(id) {
+  if (!confirm('Delete this vehicle template?')) return;
+  try {
+    await adminFetch(`/api/admin/vehicle-templates/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    setStatus('vehicleStatus', 'Deleted', 'ok');
+    await loadCatalogData();
+  } catch (e) {
+    setStatus('vehicleStatus', e.message, 'error');
+  }
+}
+
+function resetSectionForm() {
+  document.getElementById('sectionForm').reset();
+  document.querySelector('#sectionForm [name="id"]').readOnly = false;
+  setStatus('sectionStatus', '');
+}
+function editSection(id) {
+  const row = contentSections.find(item => item.id === id);
+  if (!row) return;
+  fillForm('sectionForm', row);
+  document.querySelector('#sectionForm [name="id"]').readOnly = true;
+}
+async function saveContentSection(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const payload = formPayload(form);
+  const id = payload.id;
+  const isUpdate = form.elements.id.readOnly;
+  if (isUpdate) delete payload.id;
+  try {
+    await adminFetch(isUpdate ? `/api/admin/content/sections/${encodeURIComponent(id)}` : '/api/admin/content/sections', {
+      method: isUpdate ? 'PUT' : 'POST',
+      body: JSON.stringify(payload),
+    });
+    resetSectionForm();
+    setStatus('sectionStatus', 'Saved', 'ok');
+    await loadCatalogData();
+  } catch (e) {
+    setStatus('sectionStatus', e.message, 'error');
+  }
+}
+async function deleteSection(id) {
+  if (!confirm('Delete this section and its resources?')) return;
+  try {
+    await adminFetch(`/api/admin/content/sections/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    setStatus('sectionStatus', 'Deleted', 'ok');
+    await loadCatalogData();
+  } catch (e) {
+    setStatus('sectionStatus', e.message, 'error');
+  }
+}
+
+function resetResourceForm() {
+  document.getElementById('resourceForm').reset();
+  document.querySelector('#resourceForm [name="id"]').readOnly = false;
+  setStatus('resourceStatus', '');
+}
+function editResource(id) {
+  const row = contentResources.find(item => item.id === id);
+  if (!row) return;
+  fillForm('resourceForm', row);
+  document.querySelector('#resourceForm [name="id"]').readOnly = true;
+}
+async function saveContentResource(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const payload = formPayload(form);
+  const id = payload.id;
+  const isUpdate = form.elements.id.readOnly;
+  if (isUpdate) delete payload.id;
+  try {
+    await adminFetch(isUpdate ? `/api/admin/content/resources/${encodeURIComponent(id)}` : '/api/admin/content/resources', {
+      method: isUpdate ? 'PUT' : 'POST',
+      body: JSON.stringify(payload),
+    });
+    resetResourceForm();
+    setStatus('resourceStatus', 'Saved', 'ok');
+    await loadCatalogData();
+  } catch (e) {
+    setStatus('resourceStatus', e.message, 'error');
+  }
+}
+async function deleteResource(id) {
+  if (!confirm('Delete this resource?')) return;
+  try {
+    await adminFetch(`/api/admin/content/resources/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    setStatus('resourceStatus', 'Deleted', 'ok');
+    await loadCatalogData();
+  } catch (e) {
+    setStatus('resourceStatus', e.message, 'error');
+  }
 }
 
 function renderLineChart(labels, trend) {

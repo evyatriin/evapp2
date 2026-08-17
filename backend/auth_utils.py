@@ -53,7 +53,28 @@ def ensure_admin_user(auth_user: Dict[str, Any]) -> None:
         return
 
     try:
-        profile_response = supabase.table("profiles").select("role, preferences").eq("id", auth_user["user_id"]).maybe_single().execute()
+        try:
+            profile_response = (
+                supabase.table("profiles")
+                .select("role, preferences")
+                .eq("id", auth_user["user_id"])
+                .maybe_single()
+                .execute()
+            )
+        except Exception as error:
+            message = str(error)
+            if (
+                "profiles.role does not exist" not in message
+                and "Could not find the 'role' column" not in message
+            ):
+                raise
+            profile_response = (
+                supabase.table("profiles")
+                .select("preferences")
+                .eq("id", auth_user["user_id"])
+                .maybe_single()
+                .execute()
+            )
         profile = profile_response.data if profile_response else None
     except Exception as error:
         raise HTTPException(status_code=500, detail=f"Failed to verify admin access: {error}") from error

@@ -1,12 +1,13 @@
 import logging
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, HttpUrl
-from typing import Optional, List
+from typing import Any, Dict, Optional, List
 from datetime import datetime
-from supabase_client import get_supabase
+from uuid import UUID
+from supabase_client import supabase
+from auth_utils import ensure_admin_user, get_authenticated_user
 
 router = APIRouter()
-supabase = get_supabase()
 logger = logging.getLogger(__name__)
 
 
@@ -38,7 +39,7 @@ class NewsResponse(BaseModel):
 @router.get("/", response_model=List[NewsResponse])
 async def get_news(
     limit: int = Query(20, ge=1, le=100),
-    category: Optional[str] = Query(None, regex="^(policy|vehicles|charging|industry)$"),
+    category: Optional[str] = Query(None, pattern="^(policy|vehicles|charging|industry)$"),
     featured_only: bool = False,
 ):
     """
@@ -71,6 +72,11 @@ async def get_news(
 async def get_news_by_id(news_id: str):
     """Get a specific news article by ID."""
     try:
+        UUID(news_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="News article not found")
+
+    try:
         response = supabase.table("ev_news").select("*").eq("id", news_id).execute()
         
         if not response.data:
@@ -84,26 +90,38 @@ async def get_news_by_id(news_id: str):
 
 
 @router.post("/", response_model=NewsResponse)
-async def create_news(news: NewsCreate):
+async def create_news(
+    news: NewsCreate,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     """
     Create a new news article.
     
     This endpoint is intended for the AI news fetching batch job.
     """
     try:
+        ensure_admin_user(auth_user)
         data = news.dict()
         data['published_at'] = news.published_at.isoformat()
         
         response = supabase.table("ev_news").insert(data).execute()
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error creating news: {str(e)}")
+        logger.exception("Error creating news")
+        raise HTTPException(status_code=500, detail="Error creating news") from e
 
 
 @router.put("/{news_id}", response_model=NewsResponse)
-async def update_news(news_id: str, news: NewsCreate):
+async def update_news(
+    news_id: str,
+    news: NewsCreate,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     """Update an existing news article."""
     try:
+        ensure_admin_user(auth_user)
         data = news.dict()
         data['published_at'] = news.published_at.isoformat()
         
@@ -120,9 +138,13 @@ async def update_news(news_id: str, news: NewsCreate):
 
 
 @router.delete("/{news_id}")
-async def delete_news(news_id: str):
+async def delete_news(
+    news_id: str,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     """Delete a news article."""
     try:
+        ensure_admin_user(auth_user)
         response = supabase.table("ev_news").delete().eq("id", news_id).execute()
         
         if not response.data:

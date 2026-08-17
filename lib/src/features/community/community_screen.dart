@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'trending_tab.dart';
 import 'resources_tab.dart';
 import 'leaderboard_screen.dart';
+import '../../core/app_config.dart';
 
 class CommunityScreen extends StatelessWidget {
   const CommunityScreen({super.key});
@@ -18,21 +19,27 @@ class CommunityScreen extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Community'),
           centerTitle: false,
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilledButton.icon(
-                onPressed: () => context.push('/sos'),
-                icon: const Icon(Icons.sos, size: 16),
-                label: const Text('SOS'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: theme.colorScheme.error,
-                  foregroundColor: theme.colorScheme.onError,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                ),
-              ),
-            ),
-          ],
+          actions:
+              AppConfig.sosEnabled
+                  ? [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilledButton.icon(
+                        onPressed: () => context.push('/sos'),
+                        icon: const Icon(Icons.sos, size: 16),
+                        label: const Text('SOS'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: theme.colorScheme.error,
+                          foregroundColor: theme.colorScheme.onError,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ]
+                  : null,
           bottom: const PreferredSize(
             preferredSize: Size.fromHeight(36),
             child: TabBar(
@@ -48,11 +55,7 @@ class CommunityScreen extends StatelessWidget {
           ),
         ),
         body: const TabBarView(
-          children: [
-            TrendingTab(),
-            ResourcesTab(),
-            LeaderboardScreen(),
-          ],
+          children: [TrendingTab(), ResourcesTab(), LeaderboardScreen()],
         ),
       ),
     );

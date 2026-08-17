@@ -19,6 +19,13 @@ limiter = Limiter(key_func=get_remote_address)
 PLATFORM_FEE_PERCENT = 5.0   # 5% of energy cost
 PLATFORM_FEE_MINIMUM_INR = 2.0  # floor so micro-sessions aren't free for the platform
 HOST_DECLARATION_VERSION = "private_charger_hosting_v1"
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+UPLOAD_EXTENSIONS = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+}
 
 LOCATION_ACCESS_CHECK_KEYS = [
     "accessible_without_gated_approval",
@@ -237,7 +244,7 @@ class CreateCheckInRequest(BaseModel):
     time_taken_minutes: Optional[int] = None
     cost_paid: Optional[float] = None
     charging_slip_url: Optional[str] = None
-    points_earned: Optional[int] = 10  # Default to 10 for backward compatibility
+    points_earned: Optional[int] = None  # Ignored; rewards are calculated server-side.
     user_name: Optional[str] = None  # User's name for display (will be anonymized)
     # Electric Talks insights - trip context fields
     weather: Optional[str] = None  # Hot, Rainy, Cold, Normal
@@ -315,6 +322,9 @@ def _station_is_publicly_visible(row: Dict[str, Any]) -> bool:
 
 def _normalize_station_row(row: Dict[str, Any]) -> Dict[str, Any]:
     normalized = dict(row)
+    normalized["average_rating"] = float(normalized.get("average_rating") or 0)
+    normalized["total_reviews"] = int(normalized.get("total_reviews") or 0)
+    normalized["total_checkins"] = int(normalized.get("total_checkins") or 0)
     normalized["available_days"] = list(normalized.get("available_days") or [])
     normalized["charger_photos"] = list(normalized.get("charger_photos") or [])
     normalized["parking_photos"] = list(normalized.get("parking_photos") or [])
@@ -570,8 +580,11 @@ async def get_my_stations(
         ensure_same_user(auth_user, user_id)
         response = supabase.table("charging_stations").select("*").eq("owner_id", user_id).execute()
         return [_normalize_station_row(row) for row in (response.data or [])]
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Error fetching stations for user %s", user_id)
+        raise HTTPException(status_code=500, detail="Could not load your stations") from e
 
 @router.post("/", response_model=ChargingStation)
 async def create_station(
@@ -583,34 +596,37 @@ async def create_station(
         data = station.dict()
         data["submitted_by"] = station.owner_id
         if station.is_private:
-            data["verification_status"] = "verified" 
+            data["verification_status"] = "pending"
         
         response = supabase.table("charging_stations").insert(data).execute()
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Error creating station")
+        raise HTTPException(status_code=500, detail="Could not create station") from e
 
 
 @router.post("/host")
 @limiter.limit("5/minute")
 async def create_or_update_host_station(
-    http_request: Request,
-    request: HostChargerRequest,
+    request: Request,
+    body: HostChargerRequest,
     auth_user: Dict[str, Any] = Depends(get_authenticated_user),
 ):
     try:
-        ensure_same_user(auth_user, request.owner_id)
+        ensure_same_user(auth_user, body.owner_id)
 
         location_access_checks = _normalize_checkbox_object(
-            request.location_access_checks,
+            body.location_access_checks,
             LOCATION_ACCESS_CHECK_KEYS,
         )
         safety_checks = _normalize_checkbox_object(
-            request.safety_checks,
+            body.safety_checks,
             SAFETY_CHECK_KEYS,
         )
         host_declarations = _normalize_checkbox_object(
-            request.host_declarations,
+            body.host_declarations,
             HOST_DECLARATION_KEYS,
         )
         if not all(host_declarations.values()):
@@ -619,8 +635,8 @@ async def create_or_update_host_station(
                 detail="All host declarations must be accepted before listing a private charger.",
             )
 
-        charger_photos = _normalize_text_list(request.charger_photos)
-        parking_photos = _normalize_text_list(request.parking_photos)
+        charger_photos = _normalize_text_list(body.charger_photos)
+        parking_photos = _normalize_text_list(body.parking_photos)
         moderation_flags = _normalize_text_list([])
         if not all(location_access_checks.values()):
             moderation_flags.append("location_access_incomplete")
@@ -628,84 +644,84 @@ async def create_or_update_host_station(
             moderation_flags.append("safety_check_incomplete")
 
         verification_badges = _build_host_verification_badges(
-            owner_id=request.owner_id,
+            owner_id=body.owner_id,
             charger_photos=charger_photos,
             parking_photos=parking_photos,
         )
 
         # Compute a suggested energy-based access amount when the host enters
         # recovery cost + convenience margin.
-        computed_price_per_kwh = request.price_per_kwh
+        computed_price_per_kwh = body.price_per_kwh
         if (
-            request.electricity_cost_per_kwh is not None
-            and request.host_margin_per_kwh is not None
+            body.electricity_cost_per_kwh is not None
+            and body.host_margin_per_kwh is not None
         ):
             computed_price_per_kwh = round(
-                request.electricity_cost_per_kwh + request.host_margin_per_kwh, 2
+                body.electricity_cost_per_kwh + body.host_margin_per_kwh, 2
             )
-        elif request.electricity_cost_per_kwh is not None and computed_price_per_kwh is None:
-            computed_price_per_kwh = request.electricity_cost_per_kwh
+        elif body.electricity_cost_per_kwh is not None and computed_price_per_kwh is None:
+            computed_price_per_kwh = body.electricity_cost_per_kwh
 
         payload = {
-            "name": request.name,
-            "address": request.address,
-            "latitude": request.latitude,
-            "longitude": request.longitude,
-            "provider": request.provider or "Community Host",
-            "connector_types": request.connector_types,
-            "power_kw": request.power_kw,
+            "name": body.name,
+            "address": body.address,
+            "latitude": body.latitude,
+            "longitude": body.longitude,
+            "provider": body.provider or "Community Host",
+            "connector_types": body.connector_types,
+            "power_kw": body.power_kw,
             "is_private": True,
-            "owner_id": request.owner_id,
+            "owner_id": body.owner_id,
             "access_type": "Private",
-            "access_instructions": request.access_instructions,
-            "submitted_by": request.owner_id,
+            "access_instructions": body.access_instructions,
+            "submitted_by": body.owner_id,
             "verification_status": "verified",
-            "host_name": request.host_name,
-            "host_phone": request.host_phone,
-            "host_upi_id": request.host_upi_id,
-            "electricity_cost_per_kwh": request.electricity_cost_per_kwh,
-            "host_margin_per_kwh": request.host_margin_per_kwh,
+            "host_name": body.host_name,
+            "host_phone": body.host_phone,
+            "host_upi_id": body.host_upi_id,
+            "electricity_cost_per_kwh": body.electricity_cost_per_kwh,
+            "host_margin_per_kwh": body.host_margin_per_kwh,
             "price_per_kwh": computed_price_per_kwh,
-            "price_per_session": request.price_per_session,
-            "available_from": request.available_from,
-            "available_to": request.available_to,
-            "available_days": request.available_days,
-            "available_hours": request.available_hours,
-            "is_accepting_requests": request.is_accepting_requests,
-            "parking_notes": request.parking_notes,
-            "house_rules": request.house_rules,
-            "amenities": request.amenities,
+            "price_per_session": body.price_per_session,
+            "available_from": body.available_from,
+            "available_to": body.available_to,
+            "available_days": body.available_days,
+            "available_hours": body.available_hours,
+            "is_accepting_requests": body.is_accepting_requests,
+            "parking_notes": body.parking_notes,
+            "house_rules": body.house_rules,
+            "amenities": body.amenities,
             "charger_photos": charger_photos,
             "parking_photos": parking_photos,
-            "property_type": request.property_type,
-            "visitor_access_type": request.visitor_access_type,
-            "vehicle_size_support": request.vehicle_size_support,
+            "property_type": body.property_type,
+            "visitor_access_type": body.visitor_access_type,
+            "vehicle_size_support": body.vehicle_size_support,
             "location_access_checks": location_access_checks,
             "safety_checks": safety_checks,
             "host_declarations": host_declarations,
-            "declaration_version": request.declaration_version or HOST_DECLARATION_VERSION,
+            "declaration_version": body.declaration_version or HOST_DECLARATION_VERSION,
             "declarations_completed_at": datetime.now().isoformat(),
             "moderation_flags": moderation_flags,
             "verification_badges": verification_badges,
         }
 
-        if request.station_id:
+        if body.station_id:
             existing = (
                 supabase.table("charging_stations")
                 .select("*")
-                .eq("id", request.station_id)
+                .eq("id", body.station_id)
                 .maybe_single()
                 .execute()
             )
             if not existing.data:
                 raise HTTPException(status_code=404, detail="Hosted charger not found")
-            if existing.data.get("owner_id") != request.owner_id:
+            if existing.data.get("owner_id") != body.owner_id:
                 raise HTTPException(status_code=403, detail="You can only update your own hosted charger")
 
             response = (
                 supabase.table("charging_stations")
                 .update(payload)
-                .eq("id", request.station_id)
+                .eq("id", body.station_id)
                 .execute()
             )
             if not response.data:
@@ -746,24 +762,26 @@ async def get_my_hosted_stations(
             reverse=True,
         )
         return rows
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error fetching hosted chargers for user %s", user_id)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Could not load hosted chargers") from e
 
 
 @router.post("/request")
 @limiter.limit("10/minute")
 async def create_charger_request(
-    http_request: Request,
-    request: CreateChargerRequest,
+    request: Request,
+    body: CreateChargerRequest,
     auth_user: Dict[str, Any] = Depends(get_authenticated_user),
 ):
     try:
-        ensure_same_user(auth_user, request.requester_user_id)
+        ensure_same_user(auth_user, body.requester_user_id)
         station_response = (
             supabase.table("charging_stations")
             .select("*")
-            .eq("id", request.station_id)
+            .eq("id", body.station_id)
             .maybe_single()
             .execute()
         )
@@ -776,14 +794,14 @@ async def create_charger_request(
             raise HTTPException(status_code=400, detail="This hosted charger is not live yet")
         if not bool(station.get("is_accepting_requests") or False):
             raise HTTPException(status_code=400, detail="This host is not currently accepting requests")
-        if station.get("owner_id") == request.requester_user_id:
+        if station.get("owner_id") == body.requester_user_id:
             raise HTTPException(status_code=400, detail="You cannot request charging from your own hosted charger")
 
         duplicate = (
             supabase.table("charger_requests")
             .select("id")
-            .eq("station_id", request.station_id)
-            .eq("requester_user_id", request.requester_user_id)
+            .eq("station_id", body.station_id)
+            .eq("requester_user_id", body.requester_user_id)
             .eq("status", "pending")
             .limit(1)
             .execute()
@@ -802,7 +820,7 @@ async def create_charger_request(
         elif station.get("price_per_kwh") is not None:
             # Estimate using SOC gap and a 40 kWh reference battery.
             # This is rough; the final settlement uses the host-confirmed session amount.
-            soc_gap = max(0, 100 - (request.current_soc or 50)) / 100
+            soc_gap = max(0, 100 - (body.current_soc or 50)) / 100
             estimated_kwh = round(soc_gap * 40.0, 1)
             energy_cost = round(estimated_kwh * float(station["price_per_kwh"]), 2)
             platform_fee = round(
@@ -811,16 +829,16 @@ async def create_charger_request(
             estimated_amount = round(energy_cost + platform_fee, 2)
 
         payload = {
-            "station_id": request.station_id,
+            "station_id": body.station_id,
             "host_user_id": station.get("owner_id"),
-            "requester_user_id": request.requester_user_id,
-            "requester_name": request.requester_name or auth_user.get("metadata", {}).get("name") or auth_user.get("email"),
-            "requester_phone": request.requester_phone,
-            "vehicle_name": request.vehicle_name,
-            "current_soc": request.current_soc,
-            "message": request.message,
-            "requested_start_at": request.requested_start_at.isoformat(),
-            "requested_end_at": request.requested_end_at.isoformat() if request.requested_end_at else None,
+            "requester_user_id": body.requester_user_id,
+            "requester_name": body.requester_name or auth_user.get("metadata", {}).get("name") or auth_user.get("email"),
+            "requester_phone": body.requester_phone,
+            "vehicle_name": body.vehicle_name,
+            "current_soc": body.current_soc,
+            "message": body.message,
+            "requested_start_at": body.requested_start_at.isoformat(),
+            "requested_end_at": body.requested_end_at.isoformat() if body.requested_end_at else None,
             "estimated_amount": estimated_amount,
         }
         response = supabase.table("charger_requests").insert(payload).execute()
@@ -849,9 +867,11 @@ async def get_incoming_charger_requests(
             .execute()
         )
         return _hydrate_request_rows(response.data or [])
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error fetching incoming charger requests for user %s", user_id)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Could not load incoming requests") from e
 
 
 @router.get("/requests/outgoing/{user_id}")
@@ -869,9 +889,11 @@ async def get_outgoing_charger_requests(
             .execute()
         )
         return _hydrate_request_rows(response.data or [])
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error fetching outgoing charger requests for user %s", user_id)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Could not load outgoing requests") from e
 
 
 @router.post("/request/{request_id}/decision")
@@ -1061,8 +1083,11 @@ async def get_charging_history(
         ensure_same_user(auth_user, user_id)
         response = supabase.table("charging_sessions").select("*").eq("user_id", user_id).order("start_time", desc=True).execute()
         return response.data
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Error fetching charging history for user %s", user_id)
+        raise HTTPException(status_code=500, detail="Could not load charging history") from e
 
 @router.post("/session", response_model=ChargingSession)
 async def log_session(
@@ -1071,11 +1096,43 @@ async def log_session(
 ):
     try:
         ensure_same_user(auth_user, session.user_id)
-        data = session.dict()
+        data = session.model_dump(mode="json")
         response = supabase.table("charging_sessions").insert(data).execute()
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Error logging charging session")
+        raise HTTPException(status_code=500, detail="Could not save charging session") from e
+
+
+@router.get("/checkins/public", response_model=List[CheckIn])
+async def get_public_checkins(limit: int = 50):
+    """Get recent public check-ins with anonymized user names"""
+    try:
+        response = (
+            supabase.table("station_checkins")
+            .select("*")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+        checkins = response.data
+
+        # Anonymize user names
+        for checkin in checkins:
+            if 'user_name' in checkin and checkin['user_name']:
+                checkin['user_name'] = anonymize_name(checkin['user_name'])
+            else:
+                checkin['user_name'] = "A***r"  # Default anonymized name
+
+        return checkins
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error fetching public checkins")
+        raise HTTPException(status_code=500, detail=f"Error fetching public checkins: {e}")
+
 
 @router.get("/checkins/{user_id}", response_model=List[CheckIn])
 async def get_my_checkins(
@@ -1086,9 +1143,11 @@ async def get_my_checkins(
         ensure_same_user(auth_user, user_id)
         response = supabase.table("station_checkins").select("*").eq("user_id", user_id).order("created_at", desc=True).execute()
         return response.data
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error fetching checkins for user %s", user_id)
-        raise HTTPException(status_code=500, detail=f"Error fetching checkins: {e}")
+        raise HTTPException(status_code=500, detail="Could not load check-ins") from e
 
 @router.get("/checkin/station/{station_id}/latest")
 async def get_latest_station_checkin(station_id: str):
@@ -1118,8 +1177,8 @@ async def create_checkin(
         # Insert checkin — use service client to bypass RLS (user already verified above)
         response = service_supabase.table("station_checkins").insert(data).execute()
 
-        # Reward points logic - use points from request (default 10)
-        points_to_award = checkin.points_earned or 10
+        # Reward points are fixed on the server so clients cannot mint points.
+        points_to_award = 10
         try:
             from utils.gamification_utils import award_points_internal
             await award_points_internal(checkin.user_id, points_to_award, 'check_in')
@@ -1127,8 +1186,11 @@ async def create_checkin(
             logger.warning("Error updating points for checkin: %s", e)
 
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.exception("Error creating check-in")
+        raise HTTPException(status_code=500, detail="Could not create check-in") from e
 
 def anonymize_name(name: str) -> str:
     """Anonymize name: show first and last char, star the rest"""
@@ -1145,25 +1207,6 @@ def anonymize_name(name: str) -> str:
         first_word = parts[0]
         last_word = parts[-1]
         return first_word[0] + '***' + last_word[-1]
-
-@router.get("/checkins/public", response_model=List[CheckIn])
-async def get_public_checkins(limit: int = 50):
-    """Get recent public check-ins with anonymized user names"""
-    try:
-        response = supabase.table("station_checkins").select("*").order("created_at", desc=True).limit(limit).execute()
-        checkins = response.data
-        
-        # Anonymize user names
-        for checkin in checkins:
-            if 'user_name' in checkin and checkin['user_name']:
-                checkin['user_name'] = anonymize_name(checkin['user_name'])
-            else:
-                checkin['user_name'] = "A***r"  # Default anonymized name
-        
-        return checkins
-    except Exception as e:
-        logger.exception("Error fetching public checkins")
-        raise HTTPException(status_code=500, detail=f"Error fetching public checkins: {e}")
 
 @router.post("/checkin/vote")
 async def vote_checkin(
@@ -1199,67 +1242,87 @@ async def vote_checkin(
 
 @router.post("/upload-checkin-image")
 @limiter.limit("10/minute")
-async def upload_checkin_image(request: Request, file: UploadFile = File(...)):
+async def upload_checkin_image(
+    request: Request,
+    file: UploadFile = File(...),
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     """Upload an image for a check-in to Supabase Storage"""
     try:
-        # Validate file type
-        allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
-        if file.content_type not in allowed_types:
+        if file.content_type not in UPLOAD_EXTENSIONS:
             raise HTTPException(status_code=400, detail="Invalid file type. Only JPEG, PNG, and WebP are allowed.")
-        
-        # Generate unique filename
-        file_ext = file.filename.split(".")[-1]
-        unique_filename = f"checkin_{uuid.uuid4()}.{file_ext}"
-        
-        # Read file content
-        file_content = await file.read()
-        
-        # Upload to Supabase Storage
-        # Bucket name: 'checkin-images' (must be created in Supabase)
-        storage_response = supabase.storage.from_("checkin-images").upload(
+
+        if not service_supabase:
+            raise HTTPException(status_code=503, detail="Image storage is not configured.")
+
+        file_content = await file.read(MAX_UPLOAD_BYTES + 1)
+        if len(file_content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Image must be 5 MB or smaller.")
+
+        extension = UPLOAD_EXTENSIONS[file.content_type]
+        unique_filename = (
+            f"{auth_user['user_id']}/checkin_{uuid.uuid4()}.{extension}"
+        )
+
+        service_supabase.storage.from_("checkin-images").upload(
             unique_filename,
             file_content,
             {"content-type": file.content_type}
         )
-        
-        # Get public URL
-        public_url = supabase.storage.from_("checkin-images").get_public_url(unique_filename)
-        
+
+        public_url = service_supabase.storage.from_("checkin-images").get_public_url(
+            unique_filename
+        )
         return {"image_url": public_url}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error uploading checkin image")
-        raise HTTPException(status_code=500, detail=f"Error uploading image: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not upload image.") from e
 
 
 @router.post("/upload-hosted-charger-image")
 @limiter.limit("10/minute")
-async def upload_hosted_charger_image(request: Request, file: UploadFile = File(...)):
+async def upload_hosted_charger_image(
+    request: Request,
+    file: UploadFile = File(...),
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
     """Upload a hosted charger or parking/access image to Supabase Storage."""
     try:
-        allowed_types = ["image/jpeg", "image/jpg", "image/png", "image/webp"]
-        if file.content_type not in allowed_types:
+        if file.content_type not in UPLOAD_EXTENSIONS:
             raise HTTPException(
                 status_code=400,
                 detail="Invalid file type. Only JPEG, PNG, and WebP are allowed.",
             )
 
-        file_ext = file.filename.split(".")[-1]
-        unique_filename = f"hosted_charger_{uuid.uuid4()}.{file_ext}"
-        file_content = await file.read()
+        if not service_supabase:
+            raise HTTPException(status_code=503, detail="Image storage is not configured.")
 
-        supabase.storage.from_("hosted-charger-images").upload(
+        file_content = await file.read(MAX_UPLOAD_BYTES + 1)
+        if len(file_content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(status_code=413, detail="Image must be 5 MB or smaller.")
+
+        extension = UPLOAD_EXTENSIONS[file.content_type]
+        unique_filename = (
+            f"{auth_user['user_id']}/hosted_charger_{uuid.uuid4()}.{extension}"
+        )
+
+        service_supabase.storage.from_("hosted-charger-images").upload(
             unique_filename,
             file_content,
             {"content-type": file.content_type},
         )
 
-        public_url = supabase.storage.from_("hosted-charger-images").get_public_url(
-            unique_filename
-        )
+        public_url = service_supabase.storage.from_(
+            "hosted-charger-images"
+        ).get_public_url(unique_filename)
         return {"image_url": public_url}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error uploading hosted charger image")
-        raise HTTPException(status_code=500, detail=f"Error uploading image: {str(e)}")
+        raise HTTPException(status_code=500, detail="Could not upload image.") from e
 
 # --- Saved Chargers Endpoints ---
 
@@ -1297,7 +1360,11 @@ class SaveChargerRequest(BaseModel):
 
 @router.post("/along-route", response_model=List[ChargerAlongRoute])
 @limiter.limit("15/minute")
-async def get_chargers_along_route(http_request: Request, request_data: ChargerOnRouteRequest):
+async def get_chargers_along_route(
+    request: Request,
+    request_data: ChargerOnRouteRequest,
+    _auth: Dict[str, Any] = Depends(require_auth),
+):
     """
     Get chargers along a route corridor.
     - Creates a 4-5km buffer zone around the actual route
@@ -1631,6 +1698,8 @@ def unsave_charger(
         ensure_same_user(auth_user, user_id)
         result = supabase.table("saved_chargers").delete().eq("user_id", user_id).eq("station_id", station_id).execute()
         return {"message": "Charger unsaved successfully"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error unsaving charger")
         raise HTTPException(status_code=500, detail=f"Error unsaving charger: {str(e)}")
@@ -1660,6 +1729,8 @@ def get_saved_chargers(
             station['saved_at'] = saved_map.get(station['id'])
         
         return stations_result.data
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error fetching saved chargers for user %s", user_id)
         raise HTTPException(status_code=500, detail=f"Error fetching saved chargers: {str(e)}")

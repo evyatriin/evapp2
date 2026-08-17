@@ -11,11 +11,11 @@ class ChargerMapMarker extends StatelessWidget {
   final bool showLabel;
 
   const ChargerMapMarker({
-    Key? key,
+    super.key,
     required this.charger,
     required this.onTap,
     this.showLabel = true,
-  }) : super(key: key);
+  });
 
   /// Get color based on charger type
   Color get markerColor {
@@ -33,7 +33,7 @@ class ChargerMapMarker extends StatelessWidget {
 
   /// Get background color for marker circle
   Color get backgroundColor {
-    return markerColor.withOpacity(0.2);
+    return markerColor.withValues(alpha: 0.2);
   }
 
   /// Get marker icon
@@ -55,17 +55,10 @@ class ChargerMapMarker extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: backgroundColor,
-              border: Border.all(
-                color: markerColor,
-                width: 2,
-              ),
+              border: Border.all(color: markerColor, width: 2),
             ),
             child: Center(
-              child: Icon(
-                markerIcon,
-                color: markerColor,
-                size: 20,
-              ),
+              child: Icon(markerIcon, color: markerColor, size: 20),
             ),
           ),
           // Distance label (positioned above marker)
@@ -103,19 +96,25 @@ class ChargersMarkerLayer extends StatelessWidget {
   final double minGeoSeparationKm;
 
   const ChargersMarkerLayer({
-    Key? key,
+    super.key,
     required this.chargers,
     required this.onChargerTap,
     this.showOptimalOnly = false,
     this.targetMarkerCount = 10,
     this.minGeoSeparationKm = 25.0,
-  }) : super(key: key);
+  });
 
-  static double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
+  static double _haversineKm(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     const r = 6371.0;
     final dLat = (lat2 - lat1) * math.pi / 180.0;
     final dLon = (lon2 - lon1) * math.pi / 180.0;
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+    final a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
         math.cos(lat1 * math.pi / 180.0) *
             math.cos(lat2 * math.pi / 180.0) *
             math.sin(dLon / 2) *
@@ -133,14 +132,16 @@ class ChargersMarkerLayer extends StatelessWidget {
   List<ChargerAlongRoute> _spaceAlongRoute(List<ChargerAlongRoute> input) {
     if (input.length <= 2) return input;
 
-    final sorted = [...input]
-      ..sort((a, b) => a.distanceFromOriginKm.compareTo(b.distanceFromOriginKm));
+    final sorted = [
+      ...input,
+    ]..sort((a, b) => a.distanceFromOriginKm.compareTo(b.distanceFromOriginKm));
 
     final routeLen = sorted.last.distanceFromOriginKm;
     if (routeLen < 50) return sorted; // Short route: show everything
 
     final n = math.max(4, math.min(targetMarkerCount, (routeLen / 60).round()));
-    final maxDelta = routeLen / n; // Anchor must have a charger within half-segment
+    final maxDelta =
+        routeLen / n; // Anchor must have a charger within half-segment
 
     final selected = <ChargerAlongRoute>[];
     final used = <String>{};
@@ -178,15 +179,18 @@ class ChargersMarkerLayer extends StatelessWidget {
       }
     }
 
-    selected.sort((a, b) => a.distanceFromOriginKm.compareTo(b.distanceFromOriginKm));
+    selected.sort(
+      (a, b) => a.distanceFromOriginKm.compareTo(b.distanceFromOriginKm),
+    );
     return selected;
   }
 
   /// Returns the filtered+spaced charger list for reuse by connector layer.
   List<ChargerAlongRoute> buildDisplayList() {
-    final filtered = showOptimalOnly
-        ? chargers.where((c) => c.isOptimal).toList()
-        : chargers;
+    final filtered =
+        showOptimalOnly
+            ? chargers.where((c) => c.isOptimal).toList()
+            : chargers;
     return _spaceAlongRoute(filtered);
   }
 
@@ -194,20 +198,21 @@ class ChargersMarkerLayer extends StatelessWidget {
   Widget build(BuildContext context) {
     final displayChargers = buildDisplayList();
     return MarkerLayer(
-      markers: displayChargers
-          .map(
-            (charger) => Marker(
-              point: LatLng(charger.latitude, charger.longitude),
-              width: 50,
-              height: 50,
-              child: ChargerMapMarker(
-                charger: charger,
-                onTap: () => onChargerTap(charger),
-                showLabel: true,
-              ),
-            ),
-          )
-          .toList(),
+      markers:
+          displayChargers
+              .map(
+                (charger) => Marker(
+                  point: LatLng(charger.latitude, charger.longitude),
+                  width: 50,
+                  height: 50,
+                  child: ChargerMapMarker(
+                    charger: charger,
+                    onTap: () => onChargerTap(charger),
+                    showLabel: true,
+                  ),
+                ),
+              )
+              .toList(),
     );
   }
 }
@@ -220,17 +225,16 @@ class ChargersConnectorLayer extends StatelessWidget {
   final bool showOptimalOnly;
 
   const ChargersConnectorLayer({
-    Key? key,
+    super.key,
     required this.chargers,
     this.showOptimalOnly = false,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     final polylines = <Polyline>[];
-    final source = showOptimalOnly
-        ? chargers.where((c) => c.isOptimal)
-        : chargers;
+    final source =
+        showOptimalOnly ? chargers.where((c) => c.isOptimal) : chargers;
 
     for (final c in source) {
       if (!c.isOptimal &&

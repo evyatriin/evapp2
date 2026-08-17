@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../common_widgets/app_text_field.dart';
 import '../../common_widgets/app_button.dart';
 import 'user_provider.dart';
@@ -23,6 +24,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _acceptedTerms = false;
 
   String _formatSignupError(Object error) {
     final raw = error.toString().toLowerCase();
@@ -31,7 +33,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     if (raw.contains('failed host lookup') || raw.contains('socketexception')) {
       return 'Could not reach the authentication server. Please update the app or try again on a stable network.';
     }
-    if (raw.contains('email') && (raw.contains('invalid') || raw.contains('format'))) {
+    if (raw.contains('email') &&
+        (raw.contains('invalid') || raw.contains('format'))) {
       return 'Please enter a valid email address.';
     }
     if (raw.contains('already registered') || raw.contains('already exists')) {
@@ -40,11 +43,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     if (raw.contains('email confirmation') || raw.contains('verify email')) {
       return 'Please check your email to verify your account before logging in.';
     }
-    if (raw.contains('password') && (raw.contains('weak') || raw.contains('length'))) {
+    if (raw.contains('password') &&
+        (raw.contains('weak') || raw.contains('length'))) {
       return 'Password must be at least 6 characters.';
     }
-    // Return the actual error message for debugging
-    return 'Signup error: $error';
+    return error.toString();
   }
 
   @override
@@ -58,14 +61,27 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   Future<void> _handleSignup() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_acceptedTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please accept the Terms of Service and Privacy Policy.',
+          ),
+        ),
+      );
+      return;
+    }
 
     setState(() => _isLoading = true);
 
     try {
-      await ref.read(userProvider.notifier).signUp(
+      await ref
+          .read(userProvider.notifier)
+          .signUp(
             email: _emailController.text.trim(),
             password: _passwordController.text,
             name: _nameController.text.trim(),
+            termsAccepted: _acceptedTerms,
           );
 
       if (mounted) {
@@ -73,35 +89,36 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('Check Your Email'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.email, size: 64, color: Colors.green),
-                const Gap(16),
-                Text(
-                  'We\'ve sent a confirmation email to ${_emailController.text.trim()}',
-                  textAlign: TextAlign.center,
+          builder:
+              (context) => AlertDialog(
+                title: const Text('Check Your Email'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.email, size: 64, color: Colors.green),
+                    const Gap(16),
+                    Text(
+                      'We\'ve sent a confirmation email to ${_emailController.text.trim()}',
+                      textAlign: TextAlign.center,
+                    ),
+                    const Gap(8),
+                    const Text(
+                      'Please check your email and click the confirmation link to activate your account.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 14, color: Colors.grey),
+                    ),
+                  ],
                 ),
-                const Gap(8),
-                const Text(
-                  'Please check your email and click the confirmation link to activate your account.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-              ],
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  context.go('/login');
-                },
-                child: const Text('Go to Login'),
+                actions: [
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      context.go('/login');
+                    },
+                    child: const Text('Go to Login'),
+                  ),
+                ],
               ),
-            ],
-          ),
         );
       }
     } catch (e) {
@@ -117,6 +134,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
       }
+    }
+  }
+
+  Future<void> _openLegalPage(String path) async {
+    final uri = Uri.parse('https://evraahein.app/$path');
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
+        mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the legal page.')),
+      );
     }
   }
 
@@ -195,9 +222,14 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     obscureText: _obscurePassword,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        _obscurePassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
                       ),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed:
+                          () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -217,9 +249,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     obscureText: _obscureConfirmPassword,
                     suffixIcon: IconButton(
                       icon: Icon(
-                        _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        _obscureConfirmPassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
                       ),
-                      onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                      onPressed:
+                          () => setState(
+                            () =>
+                                _obscureConfirmPassword =
+                                    !_obscureConfirmPassword,
+                          ),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -230,6 +269,33 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       }
                       return null;
                     },
+                  ),
+                  const Gap(12),
+                  CheckboxListTile(
+                    value: _acceptedTerms,
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    onChanged:
+                        _isLoading
+                            ? null
+                            : (value) {
+                              setState(() => _acceptedTerms = value ?? false);
+                            },
+                    title: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const Text('I agree to the '),
+                        TextButton(
+                          onPressed: () => _openLegalPage('terms.html'),
+                          child: const Text('Terms of Service'),
+                        ),
+                        const Text(' and '),
+                        TextButton(
+                          onPressed: () => _openLegalPage('privacy.html'),
+                          child: const Text('Privacy Policy'),
+                        ),
+                      ],
+                    ),
                   ),
                   const Gap(24),
                   AppButton(

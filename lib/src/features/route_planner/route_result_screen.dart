@@ -66,7 +66,8 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
     try {
       // Get origin and destination from the first and last stop
       final origin = route.stops.isNotEmpty ? route.stops.first.location : null;
-      final destination = route.stops.isNotEmpty ? route.stops.last.location : null;
+      final destination =
+          route.stops.isNotEmpty ? route.stops.last.location : null;
 
       if (origin == null || destination == null) {
         setState(() => _loadingChargers = false);
@@ -74,9 +75,10 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
       }
 
       // Convert polyline to LatLng list
-      final polyline = route.polyline
-          .map((p) => ll.LatLng(p.latitude, p.longitude))
-          .toList();
+      final polyline =
+          route.polyline
+              .map((p) => ll.LatLng(p.latitude, p.longitude))
+              .toList();
 
       final chargers = await _chargerRouteService.getChargersAlongRoute(
         origin: origin,
@@ -265,49 +267,51 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
               PolylineLayer(
                 polylines: [
                   Polyline(
-                    points: selectedRoute.polyline
-                        .map((p) => ll.LatLng(p.latitude, p.longitude))
-                        .toList(),
+                    points:
+                        selectedRoute.polyline
+                            .map((p) => ll.LatLng(p.latitude, p.longitude))
+                            .toList(),
                     color: theme.colorScheme.primary,
                     strokeWidth: 5,
                   ),
                 ],
               ),
               MarkerLayer(
-                markers: selectedRoute.stops.map((stop) {
-                  final colorScheme = theme.colorScheme;
-                  final color =
-                      stop.type == StopType.charging
-                          ? colorScheme.primary
-                          : (stop.type == StopType.origin ||
+                markers:
+                    selectedRoute.stops.map((stop) {
+                      final colorScheme = theme.colorScheme;
+                      final color =
+                          stop.type == StopType.charging
+                              ? colorScheme.primary
+                              : (stop.type == StopType.origin ||
                                   stop.type == StopType.destination)
                               ? colorScheme.error
                               : colorScheme.tertiary;
-                  final icon =
-                      stop.type == StopType.charging
-                          ? Icons.ev_station
-                          : stop.type == StopType.origin
+                      final icon =
+                          stop.type == StopType.charging
+                              ? Icons.ev_station
+                              : stop.type == StopType.origin
                               ? Icons.trip_origin
                               : stop.type == StopType.destination
-                                  ? Icons.location_pin
-                                  : Icons.place;
+                              ? Icons.location_pin
+                              : Icons.place;
 
-                  return Marker(
-                    point: ll.LatLng(
-                      stop.location.latitude,
-                      stop.location.longitude,
-                    ),
-                    width: 44,
-                    height: 44,
-                    child: GestureDetector(
-                      onTap:
-                          stop.type == StopType.charging
-                              ? () => _showChargingStopDetails(stop)
-                              : null,
-                      child: Icon(icon, color: color, size: 34),
-                    ),
-                  );
-                }).toList(),
+                      return Marker(
+                        point: ll.LatLng(
+                          stop.location.latitude,
+                          stop.location.longitude,
+                        ),
+                        width: 44,
+                        height: 44,
+                        child: GestureDetector(
+                          onTap:
+                              stop.type == StopType.charging
+                                  ? () => _showChargingStopDetails(stop)
+                                  : null,
+                          child: Icon(icon, color: color, size: 34),
+                        ),
+                      );
+                    }).toList(),
               ),
               // Dashed connector lines: off-route charger → nearest route point
               if (_showChargersOnMap && _chargersAlongRoute.isNotEmpty)
@@ -329,7 +333,10 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
               left: 16,
               right: 16,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(8),
@@ -370,20 +377,19 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
               left: 16,
               right: 16,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
+                  color: Colors.green.withValues(alpha: 0.1),
                   border: Border.all(color: Colors.green, width: 1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.ev_station,
-                      size: 14,
-                      color: Colors.green,
-                    ),
+                    Icon(Icons.ev_station, size: 14, color: Colors.green),
                     const Gap(6),
                     Text(
                       '${_chargersAlongRoute.length} chargers found',
@@ -451,10 +457,13 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         child: Icon(
-                          _showChargersOnMap ? Icons.ev_station : Icons.power_off_outlined,
-                          color: _showChargersOnMap
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurfaceVariant,
+                          _showChargersOnMap
+                              ? Icons.ev_station
+                              : Icons.power_off_outlined,
+                          color:
+                              _showChargersOnMap
+                                  ? theme.colorScheme.primary
+                                  : theme.colorScheme.onSurfaceVariant,
                           size: 18,
                         ),
                       ),
@@ -493,8 +502,7 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
                               _routes.asMap().entries.map((entry) {
                                 final index = entry.key;
                                 final route = entry.value;
-                                final isSelected =
-                                    route.id == selectedRoute.id;
+                                final isSelected = route.id == selectedRoute.id;
                                 return DropdownMenuItem(
                                   value: route,
                                   child: _RouteDropdownLabel(
@@ -506,15 +514,16 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
                                 );
                               }).toList(),
                           selectedItemBuilder:
-                              (context) => _routes.asMap().entries.map((entry) {
-                                final route = entry.value;
-                                return _RouteDropdownLabel(
-                                  route: route,
-                                  index: entry.key + 1,
-                                  isSelected: route.id == selectedRoute.id,
-                                  compact: true,
-                                );
-                              }).toList(),
+                              (context) =>
+                                  _routes.asMap().entries.map((entry) {
+                                    final route = entry.value;
+                                    return _RouteDropdownLabel(
+                                      route: route,
+                                      index: entry.key + 1,
+                                      isSelected: route.id == selectedRoute.id,
+                                      compact: true,
+                                    );
+                                  }).toList(),
                           onChanged: (RouteModel? newValue) {
                             if (newValue != null) {
                               setState(() {
@@ -562,10 +571,7 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
       if (point.longitude > maxLng) maxLng = point.longitude;
     }
 
-    return LatLngBounds(
-      ll.LatLng(minLat, minLng),
-      ll.LatLng(maxLat, maxLng),
-    );
+    return LatLngBounds(ll.LatLng(minLat, minLng), ll.LatLng(maxLat, maxLng));
   }
 
   Future<void> _showChargingStopDetails(RouteStop stop) async {
@@ -614,13 +620,14 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
-      builder: (sheetContext) => ChargerDetailsSheet(
-        charger: charger,
-        onOpenInMaps: () async {
-          Navigator.of(sheetContext).pop();
-          await _openChargerInMaps(charger);
-        },
-      ),
+      builder:
+          (sheetContext) => ChargerDetailsSheet(
+            charger: charger,
+            onOpenInMaps: () async {
+              Navigator.of(sheetContext).pop();
+              await _openChargerInMaps(charger);
+            },
+          ),
     );
   }
 
@@ -642,9 +649,9 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open charger: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Could not open charger: $e')));
       }
     }
   }

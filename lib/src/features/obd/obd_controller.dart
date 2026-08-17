@@ -36,6 +36,7 @@ class ObdSessionController extends Notifier<ObdSessionState> {
   List<ObdCommandResult> _cachedEnhancedResults = const [];
   String? _sessionId;
   DateTime? _sessionStartedAt;
+  bool _isPolling = false;
 
   // GPS-derived fields updated independently of OBD polling
   double? _gpsSpeedKph;
@@ -51,6 +52,7 @@ class ObdSessionController extends Notifier<ObdSessionState> {
   static const String _thresholdPrefKey = 'obd_charge_threshold_pct';
 
   bool _initialized = false;
+  bool _disposed = false;
 
   @override
   ObdSessionState build() {
@@ -67,6 +69,7 @@ class ObdSessionController extends Notifier<ObdSessionState> {
       _adapterSubscription?.cancel();
       _service.bindScanStreams(
         onScanResults: (devices) {
+          if (_disposed) return;
           _recordDiagnostic(
             'scan',
             'Scan results updated with ${devices.length} visible adapter(s).',
@@ -74,6 +77,7 @@ class ObdSessionController extends Notifier<ObdSessionState> {
           state = state.copyWith(scanDevices: devices);
         },
         onScanningChanged: (isScanning) {
+          if (_disposed) return;
           _recordDiagnostic(
             'scan',
             isScanning ? 'Bluetooth scan started.' : 'Bluetooth scan stopped.',
@@ -88,8 +92,14 @@ class ObdSessionController extends Notifier<ObdSessionState> {
           );
         },
       );
-      _adapterSubscription = FlutterBluePlus.adapterState.listen((adapterState) {
-        _recordDiagnostic('adapter', 'Bluetooth adapter state is $adapterState.');
+      _adapterSubscription = FlutterBluePlus.adapterState.listen((
+        adapterState,
+      ) {
+        if (_disposed) return;
+        _recordDiagnostic(
+          'adapter',
+          'Bluetooth adapter state is $adapterState.',
+        );
         final nextStage = switch (adapterState) {
           BluetoothAdapterState.off => ObdConnectionStage.bluetoothOff,
           _ => state.stage,
@@ -110,6 +120,7 @@ class ObdSessionController extends Notifier<ObdSessionState> {
         );
       });
       final support = await _service.ensurePermissions();
+      if (_disposed) return;
       _recordDiagnostic(
         'permissions',
         'Permissions granted=${support.permissionsGranted}, BLE=${support.bleSupported}, classic=${support.classicSupported}.',
@@ -143,6 +154,7 @@ class ObdSessionController extends Notifier<ObdSessionState> {
 
       // Load persisted charge threshold
       await _loadChargeThreshold();
+      if (_disposed) return;
 
       _initialized = true;
       _recordDiagnostic('setup', 'OBD controller initialization finished.');
@@ -196,9 +208,12 @@ class ObdSessionController extends Notifier<ObdSessionState> {
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: 5, // only trigger when moved ≥5 m
       ),
-    ).listen(_onGpsPosition, onError: (Object e) {
-      _recordDiagnostic('gps', 'GPS stream error: $e');
-    });
+    ).listen(
+      _onGpsPosition,
+      onError: (Object e) {
+        _recordDiagnostic('gps', 'GPS stream error: $e');
+      },
+    );
     _recordDiagnostic('gps', 'GPS position stream started.');
   }
 
@@ -212,7 +227,10 @@ class ObdSessionController extends Notifier<ObdSessionState> {
 
     if (_prevGpsLat != null && _prevGpsLng != null) {
       final segmentM = Geolocator.distanceBetween(
-        _prevGpsLat!, _prevGpsLng!, lat, lng,
+        _prevGpsLat!,
+        _prevGpsLng!,
+        lat,
+        lng,
       );
       _gpsDistanceAccumM += segmentM;
     }
@@ -242,7 +260,10 @@ class ObdSessionController extends Notifier<ObdSessionState> {
       final saved = prefs.getDouble(_thresholdPrefKey);
       if (saved != null) {
         state = state.copyWith(chargeThresholdPct: saved);
-        _recordDiagnostic('soc', 'Charge threshold loaded: ${saved.toStringAsFixed(0)}%');
+        _recordDiagnostic(
+          'soc',
+          'Charge threshold loaded: ${saved.toStringAsFixed(0)}%',
+        );
       }
     } catch (e) {
       _recordDiagnostic('soc', 'Could not load charge threshold: $e');
@@ -278,7 +299,10 @@ class ObdSessionController extends Notifier<ObdSessionState> {
     }
 
     if (state.adapterState == BluetoothAdapterState.off) {
-      _recordDiagnostic('scan', 'Scan blocked because Bluetooth is turned off.');
+      _recordDiagnostic(
+        'scan',
+        'Scan blocked because Bluetooth is turned off.',
+      );
       state = state.copyWith(
         isScanning: false,
         stage: ObdConnectionStage.bluetoothOff,
@@ -298,8 +322,9 @@ class ObdSessionController extends Notifier<ObdSessionState> {
       await _service.startScan();
     } catch (e) {
       _recordDiagnostic('scan', 'Scan failed: $e');
-      final bluetoothOff =
-          e.toString().toLowerCase().contains('bluetooth must be turned on');
+      final bluetoothOff = e.toString().toLowerCase().contains(
+        'bluetooth must be turned on',
+      );
       state = state.copyWith(
         isScanning: false,
         stage:
@@ -360,8 +385,24 @@ class ObdSessionController extends Notifier<ObdSessionState> {
       _startPolling();
     } catch (e) {
       _recordDiagnostic('connect', 'Connection failed: $e');
+      try {
+        await _service.disconnect();
+      } catch (cleanupError) {
+        _recordDiagnostic(
+          'connect',
+          'Cleanup after failed connection also failed: $cleanupError',
+        );
+      }
+      _pollingTimer?.cancel();
+      _gpsSubscription?.cancel();
+      _gpsSubscription = null;
+      _cachedEnhancedResults = const [];
+      _pollCycle = 0;
+      _sessionId = null;
+      _sessionStartedAt = null;
       state = state.copyWith(
         stage: ObdConnectionStage.error,
+        clearSelectedDevice: true,
         statusMessage: 'Failed to connect: $e',
       );
     }
@@ -408,6 +449,14 @@ class ObdSessionController extends Notifier<ObdSessionState> {
   }
 
   Future<void> _pollOnce() async {
+    if (_isPolling) {
+      _recordDiagnostic(
+        'poll',
+        'Previous poll is still running; skipping this tick.',
+      );
+      return;
+    }
+    _isPolling = true;
     try {
       final primaryVehicle = ref.read(vehicleProvider.notifier).primaryVehicle;
       final standardResults = await _service.pollStandardTelemetry();
@@ -497,11 +546,14 @@ class ObdSessionController extends Notifier<ObdSessionState> {
               'Transient error (attempt $_consecutiveErrors/$_maxConsecutiveErrors), retrying...',
         );
       }
+    } finally {
+      _isPolling = false;
     }
   }
 
   String get enhancedMetricCountLabel {
-    final count = _cachedEnhancedResults.where((result) => result.supported).length;
+    final count =
+        _cachedEnhancedResults.where((result) => result.supported).length;
     return '$count enhanced metric${count == 1 ? '' : 's'}';
   }
 
@@ -595,6 +647,7 @@ class ObdSessionController extends Notifier<ObdSessionState> {
 
   void _disposeResources() {
     unawaited(_persistHistorySnapshot());
+    _disposed = true;
     _pollingTimer?.cancel();
     _adapterSubscription?.cancel();
     _gpsSubscription?.cancel();
@@ -633,10 +686,13 @@ class ObdSessionController extends Notifier<ObdSessionState> {
     );
 
     await ObdHistoryService().upsertCurrentUserEntry(entry);
-    ref.invalidate(obdHistoryEntriesProvider);
+    if (!_disposed) {
+      ref.invalidate(obdHistoryEntriesProvider);
+    }
   }
 
   void _recordDiagnostic(String phase, String message) {
+    if (_disposed) return;
     final nextEntries = [
       ...state.diagnostics,
       ObdDiagnosticEntry(

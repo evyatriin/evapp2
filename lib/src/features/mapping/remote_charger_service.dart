@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/backend_service.dart';
+import '../authentication/auth_service.dart';
 import 'station_model.dart';
 
 class RemoteChargerService {
@@ -9,7 +10,10 @@ class RemoteChargerService {
     LatLng? center, {
     double radiusKm = 10.0,
   }) async {
-    final token = Supabase.instance.client.auth.currentSession?.accessToken;
+    // Prefer AuthService.currentToken (set at login, survives session restore)
+    // then fall back to Supabase client session as secondary option.
+    final token = AuthService.currentToken
+        ?? Supabase.instance.client.auth.currentSession?.accessToken;
     if (token == null) {
       debugPrint('[RemoteChargerService] No auth token — user not logged in');
       return [];

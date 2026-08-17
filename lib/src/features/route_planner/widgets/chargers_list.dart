@@ -8,17 +8,18 @@ class ChargersList extends StatelessWidget {
   final Function(ChargerAlongRoute)? onChargerTap;
 
   const ChargersList({
-    Key? key,
+    super.key,
     required this.chargers,
     this.showOnlyOptimal = false,
     this.onChargerTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
-    final displayChargers = showOnlyOptimal
-        ? chargers.where((c) => c.isOptimal).toList()
-        : chargers;
+    final displayChargers =
+        showOnlyOptimal
+            ? chargers.where((c) => c.isOptimal).toList()
+            : chargers;
 
     if (displayChargers.isEmpty) {
       return Padding(
@@ -51,11 +52,7 @@ class ChargerListTile extends StatelessWidget {
   final ChargerAlongRoute charger;
   final VoidCallback? onTap;
 
-  const ChargerListTile({
-    Key? key,
-    required this.charger,
-    this.onTap,
-  }) : super(key: key);
+  const ChargerListTile({super.key, required this.charger, this.onTap});
 
   Color get typeColor {
     switch (charger.chargerType) {
@@ -92,15 +89,11 @@ class ChargerListTile extends StatelessWidget {
         height: 40,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: typeColor.withOpacity(0.2),
+          color: typeColor.withValues(alpha: 0.2),
           border: Border.all(color: typeColor, width: 1.5),
         ),
         child: Center(
-          child: Icon(
-            Icons.ev_station,
-            color: typeColor,
-            size: 18,
-          ),
+          child: Icon(Icons.ev_station, color: typeColor, size: 18),
         ),
       ),
       title: Text(
@@ -125,7 +118,7 @@ class ChargerListTile extends StatelessWidget {
             children: [
               Chip(
                 label: Text(typeBadgeLabel),
-                backgroundColor: typeColor.withOpacity(0.2),
+                backgroundColor: typeColor.withValues(alpha: 0.2),
                 labelStyle: TextStyle(
                   color: typeColor,
                   fontSize: 12,
@@ -137,11 +130,12 @@ class ChargerListTile extends StatelessWidget {
               if (charger.provider != null)
                 Chip(
                   label: Text(charger.provider!),
-                  backgroundColor: Colors.grey.withOpacity(0.2),
-                  labelStyle: const TextStyle(
-                    fontSize: 12,
+                  backgroundColor: Colors.grey.withValues(alpha: 0.2),
+                  labelStyle: const TextStyle(fontSize: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 2,
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 ),
             ],
           ),
@@ -153,9 +147,9 @@ class ChargerListTile extends StatelessWidget {
         children: [
           Text(
             '${charger.distanceFromOriginKm.toStringAsFixed(1)} km',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           if (charger.powerKw != null)
             Text(
@@ -175,11 +169,11 @@ class ChargersSummaryHeader extends StatelessWidget {
   final int alternativeChargers;
 
   const ChargersSummaryHeader({
-    Key? key,
+    super.key,
     required this.totalChargers,
     required this.optimalChargers,
     required this.alternativeChargers,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -193,18 +187,21 @@ class ChargersSummaryHeader extends StatelessWidget {
             children: [
               Text(
                 'Available Chargers',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
               const Gap(4),
               Row(
                 children: [
                   // Optimal badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.2),
+                      color: Colors.green.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -219,9 +216,12 @@ class ChargersSummaryHeader extends StatelessWidget {
                   const Gap(8),
                   // Alternative badge
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.2),
+                      color: Colors.blue.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -239,9 +239,9 @@ class ChargersSummaryHeader extends StatelessWidget {
           ),
           Text(
             'Total: $totalChargers',
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],
       ),

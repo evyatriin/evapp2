@@ -52,7 +52,21 @@ class VehicleTemplate {
   final String model;
   final String variant;
   final double rangeEfficiency;
+  final double? batteryKwh;
+  final double? certifiedRangeKm;
+  final String? rangeCycle;
+  final double? realWorldRangeKm;
+  final double? dcFastChargeKw;
+  final double? acChargeKw;
+  final String? connectorType;
+  final double? priceMin;
+  final double? priceMax;
+  final String launchStatus;
   final String imageUrl;
+  final String? sourceUrl;
+  final DateTime? lastSeenAt;
+  final DateTime? verifiedAt;
+  final double confidenceScore;
   final List<String> preferredChargingNetworks;
 
   VehicleTemplate({
@@ -61,11 +75,26 @@ class VehicleTemplate {
     required this.model,
     required this.variant,
     required this.rangeEfficiency,
+    this.batteryKwh,
+    this.certifiedRangeKm,
+    this.rangeCycle,
+    this.realWorldRangeKm,
+    this.dcFastChargeKw,
+    this.acChargeKw,
+    this.connectorType,
+    this.priceMin,
+    this.priceMax,
+    this.launchStatus = 'available',
     required this.imageUrl,
+    this.sourceUrl,
+    this.lastSeenAt,
+    this.verifiedAt,
+    this.confidenceScore = 0.6,
     required this.preferredChargingNetworks,
   });
 
-  double get ratedRangeKm => ratedRangeKmFor(brand, model);
+  double get ratedRangeKm =>
+      realWorldRangeKm ?? certifiedRangeKm ?? ratedRangeKmFor(brand, model);
 
   factory VehicleTemplate.fromJson(Map<String, dynamic> json) {
     return VehicleTemplate(
@@ -74,9 +103,34 @@ class VehicleTemplate {
       model: json['model'],
       variant: json['variant'],
       rangeEfficiency: json['range_efficiency'].toDouble(),
+      batteryKwh: _toDouble(json['battery_kwh']),
+      certifiedRangeKm: _toDouble(json['certified_range_km']),
+      rangeCycle: json['range_cycle'] as String?,
+      realWorldRangeKm: _toDouble(json['real_world_range_km']),
+      dcFastChargeKw: _toDouble(json['dc_fast_charge_kw']),
+      acChargeKw: _toDouble(json['ac_charge_kw']),
+      connectorType: json['connector_type'] as String?,
+      priceMin: _toDouble(json['price_min']),
+      priceMax: _toDouble(json['price_max']),
+      launchStatus: json['launch_status'] as String? ?? 'available',
       imageUrl: json['image_url'],
+      sourceUrl: json['source_url'] as String?,
+      lastSeenAt: _toDate(json['last_seen_at']),
+      verifiedAt: _toDate(json['verified_at']),
+      confidenceScore: _toDouble(json['confidence_score']) ?? 0.6,
       preferredChargingNetworks:
           List<String>.from(json['preferred_charging_networks'] ?? []),
     );
   }
+}
+
+double? _toDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value.toDouble();
+  return double.tryParse(value.toString());
+}
+
+DateTime? _toDate(dynamic value) {
+  if (value == null) return null;
+  return DateTime.tryParse(value.toString());
 }

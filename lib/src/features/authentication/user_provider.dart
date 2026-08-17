@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../core/backend_service.dart';
 import 'auth_service.dart';
@@ -10,12 +13,22 @@ part 'user_provider.g.dart';
 @riverpod
 class User extends _$User {
   final _authService = AuthService();
+  StreamSubscription<AuthState>? _authSubscription;
 
   @override
   UserProfile? build() {
-    // Load current user from Supabase Auth
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
+      event,
+    ) {
+      if (event.session == null) {
+        state = null;
+      } else {
+        unawaited(_loadCurrentUser());
+      }
+    });
+    ref.onDispose(() => _authSubscription?.cancel());
     _loadCurrentUser();
-    return null; // Will be populated by _loadCurrentUser
+    return null;
   }
 
   Future<void> _loadCurrentUser() async {
@@ -30,12 +43,14 @@ class User extends _$User {
     required String email,
     required String password,
     required String name,
+    required bool termsAccepted,
   }) async {
     try {
       final user = await _authService.signUp(
         email: email,
         password: password,
         name: name,
+        termsAccepted: termsAccepted,
       );
       state = user;
     } catch (e) {
@@ -64,30 +79,14 @@ class User extends _$User {
     }
   }
 
-  Future<void> completeOnboarding({
-    required String phoneNumber,
-    required bool isPhoneVerified,
-    required Map<String, dynamic> vehicleDetails,
-  }) async {
+  Future<void> completeOnboarding({required String name}) async {
     try {
       if (state == null) throw Exception('User not logged in');
 
-      await BackendService.put(
-        '/api/users/profile',
-        body: {
-          'user_id': state!.id,
-          'phone_number': phoneNumber,
-          'is_phone_verified': isPhoneVerified,
-          'vehicle_details': vehicleDetails,
-        },
-        headers: {
-          if (_authService.getAuthToken() case final token?) 'Authorization': 'Bearer $token',
-        },
-      );
+      await BackendService.put('/api/users/me', body: {'name': name});
 
-      // Update local state
       if (state != null) {
-        state = state!.copyWith(isPhoneVerified: isPhoneVerified);
+        state = state!.copyWith(name: name);
       }
     } catch (e) {
       debugPrint('Onboarding error: $e');

@@ -18,7 +18,6 @@ class ElevationProfileChart extends StatefulWidget {
 }
 
 class _ElevationProfileChartState extends State<ElevationProfileChart> {
-  int? _touchedIndex;
   double? _selectedDistance;
   double? _selectedElevation;
 
@@ -40,9 +39,13 @@ class _ElevationProfileChartState extends State<ElevationProfileChart> {
     }
 
     // Find charging stops with their distances
-    final chargingStopsWithDistance = widget.stops
-        .where((s) => s.type == StopType.charging && s.distanceFromOriginKm != null)
-        .toList();
+    final chargingStopsWithDistance =
+        widget.stops
+            .where(
+              (s) =>
+                  s.type == StopType.charging && s.distanceFromOriginKm != null,
+            )
+            .toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -75,22 +78,21 @@ class _ElevationProfileChartState extends State<ElevationProfileChart> {
                 maxX: points.last.distanceFromOriginKm,
                 minY:
                     widget.elevationProfile.minElevationM -
-                        ((widget.elevationProfile.maxElevationM -
-                                widget.elevationProfile.minElevationM) *
-                            0.1),
+                    ((widget.elevationProfile.maxElevationM -
+                            widget.elevationProfile.minElevationM) *
+                        0.1),
                 maxY:
                     widget.elevationProfile.maxElevationM +
-                        ((widget.elevationProfile.maxElevationM -
-                                widget.elevationProfile.minElevationM) *
-                            0.1),
+                    ((widget.elevationProfile.maxElevationM -
+                            widget.elevationProfile.minElevationM) *
+                        0.1),
                 gridData: FlGridData(
                   show: true,
                   drawVerticalLine: false,
-                  horizontalInterval:
-                      _getGridInterval(
-                        widget.elevationProfile.maxElevationM -
-                            widget.elevationProfile.minElevationM,
-                      ),
+                  horizontalInterval: _getGridInterval(
+                    widget.elevationProfile.maxElevationM -
+                        widget.elevationProfile.minElevationM,
+                  ),
                 ),
                 titlesData: FlTitlesData(
                   show: true,
@@ -104,8 +106,9 @@ class _ElevationProfileChartState extends State<ElevationProfileChart> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 30,
-                      interval:
-                          _getAxisInterval(points.last.distanceFromOriginKm),
+                      interval: _getAxisInterval(
+                        points.last.distanceFromOriginKm,
+                      ),
                       getTitlesWidget: (value, meta) {
                         return Text(
                           '${value.toInt()} km',
@@ -118,11 +121,10 @@ class _ElevationProfileChartState extends State<ElevationProfileChart> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       reservedSize: 40,
-                      interval:
-                          _getGridInterval(
-                            widget.elevationProfile.maxElevationM -
-                                widget.elevationProfile.minElevationM,
-                          ),
+                      interval: _getGridInterval(
+                        widget.elevationProfile.maxElevationM -
+                            widget.elevationProfile.minElevationM,
+                      ),
                       getTitlesWidget: (value, meta) {
                         return Text(
                           '${value.toInt()} m',
@@ -147,14 +149,13 @@ class _ElevationProfileChartState extends State<ElevationProfileChart> {
                 ),
                 lineBarsData: [
                   LineChartBarData(
-                    spots: points
-                        .map(
-                          (p) => FlSpot(
-                            p.distanceFromOriginKm,
-                            p.elevationM,
-                          ),
-                        )
-                        .toList(),
+                    spots:
+                        points
+                            .map(
+                              (p) =>
+                                  FlSpot(p.distanceFromOriginKm, p.elevationM),
+                            )
+                            .toList(),
                     isCurved: true,
                     color: theme.colorScheme.primary,
                     barWidth: 2,
@@ -171,8 +172,9 @@ class _ElevationProfileChartState extends State<ElevationProfileChart> {
                     if (_selectedDistance != null)
                       VerticalLine(
                         x: _selectedDistance!,
-                        color:
-                            theme.colorScheme.tertiary.withValues(alpha: 0.5),
+                        color: theme.colorScheme.tertiary.withValues(
+                          alpha: 0.5,
+                        ),
                         strokeWidth: 2,
                       ),
                     // Charging stops vertical lines

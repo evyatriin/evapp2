@@ -21,5 +21,6 @@ def get_supabase() -> Client:
 def get_service_supabase() -> Client:
     return _create_supabase_client(settings.SUPABASE_SERVICE_ROLE_KEY)
 
-supabase = get_supabase()
+public_supabase = get_supabase()
 service_supabase = get_service_supabase()
+supabase = service_supabase or public_supabase

@@ -32,8 +32,17 @@ class Settings:
     OPENCHARGEMAP_API_KEY = _clean_env(os.getenv("OPENCHARGEMAP_API_KEY", ""))
     HERE_API_KEY = _clean_env(os.getenv("HERE_API_KEY", ""))
     APP_ENV = _clean_env(os.getenv("APP_ENV", "development"))
+    FEATURE_SOS_ENABLED = (
+        _clean_env(os.getenv("FEATURE_SOS_ENABLED", "false")).lower() == "true"
+    )
     ALLOWED_ORIGINS = _parse_allowed_origins(
         os.getenv("ALLOWED_ORIGINS", "https://evraahein.app,https://www.evraahein.app")
+    )
+    PASSWORD_RESET_REDIRECT_URL = _clean_env(
+        os.getenv(
+            "PASSWORD_RESET_REDIRECT_URL",
+            "https://evraahein-backend-187759131948.asia-south1.run.app/reset-password",
+        )
     )
     PORT = int(_clean_env(os.getenv("PORT", "8080")))
 

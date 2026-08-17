@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../charge/charging_service.dart';
+import '../authentication/auth_service.dart';
 import '../authentication/user_provider.dart';
 import '../mapping/stations_repository.dart';
 import '../mapping/station_model.dart';
@@ -110,12 +111,18 @@ class _CheckInSheetState extends ConsumerState<CheckInSheet> {
 
   Future<String?> _uploadImage(File file) async {
     try {
+      final token = AuthService.currentToken;
+      if (token == null) {
+        throw Exception('You must be signed in to upload check-in images.');
+      }
+
       final request = http.MultipartRequest(
         'POST',
         Uri.parse(
           '${BackendService.baseUrl}/api/chargers/upload-checkin-image',
         ),
       );
+      request.headers['Authorization'] = 'Bearer $token';
 
       request.files.add(await http.MultipartFile.fromPath('file', file.path));
 

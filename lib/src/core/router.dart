@@ -26,6 +26,8 @@ import '../features/route_planner/saved_routes_screen.dart';
 import '../features/vehicle_profile/vehicle_selection_screen.dart';
 import '../features/obd/obd_analytics_screen.dart';
 import '../features/obd/obd_telemetry_screen.dart';
+import '../features/beckn/beckn_network_screen.dart';
+import 'app_config.dart';
 
 final router = GoRouter(
   initialLocation: '/splash',
@@ -53,8 +55,11 @@ final router = GoRouter(
     ),
     GoRoute(
       path: '/planner/result',
+      redirect:
+          (context, state) =>
+              state.extra is Map<String, dynamic> ? null : '/planner',
       builder: (context, state) {
-        final extra = state.extra as Map<String, dynamic>;
+        final extra = state.extra! as Map<String, dynamic>;
         return RouteResultScreen(extra: extra);
       },
     ),
@@ -69,6 +74,10 @@ final router = GoRouter(
     GoRoute(
       path: '/search',
       builder: (context, state) => const LocationSearchScreen(),
+    ),
+    GoRoute(
+      path: '/open-network',
+      builder: (context, state) => const BecknNetworkScreen(),
     ),
     GoRoute(
       path: '/obd',
@@ -104,14 +113,21 @@ final router = GoRouter(
         ),
         GoRoute(
           path: 'vehicle/edit',
+          redirect:
+              (context, state) =>
+                  state.extra is VehicleProfile ? null : '/setup',
           builder: (context, state) {
-            final vehicle = state.extra as VehicleProfile;
+            final vehicle = state.extra! as VehicleProfile;
             return VehicleFormScreen(vehicleToEdit: vehicle);
           },
         ),
       ],
     ),
-    GoRoute(path: '/sos', builder: (context, state) => const SosScreen()),
+    GoRoute(
+      path: '/sos',
+      redirect: (context, state) => AppConfig.sosEnabled ? null : '/',
+      builder: (context, state) => const SosScreen(),
+    ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return MainScreen(navigationShell: navigationShell);
@@ -160,8 +176,6 @@ class _ObdPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: ObdTelemetryScreen(),
-    );
+    return const Scaffold(body: ObdTelemetryScreen());
   }
 }
