@@ -92,33 +92,6 @@ class ObdSessionController extends Notifier<ObdSessionState> {
           );
         },
       );
-      _adapterSubscription = FlutterBluePlus.adapterState.listen((
-        adapterState,
-      ) {
-        if (_disposed) return;
-        _recordDiagnostic(
-          'adapter',
-          'Bluetooth adapter state is $adapterState.',
-        );
-        final nextStage = switch (adapterState) {
-          BluetoothAdapterState.off => ObdConnectionStage.bluetoothOff,
-          _ => state.stage,
-        };
-        final message = switch (adapterState) {
-          BluetoothAdapterState.on =>
-            state.selectedDevice == null
-                ? 'Bluetooth is on. Scan and connect to your OBD adapter.'
-                : state.statusMessage,
-          BluetoothAdapterState.off =>
-            'Turn on Bluetooth to connect to your OBD adapter.',
-          _ => state.statusMessage,
-        };
-        state = state.copyWith(
-          adapterState: adapterState,
-          stage: nextStage,
-          statusMessage: message,
-        );
-      });
       final support = await _service.ensurePermissions();
       if (_disposed) return;
       _recordDiagnostic(
@@ -138,6 +111,45 @@ class ObdSessionController extends Notifier<ObdSessionState> {
               'Bluetooth permissions were denied. Allow them in Settings to use telemetry.',
         );
         return;
+      }
+
+      if (support.bleSupported) {
+        _adapterSubscription = FlutterBluePlus.adapterState.listen(
+          (adapterState) {
+            if (_disposed) return;
+            _recordDiagnostic(
+              'adapter',
+              'Bluetooth adapter state is $adapterState.',
+            );
+            final nextStage = switch (adapterState) {
+              BluetoothAdapterState.off => ObdConnectionStage.bluetoothOff,
+              _ => state.stage,
+            };
+            final message = switch (adapterState) {
+              BluetoothAdapterState.on =>
+                state.selectedDevice == null
+                    ? 'Bluetooth is on. Scan and connect to your OBD adapter.'
+                    : state.statusMessage,
+              BluetoothAdapterState.off =>
+                'Turn on Bluetooth to connect to your OBD adapter.',
+              _ => state.statusMessage,
+            };
+            state = state.copyWith(
+              adapterState: adapterState,
+              stage: nextStage,
+              statusMessage: message,
+            );
+          },
+          onError: (Object e) {
+            if (_disposed) return;
+            _recordDiagnostic('adapter', 'Bluetooth adapter stream failed: $e');
+          },
+        );
+      } else {
+        _recordDiagnostic(
+          'adapter',
+          'BLE adapter stream skipped because BLE is not supported.',
+        );
       }
 
       state = state.copyWith(

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:bluetooth_serial_android/bluetooth_serial_android.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
@@ -611,20 +612,30 @@ class ObdService {
     _scanSubscription?.cancel();
     _isScanningSubscription?.cancel();
 
-    _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
-      for (final result in results) {
-        _knownBleDevices[result.device.remoteId.str] = result.device;
-      }
+    _scanSubscription = FlutterBluePlus.scanResults.listen(
+      (results) {
+        for (final result in results) {
+          _knownBleDevices[result.device.remoteId.str] = result.device;
+        }
 
-      _emitScanResults(_mapBleScanResults(results));
-    });
+        _emitScanResults(_mapBleScanResults(results));
+      },
+      onError: (Object e) {
+        _emitDiagnostic('scan', 'BLE scan result stream failed: $e');
+      },
+    );
 
-    _isScanningSubscription = FlutterBluePlus.isScanning.listen((isScanning) {
-      _onScanningChanged(isScanning);
-      if (!isScanning && Platform.isAndroid) {
-        unawaited(_safeRefreshClassicDevices());
-      }
-    });
+    _isScanningSubscription = FlutterBluePlus.isScanning.listen(
+      (isScanning) {
+        _onScanningChanged(isScanning);
+        if (!isScanning && Platform.isAndroid) {
+          unawaited(_safeRefreshClassicDevices());
+        }
+      },
+      onError: (Object e) {
+        _emitDiagnostic('scan', 'BLE scanning state stream failed: $e');
+      },
+    );
   }
 
   Future<void> _safeRefreshClassicDevices() async {
@@ -648,11 +659,9 @@ class ObdService {
     );
 
     final classicSupported = Platform.isAndroid;
-    final bleSupported = await FlutterBluePlus.isSupported;
+    final bleSupported = await _isBleSupported();
     final classicPermissionsGranted =
-        classicSupported
-            ? await FlutterBluetoothSerial.ensurePermissions()
-            : false;
+        classicSupported ? await _classicEnsurePermissions() : false;
 
     return ObdTransportSupport(
       bleSupported: bleSupported,
@@ -738,7 +747,7 @@ class ObdService {
 
     if (_activeTransport == ObdTransport.classicBluetooth) {
       try {
-        await FlutterBluetoothSerial.disconnect();
+        await _classicDisconnect();
       } catch (e) {
         _emitDiagnostic(
           'classic',
@@ -983,17 +992,22 @@ class ObdService {
   }
 
   Future<List<ObdScanDevice>> _startBleScan() async {
-    if (!await FlutterBluePlus.isSupported) {
+    if (!await _isBleSupported()) {
       _emitDiagnostic('scan', 'BLE is not supported on this phone.');
       return const [];
     }
 
-    await FlutterBluePlus.startScan(
-      timeout: const Duration(seconds: 12),
-      webOptionalServices: [
-        for (final layout in _bleSerialLayouts) layout.service,
-      ],
-    );
+    try {
+      await FlutterBluePlus.startScan(
+        timeout: const Duration(seconds: 12),
+        webOptionalServices: [
+          for (final layout in _bleSerialLayouts) layout.service,
+        ],
+      );
+    } on PlatformException catch (e) {
+      _emitDiagnostic('scan', 'BLE scan failed: ${_platformMessage(e)}');
+      return const [];
+    }
 
     final existingResults = FlutterBluePlus.lastScanResults;
     return _mapBleScanResults(existingResults);
@@ -1038,7 +1052,7 @@ class ObdService {
 
     final nextDevices = <String, ObdScanDevice>{};
 
-    for (final device in await FlutterBluetoothSerial.getPairedDevices()) {
+    for (final device in await _classicGetPairedDevices()) {
       final mapped = _mapClassicDevice(device);
       if (mapped != null) {
         nextDevices[mapped.id] = mapped;
@@ -1050,7 +1064,7 @@ class ObdService {
         'scan',
         'Refreshing paired and discovered classic Bluetooth devices.',
       );
-      for (final device in await FlutterBluetoothSerial.scanDevices()) {
+      for (final device in await _classicScanDevices()) {
         final mapped = _mapClassicDevice(device);
         if (mapped != null) {
           nextDevices[mapped.id] = mapped;
@@ -1063,7 +1077,7 @@ class ObdService {
       ..addAll(nextDevices);
 
     return _emitScanResults([
-      ..._mapBleScanResults(FlutterBluePlus.lastScanResults),
+      ..._safeLastBleScanResults(),
       ..._classicDevices.values,
     ]);
   }
@@ -1155,7 +1169,7 @@ class ObdService {
         'classic',
         'Trying classic Bluetooth connection with ${timeout}ms timeout.',
       );
-      connected = await FlutterBluetoothSerial.connect(
+      connected = await _classicConnect(
         address,
         uuid: _serialPortProfileUuid,
         timeoutMs: timeout,
@@ -1472,6 +1486,12 @@ class ObdService {
     String command, {
     Duration timeout = const Duration(seconds: 2),
   }) async {
+    if (_activeTransport == ObdTransport.classicBluetooth) {
+      _responseBuffer.clear();
+      await _classicWrite('$command\r');
+      return await _readClassicResponse(timeout, command);
+    }
+
     _completePendingResponseError(
       StateError('A new command was sent before the previous one completed.'),
     );
@@ -1479,11 +1499,6 @@ class ObdService {
     _responseBuffer.clear();
 
     try {
-      if (_activeTransport == ObdTransport.classicBluetooth) {
-        await FlutterBluetoothSerial.write('$command\r');
-        return await _readClassicResponse(timeout, command);
-      }
-
       final characteristic = _writeCharacteristic;
       if (characteristic == null) {
         throw StateError('No writable characteristic available.');
@@ -1516,7 +1531,7 @@ class ObdService {
     final deadline = DateTime.now().add(timeout);
 
     while (DateTime.now().isBefore(deadline)) {
-      final chunk = await FlutterBluetoothSerial.read();
+      final chunk = await _classicRead();
       if (chunk != null && chunk.isNotEmpty) {
         _responseBuffer.write(chunk);
         if (_responseBuffer.toString().contains('>')) {
@@ -1548,6 +1563,137 @@ class ObdService {
     if (pending != null && !pending.isCompleted) {
       pending.completeError(error);
     }
+  }
+
+  Future<bool> _isBleSupported() async {
+    try {
+      return await FlutterBluePlus.isSupported;
+    } catch (e) {
+      _emitDiagnostic('ble', 'BLE support check failed: $e');
+      return false;
+    }
+  }
+
+  List<ObdScanDevice> _safeLastBleScanResults() {
+    try {
+      return _mapBleScanResults(FlutterBluePlus.lastScanResults);
+    } catch (e) {
+      _emitDiagnostic('scan', 'Could not read last BLE scan results: $e');
+      return const [];
+    }
+  }
+
+  Future<bool> _classicEnsurePermissions() async {
+    try {
+      return await FlutterBluetoothSerial.ensurePermissions();
+    } on PlatformException catch (e) {
+      _emitDiagnostic(
+        'classic',
+        'Classic Bluetooth permission check failed: ${_platformMessage(e)}',
+      );
+      return false;
+    } catch (e) {
+      _emitDiagnostic(
+        'classic',
+        'Classic Bluetooth permission check failed: $e',
+      );
+      return false;
+    }
+  }
+
+  Future<List<Map<String, String>>> _classicGetPairedDevices() async {
+    try {
+      return await FlutterBluetoothSerial.getPairedDevices();
+    } on PlatformException catch (e) {
+      _emitDiagnostic(
+        'classic',
+        'Could not list paired classic Bluetooth devices: ${_platformMessage(e)}',
+      );
+      return const [];
+    } catch (e) {
+      _emitDiagnostic(
+        'classic',
+        'Could not list paired classic Bluetooth devices: $e',
+      );
+      return const [];
+    }
+  }
+
+  Future<List<Map<String, String>>> _classicScanDevices() async {
+    try {
+      return await FlutterBluetoothSerial.scanDevices();
+    } on PlatformException catch (e) {
+      _emitDiagnostic(
+        'classic',
+        'Classic Bluetooth discovery failed: ${_platformMessage(e)}',
+      );
+      return const [];
+    } catch (e) {
+      _emitDiagnostic('classic', 'Classic Bluetooth discovery failed: $e');
+      return const [];
+    }
+  }
+
+  Future<bool> _classicConnect(
+    String address, {
+    required String uuid,
+    required int timeoutMs,
+  }) async {
+    try {
+      return await FlutterBluetoothSerial.connect(
+        address,
+        uuid: uuid,
+        timeoutMs: timeoutMs,
+      ).timeout(Duration(milliseconds: timeoutMs + 500));
+    } on TimeoutException {
+      await _classicDisconnect();
+      throw StateError(
+        'Classic Bluetooth connection timed out after ${timeoutMs}ms.',
+      );
+    } on PlatformException catch (e) {
+      throw StateError(
+        'Classic Bluetooth connection failed: ${_platformMessage(e)}',
+      );
+    } catch (e) {
+      throw StateError('Classic Bluetooth connection failed: $e');
+    }
+  }
+
+  Future<void> _classicDisconnect() async {
+    try {
+      await FlutterBluetoothSerial.disconnect();
+    } on PlatformException catch (e) {
+      _emitDiagnostic(
+        'classic',
+        'Classic Bluetooth disconnect failed: ${_platformMessage(e)}',
+      );
+    }
+  }
+
+  Future<void> _classicWrite(String message) async {
+    try {
+      await FlutterBluetoothSerial.write(message);
+    } on PlatformException catch (e) {
+      throw StateError(
+        'Classic Bluetooth write failed: ${_platformMessage(e)}',
+      );
+    }
+  }
+
+  Future<String?> _classicRead() async {
+    try {
+      return await FlutterBluetoothSerial.read();
+    } on PlatformException catch (e) {
+      throw StateError('Classic Bluetooth read failed: ${_platformMessage(e)}');
+    }
+  }
+
+  String _platformMessage(PlatformException e) {
+    final message = e.message;
+    return [
+      e.code,
+      if (message != null && message.trim().isNotEmpty) message.trim(),
+    ].join(': ');
   }
 
   String _normalizeResponse(String response) {
@@ -1733,9 +1879,7 @@ class ObdService {
       return bytes;
     }
 
-    var compact = line
-        .toUpperCase()
-        .replaceAll(RegExp(r'[^0-9A-F]'), '');
+    var compact = line.toUpperCase().replaceAll(RegExp(r'[^0-9A-F]'), '');
     if (compact.length >= 12 && compact.startsWith(RegExp(r'18D[AB]'))) {
       compact = compact.substring(8);
     } else if (compact.length.isOdd && compact.length >= 5) {
