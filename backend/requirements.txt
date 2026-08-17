@@ -11,3 +11,19 @@ flexpolyline==0.1.0
 python-multipart==0.0.18
 sentry-sdk[fastapi]==2.20.0
 slowapi==0.1.9
+
+# ── Beckn EV Charging (used when BECKN_CHARGING_ENABLED=true) ──
+# Redis — cache, locks, pub/sub, idempotency
+redis==5.0.1
+# QR code generation
+qrcode==7.4.2
+pillow==10.1.0
+# WebSocket support (already included via uvicorn[standard] but explicit pin)
+websockets==12.0
+
+# ── Testing ──
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+httpx==0.26.0
+faker==20.1.0

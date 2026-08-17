@@ -27,6 +27,9 @@ from routers import (
     news,
     content,
 )
+# Beckn EV charging router — always imported so /feature-flags endpoint is available,
+# but individual routes gate themselves behind settings.BECKN_CHARGING_ENABLED
+from routers import beckn_charging
 from config import settings
 from supabase_client import service_supabase
 
@@ -69,7 +72,21 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 
-app = FastAPI(title="EV Router Backend", lifespan=lifespan)
+_is_prod = settings.APP_ENV == "production"
+app = FastAPI(
+    title="EVraahein Backend",
+    description=(
+        "EV routing, charging discovery, OBD telemetry, and Beckn EV charging API. "
+        "Docs are available in non-production environments only."
+    ),
+    version="1.0.0",
+    contact={"name": "EVraahein Support", "email": "pidaparthy@gmail.com"},
+    license_info={"name": "Proprietary"},
+    docs_url=None if _is_prod else "/docs",
+    redoc_url=None if _is_prod else "/redoc",
+    openapi_url=None if _is_prod else "/openapi.json",
+    lifespan=lifespan,
+)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
@@ -95,6 +112,8 @@ app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(gamification.router, prefix="/api/gamification", tags=["Gamification"])
 app.include_router(news.router, prefix="/api/news", tags=["News"])
 app.include_router(content.router, prefix="/api/content", tags=["Content"])
+# Beckn EV charging — mounted at /api/chargers so /feature-flags is at /api/chargers/feature-flags
+app.include_router(beckn_charging.router, prefix="/api/chargers", tags=["Beckn Charging"])
 
 @app.get("/")
 def read_root():
