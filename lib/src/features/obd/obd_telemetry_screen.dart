@@ -656,6 +656,13 @@ class _DeviceList extends StatelessWidget {
               trailing: FilledButton(
                 onPressed:
                     device.isConnectable ? () => onConnect(device) : null,
+                // Override the global full-width button style so this compact
+                // trailing action doesn't crush the device name next to it.
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 child: const Text('Connect'),
               ),
             ),

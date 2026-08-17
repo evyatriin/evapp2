@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -12,6 +12,8 @@ from config import settings
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 import logging
+import hashlib
+import secrets
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,19 @@ class ChangePasswordRequest(BaseModel):
 
 class ResetPasswordRequest(BaseModel):
     email: EmailStr
+
+
+TEST_OTP = os.getenv("TEST_OTP", "123456")
+OTP_TTL_MINUTES = 10
+
+
+class RequestPhoneVerification(BaseModel):
+    phone_number: str
+
+
+class VerifyPhoneOtp(BaseModel):
+    phone_number: str
+    otp: str
 
 @router.post("/signup", response_model=AuthResponse)
 @limiter.limit("3/minute")  # SECURITY FIX: Prevent signup spam
@@ -242,3 +257,124 @@ async def password_reset_page():
             settings.SUPABASE_KEY,
         )
     )
+
+
+def _sms_provider_configured() -> bool:
+    return bool(os.getenv("SMS_PROVIDER"))
+
+
+def _hash_otp(code: str) -> str:
+    return hashlib.sha256(code.encode("utf-8")).hexdigest()
+
+
+def _send_sms_otp(phone_number: str, code: str) -> None:
+    provider = os.getenv("SMS_PROVIDER", "").strip().lower()
+    if not provider:
+        logger.info(
+            "[DEV] Phone OTP for %s is %s (set SMS_PROVIDER for real SMS)",
+            phone_number,
+            code,
+        )
+        return
+    raise HTTPException(
+        status_code=500,
+        detail=f"SMS provider '{provider}' is not implemented yet",
+    )
+
+
+def _load_profile_preferences(user_id: str) -> Dict[str, Any]:
+    if not service_supabase:
+        raise HTTPException(status_code=503, detail="Service role not configured")
+    current = (
+        service_supabase.table("profiles")
+        .select("preferences")
+        .eq("id", user_id)
+        .maybe_single()
+        .execute()
+    )
+    return ((current.data or {}).get("preferences") or {}) if current else {}
+
+
+@router.post("/request-phone-verification")
+@limiter.limit("5/minute")
+async def request_phone_verification(
+    request: Request,
+    body: RequestPhoneVerification,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    phone = (body.phone_number or "").strip()
+    if not phone:
+        raise HTTPException(status_code=400, detail="Phone number is required")
+
+    user_id = auth_user["user_id"]
+    code = TEST_OTP if not _sms_provider_configured() else f"{secrets.randbelow(1000000):06d}"
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=OTP_TTL_MINUTES)).isoformat()
+
+    try:
+        preferences = _load_profile_preferences(user_id)
+        preferences["phone_pending"] = phone
+        preferences["phone_otp_hash"] = _hash_otp(code)
+        preferences["phone_otp_expires_at"] = expires_at
+        service_supabase.table("profiles").update({"preferences": preferences}).eq(
+            "id", user_id
+        ).execute()
+        _send_sms_otp(phone, code)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not start phone verification: {e}")
+
+    return {"status": "sent", "dev_mode": not _sms_provider_configured()}
+
+
+@router.post("/verify-phone-otp")
+@limiter.limit("5/minute")
+async def verify_phone_otp(
+    request: Request,
+    body: VerifyPhoneOtp,
+    auth_user: Dict[str, Any] = Depends(get_authenticated_user),
+):
+    phone = (body.phone_number or "").strip()
+    otp = (body.otp or "").strip()
+    if not phone or not otp:
+        raise HTTPException(status_code=400, detail="Phone number and code are required")
+
+    user_id = auth_user["user_id"]
+    try:
+        preferences = _load_profile_preferences(user_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not verify phone: {e}")
+
+    stored_hash = preferences.get("phone_otp_hash")
+    pending_phone = preferences.get("phone_pending")
+    expires_at = preferences.get("phone_otp_expires_at")
+
+    if not stored_hash or not pending_phone:
+        raise HTTPException(status_code=400, detail="Request a new code and try again.")
+    if pending_phone != phone:
+        raise HTTPException(status_code=400, detail="This code was sent to a different number.")
+
+    try:
+        if expires_at and datetime.fromisoformat(expires_at) < datetime.now(timezone.utc):
+            raise HTTPException(status_code=400, detail="That code has expired. Request a new one.")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    if _hash_otp(otp) != stored_hash:
+        raise HTTPException(status_code=400, detail="Incorrect code. Please try again.")
+
+    preferences["is_phone_verified"] = True
+    preferences["phone_number"] = phone
+    preferences.pop("phone_otp_hash", None)
+    preferences.pop("phone_pending", None)
+    preferences.pop("phone_otp_expires_at", None)
+    try:
+        service_supabase.table("profiles").update({"preferences": preferences}).eq(
+            "id", user_id
+        ).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not save verification: {e}")
+
+    return {"status": "verified", "is_phone_verified": True}

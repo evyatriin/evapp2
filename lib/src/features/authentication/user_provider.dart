@@ -20,15 +20,28 @@ class User extends _$User {
     _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen((
       event,
     ) {
-      if (event.session == null) {
-        state = null;
-      } else {
-        unawaited(_loadCurrentUser());
+      switch (event.event) {
+        case AuthChangeEvent.signedIn:
+        case AuthChangeEvent.initialSession:
+        case AuthChangeEvent.tokenRefreshed:
+          unawaited(_loadCurrentUser());
+          break;
+        case AuthChangeEvent.signedOut:
+          state = null;
+          break;
+        default:
+          if (event.session == null) {
+            state = null;
+          }
       }
     });
     ref.onDispose(() => _authSubscription?.cancel());
     _loadCurrentUser();
     return null;
+  }
+
+  Future<bool> signInWithOAuth(OAuthProvider provider) {
+    return _authService.signInWithOAuth(provider);
   }
 
   Future<void> _loadCurrentUser() async {
@@ -79,14 +92,39 @@ class User extends _$User {
     }
   }
 
-  Future<void> completeOnboarding({required String name}) async {
+  Future<void> completeOnboarding({
+    String? name,
+    String phoneNumber = '',
+    bool isPhoneVerified = false,
+    Map<String, dynamic> vehicleDetails = const {},
+  }) async {
     try {
       if (state == null) throw Exception('User not logged in');
 
-      await BackendService.put('/api/users/me', body: {'name': name});
+      if (name != null && name.trim().isNotEmpty) {
+        await BackendService.put('/api/users/me', body: {'name': name.trim()});
+
+        if (state != null) {
+          state = state!.copyWith(name: name.trim());
+        }
+        return;
+      }
+
+      await BackendService.put(
+        '/api/users/profile',
+        body: {
+          'user_id': state!.id,
+          'phone_number': phoneNumber,
+          'is_phone_verified': isPhoneVerified,
+          'vehicle_details': vehicleDetails,
+        },
+      );
 
       if (state != null) {
-        state = state!.copyWith(name: name);
+        state = state!.copyWith(
+          phoneNumber: phoneNumber.isEmpty ? state!.phoneNumber : phoneNumber,
+          isPhoneVerified: isPhoneVerified,
+        );
       }
     } catch (e) {
       debugPrint('Onboarding error: $e');

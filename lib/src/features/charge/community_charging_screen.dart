@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../authentication/user_provider.dart';
+import '../authentication/verification_gate.dart';
 import 'charging_service.dart';
 
 const List<String> _propertyTypeOptions = [
@@ -156,6 +157,14 @@ class _CommunityChargingScreenState
   ) async {
     final user = ref.read(userProvider);
     if (user == null) return;
+
+    if (status == 'accepted') {
+      if (!await ensureVerifiedForHelp(context, ref,
+          action: 'accept help requests')) {
+        return;
+      }
+      if (!mounted) return;
+    }
 
     try {
       await _chargingService.decideChargerRequest(
@@ -319,7 +328,7 @@ class _CommunityChargingScreenState
   }
 }
 
-class _HostedChargerFormSheet extends StatefulWidget {
+class _HostedChargerFormSheet extends ConsumerStatefulWidget {
   final HostChargerListing? existing;
   final String ownerId;
   final String defaultHostName;
@@ -331,10 +340,12 @@ class _HostedChargerFormSheet extends StatefulWidget {
   });
 
   @override
-  State<_HostedChargerFormSheet> createState() => _HostedChargerFormSheetState();
+  ConsumerState<_HostedChargerFormSheet> createState() =>
+      _HostedChargerFormSheetState();
 }
 
-class _HostedChargerFormSheetState extends State<_HostedChargerFormSheet> {
+class _HostedChargerFormSheetState
+    extends ConsumerState<_HostedChargerFormSheet> {
   final _formKey = GlobalKey<FormState>();
   final _service = ChargingService();
 
@@ -607,6 +618,10 @@ class _HostedChargerFormSheetState extends State<_HostedChargerFormSheet> {
   }
 
   Future<void> _save() async {
+    if (!await ensureVerifiedForHelp(context, ref, action: 'host a charger')) {
+      return;
+    }
+    if (!mounted) return;
     if (!_formKey.currentState!.validate()) return;
 
     final latitude = double.tryParse(_latitudeController.text.trim());

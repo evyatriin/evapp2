@@ -6,7 +6,15 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../authentication/user_provider.dart';
+import '../vehicle_profile/vehicle_provider.dart';
 
+/// A value-first onboarding flow:
+///   1. Welcome — what the app does and why it's worth it.
+///   2. Add your EV — powers accurate range & charger matching (skippable).
+///   3. Location — find chargers near you (skippable, with a settings fallback).
+///
+/// Every step can be skipped so a new user is never trapped, and the whole
+/// flow can be dismissed with "Skip" from the top bar.
 class OnboardingScreen extends ConsumerStatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -15,266 +23,256 @@ class OnboardingScreen extends ConsumerStatefulWidget {
 }
 
 class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
+  static const _lastPage = 2;
+
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  bool _isLoading = false;
+  bool _isFinishing = false;
 
-  // Step 1: Profile
-  final _nameController = TextEditingController();
-
-  // Step 2: Location
   bool _locationGranted = false;
-
-  @override
-  void initState() {
-    super.initState();
-    // Pre-fill name if available - defer to after first build
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final user = ref.read(userProvider);
-      if (user != null && mounted) {
-        setState(() {
-          _nameController.text = user.name;
-        });
-      }
-    });
-  }
+  bool _locationPermanentlyDenied = false;
 
   @override
   void dispose() {
     _pageController.dispose();
-    _nameController.dispose();
     super.dispose();
   }
 
-  void _nextPage() {
-    _pageController.nextPage(
-      duration: const Duration(milliseconds: 300),
+  void _goToPage(int page) {
+    _pageController.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 320),
       curve: Curves.easeInOut,
     );
   }
+
+  void _nextPage() => _goToPage(_currentPage + 1);
 
   Future<void> _requestLocation() async {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permissions are denied')),
-          );
-        }
-        return;
-      }
     }
 
+    if (!mounted) return;
+
     if (permission == LocationPermission.deniedForever) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Location permissions are permanently denied, we cannot request permissions.',
-            ),
+      setState(() => _locationPermanentlyDenied = true);
+      return;
+    }
+
+    if (permission == LocationPermission.denied) {
+      // User declined this time — they can still continue and grant later.
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No problem — you can enable location later from the map.',
           ),
-        );
-      }
+        ),
+      );
       return;
     }
 
     setState(() {
       _locationGranted = true;
+      _locationPermanentlyDenied = false;
     });
   }
 
-  Future<void> _completeOnboarding() async {
-    setState(() => _isLoading = true);
+  Future<void> _finish() async {
+    if (_isFinishing) return;
+    setState(() => _isFinishing = true);
     try {
-      // Verify user is logged in
       final user = ref.read(userProvider);
-      if (user == null) {
-        throw Exception('Please log in again to complete setup');
+      if (user != null) {
+        // Best-effort profile flag; never block finishing on a network hiccup.
+        try {
+          await ref.read(userProvider.notifier).completeOnboarding(
+                phoneNumber: '',
+                isPhoneVerified: false,
+                vehicleDetails: {},
+              );
+        } catch (_) {
+          // Non-fatal — the local flag below still lets the user in.
+        }
       }
-
-      await ref
-          .read(userProvider.notifier)
-          .completeOnboarding(name: _nameController.text.trim());
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('onboarding_completed', true);
 
-      if (mounted) {
-        context.go('/');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
-        );
-      }
+      if (mounted) context.go('/');
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isFinishing = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Watch the provider to keep it alive
+    // Keep auth alive and react to a vehicle being added on step 2.
     ref.watch(userProvider);
+    final hasVehicle = ref.watch(vehicleProvider).isNotEmpty;
+    final theme = Theme.of(context);
 
     return Scaffold(
       body: SafeArea(
         child: Column(
           children: [
-            Expanded(
-              child: PageView(
-                controller: _pageController,
-                physics: const NeverScrollableScrollPhysics(), // Disable swipe
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentPage = index;
-                  });
-                },
-                children: [_buildProfileStep(), _buildLocationStep()],
-              ),
-            ),
-            // Bottom Navigation
+            // Top bar: progress dots + Skip.
             Padding(
-              padding: const EdgeInsets.all(24.0),
+              padding: const EdgeInsets.fromLTRB(24, 12, 12, 0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Indicators
                   Row(
                     children: List.generate(
-                      2,
-                      (index) => Container(
+                      _lastPage + 1,
+                      (index) => AnimatedContainer(
+                        duration: const Duration(milliseconds: 250),
                         margin: const EdgeInsets.only(right: 8),
                         height: 8,
                         width: _currentPage == index ? 24 : 8,
                         decoration: BoxDecoration(
-                          color:
-                              _currentPage == index
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(
-                                    context,
-                                  ).colorScheme.surfaceContainerHighest,
+                          color: _currentPage == index
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.surfaceContainerHighest,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
                     ),
                   ),
-                  // Button
-                  if (_currentPage == 1)
-                    FilledButton(
-                      onPressed: _isLoading ? null : _completeOnboarding,
-                      child:
-                          _isLoading
-                              ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                              : const Text('Get Started'),
-                    )
-                  else
-                    FilledButton.tonal(
-                      onPressed: () {
-                        // Validation logic for profile step
-                        if (_nameController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please enter your name'),
-                            ),
-                          );
-                          return;
-                        }
-                        _nextPage();
-                      },
-                      child: const Text('Next'),
+                  const Spacer(),
+                  if (_currentPage != _lastPage)
+                    TextButton(
+                      onPressed: _isFinishing ? null : _finish,
+                      child: const Text('Skip'),
                     ),
                 ],
               ),
             ),
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (index) =>
+                    setState(() => _currentPage = index),
+                children: [
+                  _WelcomeStep(),
+                  _VehicleStep(hasVehicle: hasVehicle),
+                  _LocationStep(
+                    granted: _locationGranted,
+                    permanentlyDenied: _locationPermanentlyDenied,
+                    onOpenSettings: Geolocator.openAppSettings,
+                  ),
+                ],
+              ),
+            ),
+            _buildPrimaryAction(hasVehicle),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildProfileStep() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
+  Widget _buildPrimaryAction(bool hasVehicle) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      child: switch (_currentPage) {
+        0 => FilledButton(
+            onPressed: _nextPage,
+            child: const Text('Get started'),
+          ),
+        1 => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FilledButton(
+                onPressed: _isFinishing
+                    ? null
+                    : hasVehicle
+                        ? _nextPage
+                        : () => context.push('/onboarding/vehicle-select'),
+                child: Text(hasVehicle ? 'Continue' : 'Choose your EV'),
+              ),
+              if (!hasVehicle)
+                TextButton(
+                  onPressed: _nextPage,
+                  child: const Text("I'll add it later"),
+                ),
+            ],
+          ),
+        _ => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              FilledButton(
+                onPressed: _isFinishing
+                    ? null
+                    : _locationGranted
+                        ? _finish
+                        : _requestLocation,
+                child: _isFinishing
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(_locationGranted ? 'Finish' : 'Enable location'),
+              ),
+              if (!_locationGranted)
+                TextButton(
+                  onPressed: _isFinishing ? null : _finish,
+                  child: const Text('Skip for now'),
+                ),
+            ],
+          ),
+      },
+    );
+  }
+}
+
+/// Reusable icon + title + subtitle row used on the welcome step.
+class _Benefit extends StatelessWidget {
+  const _Benefit({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Gap(40),
-          Icon(
-            PhosphorIcons.userCircle(PhosphorIconsStyle.duotone),
-            size: 64,
-            color: Theme.of(context).colorScheme.primary,
-          ),
-          const Gap(24),
-          Text(
-            'Let\'s get to know you',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const Gap(8),
-          Text(
-            'Add your name now. You can add a vehicle from Profile at any time.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const Gap(32),
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Full Name',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.person_outline),
-            ),
-          ),
-          const Gap(24),
           Container(
-            padding: const EdgeInsets.all(16),
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.primaryContainer.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(20),
+              color: theme.colorScheme.primaryContainer.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(14),
             ),
-            child: Row(
+            child: Icon(icon, color: theme.colorScheme.primary),
+          ),
+          const Gap(16),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.phone_outlined,
-                  color: Theme.of(context).colorScheme.primary,
+                Text(
+                  title,
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700),
                 ),
-                const Gap(12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Vehicle setup is optional',
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const Gap(4),
-                      Text(
-                        'Start exploring immediately, then add a vehicle later for more accurate range planning.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
+                const Gap(2),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -284,68 +282,196 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ),
     );
   }
+}
 
-  Widget _buildLocationStep() {
+class _WelcomeStep extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Gap(16),
+          Icon(
+            PhosphorIcons.lightning(PhosphorIconsStyle.duotone),
+            size: 56,
+            color: theme.colorScheme.primary,
+          ),
+          const Gap(20),
+          Text(
+            'Drive electric,\nwithout the range anxiety.',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              height: 1.15,
+            ),
+          ),
+          const Gap(8),
+          Text(
+            "Here's what EVraahein does for you:",
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const Gap(24),
+          _Benefit(
+            icon: PhosphorIcons.path(PhosphorIconsStyle.duotone),
+            title: 'Plan trips around your battery',
+            subtitle:
+                'Range, charging stops and elevation, all worked out for you.',
+          ),
+          _Benefit(
+            icon: PhosphorIcons.mapPin(PhosphorIconsStyle.duotone),
+            title: 'Find & rate live chargers',
+            subtitle: "See what's working nearby, powered by the community.",
+          ),
+          _Benefit(
+            icon: PhosphorIcons.gauge(PhosphorIconsStyle.duotone),
+            title: 'Know your car in real time',
+            subtitle: 'Connect over OBD for live battery and range data.',
+          ),
+          const Gap(16),
+        ],
+      ),
+    );
+  }
+}
+
+class _VehicleStep extends StatelessWidget {
+  const _VehicleStep({required this.hasVehicle});
+
+  final bool hasVehicle;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            PhosphorIcons.car(PhosphorIconsStyle.duotone),
+            size: 56,
+            color: theme.colorScheme.primary,
+          ),
+          const Gap(20),
+          Text(
+            'Add your EV',
+            style: theme.textTheme.headlineMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const Gap(8),
+          Text(
+            'We use your car to calculate accurate range and only show '
+            'chargers it can actually use. You can add more cars later.',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const Gap(28),
+          if (hasVehicle)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle,
+                      color: theme.colorScheme.primary, size: 28),
+                  const Gap(12),
+                  Expanded(
+                    child: Text(
+                      'Your EV is set. You can tweak the details anytime in '
+                      'your profile.',
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocationStep extends StatelessWidget {
+  const _LocationStep({
+    required this.granted,
+    required this.permanentlyDenied,
+    required this.onOpenSettings,
+  });
+
+  final bool granted;
+  final bool permanentlyDenied;
+  final Future<bool> Function() onOpenSettings;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
             PhosphorIcons.mapPin(PhosphorIconsStyle.duotone),
-            size: 80,
-            color: Theme.of(context).colorScheme.primary,
+            size: 72,
+            color: theme.colorScheme.primary,
           ),
-          const Gap(32),
+          const Gap(24),
           Text(
-            'Enable Location',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+            'Find chargers near you',
+            style: theme.textTheme.headlineMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
-          const Gap(16),
+          const Gap(12),
           Text(
-            'Location helps find nearby chargers and plan from your current position. You can skip this and enable it later.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            'Allow location so we can center the map on you and plan routes '
+            'from where you are.',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
-          const Gap(48),
-          if (_locationGranted)
-            const Column(
+          const Gap(32),
+          if (granted)
+            Column(
               children: [
-                Icon(Icons.check_circle, color: Colors.green, size: 64),
-                Gap(8),
+                Icon(Icons.check_circle,
+                    color: theme.colorScheme.primary, size: 56),
+                const Gap(8),
                 Text(
-                  'Location Access Granted!',
-                  style: TextStyle(
-                    color: Colors.green,
+                  'Location enabled',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: theme.colorScheme.primary,
                     fontWeight: FontWeight.bold,
-                    fontSize: 18,
                   ),
                 ),
               ],
             )
-          else
+          else if (permanentlyDenied)
             Column(
               children: [
-                FilledButton.icon(
-                  onPressed: _requestLocation,
-                  icon: const Icon(Icons.location_on),
-                  label: const Text('Enable Location'),
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
-                    ),
+                Text(
+                  'Location is turned off for EVraahein. Enable it in '
+                  'Settings to use nearby chargers.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.error,
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 const Gap(12),
-                Text(
-                  'Optional. You can continue without location access.',
-                  style: Theme.of(context).textTheme.bodySmall,
+                OutlinedButton.icon(
+                  onPressed: () => onOpenSettings(),
+                  icon: const Icon(Icons.settings_outlined),
+                  label: const Text('Open Settings'),
                 ),
               ],
             ),

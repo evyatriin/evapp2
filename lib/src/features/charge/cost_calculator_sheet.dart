@@ -26,9 +26,11 @@ class _CostCalculatorSheetState extends ConsumerState<CostCalculatorSheet> {
   double _targetSoC = 80;
 
   double get _batteryCapacity {
-    // Get from vehicle if available, else use default
+    // Base the estimate on the user's primary vehicle when available.
     final vehicles = ref.read(vehicleProvider);
-    final vehicle = vehicles.isNotEmpty ? vehicles.first : null;
+    final vehicle = vehicles.isEmpty
+        ? null
+        : vehicles.firstWhere((v) => v.isPrimary, orElse: () => vehicles.first);
     // Using a reasonable default for Indian EVs
     return vehicle?.estimatedRange != null 
         ? (vehicle!.estimatedRange / 5.0).clamp(20.0, 100.0) // Rough estimate

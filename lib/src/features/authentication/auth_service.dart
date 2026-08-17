@@ -4,6 +4,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../core/backend_service.dart';
 import 'user_model.dart';
 
+/// Supabase redirects back here after OAuth sign-in. Keep this in sync with
+/// AndroidManifest.xml, Info.plist, and the Supabase redirect URL allow-list.
+const String kOAuthRedirectUri = 'io.supabase.evraahein://login-callback/';
+
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
 
@@ -109,6 +113,13 @@ class AuthService {
     );
   }
 
+  Future<bool> signInWithOAuth(OAuthProvider provider) {
+    return _supabase.auth.signInWithOAuth(
+      provider,
+      redirectTo: kIsWeb ? null : kOAuthRedirectUri,
+    );
+  }
+
   Future<void> signOut() async {
     try {
       if (currentToken != null) {
@@ -135,6 +146,9 @@ class AuthService {
         profileImageUrl: response['profile_image_url'] as String?,
         phoneNumber: response['phone_number'] as String?,
         isPhoneVerified: response['is_phone_verified'] as bool? ?? false,
+        isEmailVerified:
+            (response['email_verified'] as bool? ?? false) ||
+            _supabase.auth.currentUser?.emailConfirmedAt != null,
         points: response['points'] as int? ?? 0,
         streak: response['streak'] as int? ?? 0,
         badges:
@@ -186,20 +200,47 @@ class AuthService {
     await _supabase.auth.signOut(scope: SignOutScope.local);
   }
 
-  Future<String> requestPhoneVerification(String phoneNumber) {
-    throw const BackendException(
-      statusCode: 503,
-      message: 'Phone verification is not available in this release.',
+  Future<String> requestPhoneVerification(String phoneNumber) async {
+    final normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (normalizedPhone == null) {
+      throw const BackendException(
+        statusCode: 400,
+        message:
+            'Enter a valid phone number with country code. Indian 10-digit numbers are supported automatically.',
+      );
+    }
+
+    await BackendService.post(
+      '/api/auth/request-phone-verification',
+      body: {'phone_number': normalizedPhone},
     );
+    return normalizedPhone;
   }
 
   Future<void> verifyPhoneOtp({
     required String phoneNumber,
     required String otp,
-  }) {
-    throw const BackendException(
-      statusCode: 503,
-      message: 'Phone verification is not available in this release.',
+  }) async {
+    final normalizedPhone = normalizePhoneNumber(phoneNumber);
+    if (normalizedPhone == null) {
+      throw const BackendException(
+        statusCode: 400,
+        message: 'Enter a valid phone number before verifying.',
+      );
+    }
+    if (otp.trim().isEmpty) {
+      throw const BackendException(
+        statusCode: 400,
+        message: 'Enter the OTP sent to your phone.',
+      );
+    }
+
+    await BackendService.post(
+      '/api/auth/verify-phone-otp',
+      body: {
+        'phone_number': normalizedPhone,
+        'otp': otp.trim(),
+      },
     );
   }
 

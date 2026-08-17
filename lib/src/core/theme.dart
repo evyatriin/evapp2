@@ -6,9 +6,43 @@ class AppTheme {
   static const _radius = 18.0;
   static const _buttonHeight = 48.0;
 
+  // ── "Electric Charge" palette ──────────────────────────────────────────
+  // Trustworthy EV green as the brand base, electric lime as the energy
+  // accent, warm off-white surfaces. Status colors are deliberately distinct
+  // from the brand green so "available" reads clearly on the map.
+  static const brandGreen = Color(0xFF0B7A3B);
+  static const electricLime = Color(0xFFC8F03C);
+  static const emerald = Color(0xFF0EA371);
+  static const _lightBg = Color(0xFFF7F8F1);
+
+  // Charger / availability status colors (use these instead of raw greens).
+  static const statusAvailable = Color(0xFF22C55E);
+  static const statusBusy = Color(0xFFFB923C);
+  static const statusDown = Color(0xFFEF4444);
+
+  // The M3 `secondary` role is used as a text/icon accent across many screens,
+  // so it must stay readable on light surfaces — keep it green. The electric
+  // lime is a deliberate pop applied via the `electricLime` constant only.
+  static const _accentGreen = Color(0xFF0B6B44);
+
+  static final _lightColors = FlexSchemeColor.from(
+    primary: brandGreen,
+    secondary: _accentGreen,
+    tertiary: electricLime,
+    brightness: Brightness.light,
+  );
+
+  static final _darkColors = FlexSchemeColor.from(
+    primary: const Color(0xFF3DDC6B), // brighter green reads better on dark
+    secondary: const Color(0xFF34D07A),
+    tertiary: electricLime,
+    brightness: Brightness.dark,
+  );
+
   static ThemeData get light {
     return FlexThemeData.light(
-      scheme: FlexScheme.jungle,
+      colors: _lightColors,
+      scaffoldBackground: _lightBg,
       surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
       blendLevel: 7,
       subThemesData: const FlexSubThemesData(
@@ -93,8 +127,16 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 60,
-        labelTextStyle: WidgetStatePropertyAll(
-          const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        indicatorColor: electricLime,
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? const Color(0xFF0A2E14)
+                : null,
+          ),
+        ),
+        labelTextStyle: const WidgetStatePropertyAll(
+          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
@@ -108,7 +150,7 @@ class AppTheme {
 
   static ThemeData get dark {
     return FlexThemeData.dark(
-      scheme: FlexScheme.jungle,
+      colors: _darkColors,
       surfaceMode: FlexSurfaceMode.levelSurfacesLowScaffold,
       blendLevel: 13,
       subThemesData: const FlexSubThemesData(
@@ -192,8 +234,16 @@ class AppTheme {
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 60,
-        labelTextStyle: WidgetStatePropertyAll(
-          const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+        indicatorColor: electricLime,
+        iconTheme: WidgetStateProperty.resolveWith(
+          (states) => IconThemeData(
+            color: states.contains(WidgetState.selected)
+                ? const Color(0xFF0A2E14)
+                : null,
+          ),
+        ),
+        labelTextStyle: const WidgetStatePropertyAll(
+          TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
