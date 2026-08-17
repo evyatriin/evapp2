@@ -92,24 +92,15 @@ class VehicleService {
   }
 
   Future<List<VehicleProfile>> fetchVehicles(String userId) async {
-    final preferences = await _loadUserPreferences(userId);
-    final rawVehicles = preferences[_vehiclesPreferenceKey];
-    final primaryVehicleId = preferences[_primaryVehicleIdPreferenceKey] as String?;
-
-    if (rawVehicles is! List) {
-      return [];
+    var vehicles = await _fetchRemoteVehicles(userId);
+    if (vehicles.isEmpty) {
+      final legacyVehicles = await _loadLegacyPreferenceVehicles(userId);
+      if (legacyVehicles.isNotEmpty) {
+        vehicles = await _migrateLegacyVehicles(userId, legacyVehicles);
+      }
     }
 
-    final vehicles = rawVehicles
-        .whereType<Map>()
-        .map(
-          (item) => VehicleProfile.fromJson(
-            Map<String, dynamic>.from(item),
-          ),
-        )
-        .toList();
-
-    final normalized = _normalizeVehicles(vehicles, primaryVehicleId);
+    final normalized = await _normalizeRemoteVehicles(vehicles);
     await _cacheVehicles(userId, normalized);
     return normalized;
   }
@@ -120,30 +111,17 @@ class VehicleService {
       throw Exception('Please login to add a vehicle');
     }
 
-    final preferences = await _loadUserPreferences(userId);
     final vehicles = await fetchVehicles(userId);
 
     final normalizedVehicle = vehicle.copyWith(
-      id: vehicle.id.isEmpty ? _generateVehicleId() : vehicle.id,
+      id: vehicle.id,
       userId: userId,
       isPrimary: vehicles.isEmpty || vehicle.isPrimary,
     );
 
-    final updatedVehicles = [
-      for (final existing in vehicles)
-        existing.copyWith(
-          isPrimary: normalizedVehicle.isPrimary ? false : existing.isPrimary,
-        ),
-      normalizedVehicle,
-    ];
-
-    await _saveVehicles(
-      userId: userId,
-      preferences: preferences,
-      vehicles: updatedVehicles,
-    );
-
-    return updatedVehicles.firstWhere((item) => item.id == normalizedVehicle.id);
+    final addedVehicle = await _createRemoteVehicle(normalizedVehicle);
+    await fetchVehicles(userId);
+    return addedVehicle;
   }
 
   Future<VehicleProfile?> updateVehicle(VehicleProfile vehicle) async {
@@ -152,31 +130,16 @@ class VehicleService {
       throw Exception('Please login to update a vehicle');
     }
 
-    final preferences = await _loadUserPreferences(userId);
     final existingVehicles = await fetchVehicles(userId);
     if (!existingVehicles.any((item) => item.id == vehicle.id)) {
       throw Exception('Vehicle not found');
     }
 
-    final updatedVehicles = [
-      for (final existing in existingVehicles)
-        if (existing.id == vehicle.id)
-          vehicle.copyWith(userId: userId)
-        else
-          existing.copyWith(
-            isPrimary: vehicle.isPrimary && existing.id != vehicle.id
-                ? false
-                : existing.isPrimary,
-          ),
-    ];
-
-    await _saveVehicles(
-      userId: userId,
-      preferences: preferences,
-      vehicles: updatedVehicles,
+    final updatedVehicle = await _updateRemoteVehicle(
+      vehicle.copyWith(userId: userId),
     );
-
-    return updatedVehicles.firstWhere((item) => item.id == vehicle.id);
+    await fetchVehicles(userId);
+    return updatedVehicle;
   }
 
   Future<bool> deleteVehicle(String vehicleId) async {
@@ -185,20 +148,13 @@ class VehicleService {
       throw Exception('Please login to delete a vehicle');
     }
 
-    final preferences = await _loadUserPreferences(userId);
     final existingVehicles = await fetchVehicles(userId);
-    final updatedVehicles =
-        existingVehicles.where((vehicle) => vehicle.id != vehicleId).toList();
-
-    if (updatedVehicles.length == existingVehicles.length) {
+    if (!existingVehicles.any((vehicle) => vehicle.id == vehicleId)) {
       return false;
     }
 
-    await _saveVehicles(
-      userId: userId,
-      preferences: preferences,
-      vehicles: updatedVehicles,
-    );
+    await BackendService.delete('/api/vehicles/$vehicleId');
+    await fetchVehicles(userId);
 
     return true;
   }
@@ -209,25 +165,155 @@ class VehicleService {
       throw Exception('Please login to update your primary vehicle');
     }
 
-    final preferences = await _loadUserPreferences(userId);
     final existingVehicles = await fetchVehicles(userId);
     if (!existingVehicles.any((vehicle) => vehicle.id == vehicleId)) {
       return false;
     }
 
-    final updatedVehicles = [
-      for (final vehicle in existingVehicles)
-        vehicle.copyWith(isPrimary: vehicle.id == vehicleId),
-    ];
-
-    await _saveVehicles(
-      userId: userId,
-      preferences: preferences,
-      vehicles: updatedVehicles,
-      primaryVehicleId: vehicleId,
-    );
+    await BackendService.put('/api/vehicles/$vehicleId/primary', body: {});
+    await fetchVehicles(userId);
 
     return true;
+  }
+
+  Future<List<VehicleProfile>> _fetchRemoteVehicles(String userId) async {
+    final response = await BackendService.get(
+      '/api/vehicles',
+      queryParams: {'user_id': userId},
+    );
+    return _parseVehicleList(response);
+  }
+
+  Future<VehicleProfile> _createRemoteVehicle(VehicleProfile vehicle) async {
+    final response = await BackendService.post(
+      '/api/vehicles',
+      body: _vehicleCreatePayload(vehicle),
+    );
+    return _parseVehicle(response);
+  }
+
+  Future<VehicleProfile> _updateRemoteVehicle(VehicleProfile vehicle) async {
+    final response = await BackendService.put(
+      '/api/vehicles/${vehicle.id}',
+      body: _vehicleUpdatePayload(vehicle),
+    );
+    return _parseVehicle(response);
+  }
+
+  Future<List<VehicleProfile>> _normalizeRemoteVehicles(
+    List<VehicleProfile> vehicles,
+  ) async {
+    if (vehicles.isEmpty) return const [];
+
+    if (vehicles.any((vehicle) => vehicle.isPrimary)) {
+      return _normalizeVehicles(vehicles, null);
+    }
+
+    final primaryVehicle = await _setRemotePrimary(vehicles.first.id);
+    return [
+      for (final vehicle in vehicles)
+        vehicle.copyWith(isPrimary: vehicle.id == primaryVehicle.id),
+    ];
+  }
+
+  Future<VehicleProfile> _setRemotePrimary(String vehicleId) async {
+    final response = await BackendService.put(
+      '/api/vehicles/$vehicleId/primary',
+      body: {},
+    );
+    return _parseVehicle(response);
+  }
+
+  Future<List<VehicleProfile>> _loadLegacyPreferenceVehicles(
+    String userId,
+  ) async {
+    final response =
+        await _supabase
+            .from('profiles')
+            .select('preferences')
+            .eq('id', userId)
+            .maybeSingle();
+
+    if (response == null) {
+      return const [];
+    }
+
+    final preferences = response['preferences'];
+    if (preferences is Map) {
+      final rawVehicles = preferences[_vehiclesPreferenceKey];
+      final primaryVehicleId =
+          preferences[_primaryVehicleIdPreferenceKey] as String?;
+
+      if (rawVehicles is! List) {
+        return const [];
+      }
+
+      final vehicles =
+          rawVehicles
+              .whereType<Map>()
+              .map(
+                (item) =>
+                    VehicleProfile.fromJson(Map<String, dynamic>.from(item)),
+              )
+              .toList();
+
+      return _normalizeVehicles(vehicles, primaryVehicleId);
+    }
+
+    return const [];
+  }
+
+  Future<List<VehicleProfile>> _migrateLegacyVehicles(
+    String userId,
+    List<VehicleProfile> legacyVehicles,
+  ) async {
+    final migrated = <VehicleProfile>[];
+    for (final vehicle in legacyVehicles) {
+      final created = await _createRemoteVehicle(
+        vehicle.copyWith(userId: userId),
+      );
+      migrated.add(created);
+    }
+
+    return _normalizeRemoteVehicles(migrated);
+  }
+
+  List<VehicleProfile> _parseVehicleList(dynamic response) {
+    final vehicles = response as List<dynamic>;
+    return vehicles
+        .map((item) => _parseVehicle(Map<String, dynamic>.from(item as Map)))
+        .toList();
+  }
+
+  VehicleProfile _parseVehicle(dynamic response) {
+    return VehicleProfile.fromJson(Map<String, dynamic>.from(response as Map));
+  }
+
+  Map<String, dynamic> _vehicleCreatePayload(VehicleProfile vehicle) {
+    return {
+      'user_id': vehicle.userId,
+      'brand': vehicle.brand,
+      'model': vehicle.model,
+      'variant': vehicle.variant,
+      'range_efficiency': vehicle.rangeEfficiency,
+      'image_url': vehicle.imageUrl,
+      'photo_url': vehicle.photoUrl,
+      'preferred_charging_networks': vehicle.preferredChargingNetworks,
+      'is_primary': vehicle.isPrimary,
+    };
+  }
+
+  Map<String, dynamic> _vehicleUpdatePayload(VehicleProfile vehicle) {
+    return {
+      'brand': vehicle.brand,
+      'model': vehicle.model,
+      'variant': vehicle.variant,
+      'range_efficiency': vehicle.rangeEfficiency,
+      'image_url': vehicle.imageUrl,
+      'photo_url': vehicle.photoUrl,
+      'preferred_charging_networks': vehicle.preferredChargingNetworks,
+      'is_primary': vehicle.isPrimary,
+    };
   }
 
   Future<List<VehicleTemplate>> fetchVehicleTemplates() async {
@@ -238,56 +324,19 @@ class VehicleService {
         return _fallbackTemplates;
       }
 
-      final remoteTemplates = templates
-          .map(
-            (item) => VehicleTemplate.fromJson(
-              Map<String, dynamic>.from(item as Map),
-            ),
-          )
-          .toList();
+      final remoteTemplates =
+          templates
+              .map(
+                (item) => VehicleTemplate.fromJson(
+                  Map<String, dynamic>.from(item as Map),
+                ),
+              )
+              .toList();
       return _mergeTemplates(remoteTemplates, _fallbackTemplates);
     } catch (e) {
       debugPrint('Error fetching vehicle templates: $e');
       return _fallbackTemplates;
     }
-  }
-
-  Future<Map<String, dynamic>> _loadUserPreferences(String userId) async {
-    final response = await _supabase
-        .from('profiles')
-        .select('preferences')
-        .eq('id', userId)
-        .maybeSingle();
-
-    if (response == null) {
-      return <String, dynamic>{};
-    }
-
-    final preferences = response['preferences'];
-    if (preferences is Map) {
-      return Map<String, dynamic>.from(preferences);
-    }
-
-    return <String, dynamic>{};
-  }
-
-  Future<void> _saveVehicles({
-    required String userId,
-    required Map<String, dynamic> preferences,
-    required List<VehicleProfile> vehicles,
-    String? primaryVehicleId,
-  }) async {
-    final normalized = _normalizeVehicles(vehicles, primaryVehicleId);
-    final nextPreferences = Map<String, dynamic>.from(preferences)
-      ..[_vehiclesPreferenceKey] = normalized.map((item) => item.toJson()).toList()
-      ..[_primaryVehicleIdPreferenceKey] =
-          normalized.firstWhere((item) => item.isPrimary).id;
-
-    await _supabase
-        .from('profiles')
-        .update({'preferences': nextPreferences}).eq('id', userId);
-
-    await _cacheVehicles(userId, normalized);
   }
 
   List<VehicleProfile> _normalizeVehicles(
@@ -298,10 +347,13 @@ class VehicleService {
 
     final resolvedPrimaryId =
         primaryVehicleId ??
-        vehicles.cast<VehicleProfile?>().firstWhere(
+        vehicles
+            .cast<VehicleProfile?>()
+            .firstWhere(
               (vehicle) => vehicle?.isPrimary == true,
               orElse: () => vehicles.first,
-            )?.id ??
+            )
+            ?.id ??
         vehicles.first.id;
 
     return [
@@ -311,29 +363,26 @@ class VehicleService {
   }
 
   String _computeHash(List<VehicleProfile> vehicles) {
-    final normalized = vehicles
-        .map(
-          (vehicle) => {
-            'id': vehicle.id,
-            'brand': vehicle.brand,
-            'model': vehicle.model,
-            'variant': vehicle.variant,
-            'range_efficiency': vehicle.rangeEfficiency,
-            'is_primary': vehicle.isPrimary,
-          },
-        )
-        .toList()
-      ..sort((a, b) => (a['id']! as String).compareTo(b['id']! as String));
+    final normalized =
+        vehicles
+            .map(
+              (vehicle) => {
+                'id': vehicle.id,
+                'brand': vehicle.brand,
+                'model': vehicle.model,
+                'variant': vehicle.variant,
+                'range_efficiency': vehicle.rangeEfficiency,
+                'is_primary': vehicle.isPrimary,
+              },
+            )
+            .toList()
+          ..sort((a, b) => (a['id']! as String).compareTo(b['id']! as String));
     return json.encode(normalized);
   }
 
   String _vehiclesCacheKey(String userId) => '$_vehiclesCachePrefix$userId';
 
   String _vehiclesHashKey(String userId) => '$_vehiclesHashPrefix$userId';
-
-  String _generateVehicleId() {
-    return 'vehicle_${DateTime.now().microsecondsSinceEpoch}';
-  }
 }
 
 List<VehicleTemplate> _mergeTemplates(
@@ -380,12 +429,11 @@ VehicleTemplate _template({
   String? imageUrl,
   List<String>? preferredChargingNetworks,
 }) {
-  final normalizedId =
-      '$brand-$model-$variant'
-          .toLowerCase()
-          .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
-          .replaceAll(RegExp(r'-+'), '-')
-          .replaceAll(RegExp(r'^-|-$'), '');
+  final normalizedId = '$brand-$model-$variant'
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+      .replaceAll(RegExp(r'-+'), '-')
+      .replaceAll(RegExp(r'^-|-$'), '');
 
   return VehicleTemplate(
     id: normalizedId,
@@ -520,30 +568,10 @@ final List<VehicleTemplate> _fallbackTemplates = [
     variant: 'Empowered LR',
     rangeKm: 421,
   ),
-  _template(
-    brand: 'Tata',
-    model: 'Tiago EV',
-    variant: 'XE MR',
-    rangeKm: 250,
-  ),
-  _template(
-    brand: 'Tata',
-    model: 'Tiago EV',
-    variant: 'XZ+ LR',
-    rangeKm: 315,
-  ),
-  _template(
-    brand: 'Tata',
-    model: 'Tigor EV',
-    variant: 'XE',
-    rangeKm: 306,
-  ),
-  _template(
-    brand: 'Tata',
-    model: 'Tigor EV',
-    variant: 'XZ+',
-    rangeKm: 306,
-  ),
+  _template(brand: 'Tata', model: 'Tiago EV', variant: 'XE MR', rangeKm: 250),
+  _template(brand: 'Tata', model: 'Tiago EV', variant: 'XZ+ LR', rangeKm: 315),
+  _template(brand: 'Tata', model: 'Tigor EV', variant: 'XE', rangeKm: 306),
+  _template(brand: 'Tata', model: 'Tigor EV', variant: 'XZ+', rangeKm: 306),
   _template(
     brand: 'Tata',
     model: 'Curvv EV',
@@ -568,12 +596,7 @@ final List<VehicleTemplate> _fallbackTemplates = [
     variant: 'Empowered AWD',
     rangeKm: 550,
   ),
-  _template(
-    brand: 'Tata',
-    model: 'Sierra EV',
-    variant: 'Smart',
-    rangeKm: 450,
-  ),
+  _template(brand: 'Tata', model: 'Sierra EV', variant: 'Smart', rangeKm: 450),
   _template(
     brand: 'Tata',
     model: 'Sierra EV',
@@ -586,60 +609,20 @@ final List<VehicleTemplate> _fallbackTemplates = [
     variant: 'Accomplished AWD',
     rangeKm: 500,
   ),
-  _template(
-    brand: 'MG',
-    model: 'Comet EV',
-    variant: 'Executive',
-    rangeKm: 230,
-  ),
-  _template(
-    brand: 'MG',
-    model: 'Comet EV',
-    variant: 'Excite',
-    rangeKm: 230,
-  ),
-  _template(
-    brand: 'MG',
-    model: 'Comet EV',
-    variant: 'Exclusive',
-    rangeKm: 230,
-  ),
-  _template(
-    brand: 'MG',
-    model: 'ZS EV',
-    variant: 'Executive',
-    rangeKm: 461,
-  ),
-  _template(
-    brand: 'MG',
-    model: 'ZS EV',
-    variant: 'Exclusive',
-    rangeKm: 461,
-  ),
-  _template(
-    brand: 'MG',
-    model: 'Cyberster',
-    variant: 'RWD',
-    rangeKm: 500,
-  ),
+  _template(brand: 'MG', model: 'Comet EV', variant: 'Executive', rangeKm: 230),
+  _template(brand: 'MG', model: 'Comet EV', variant: 'Excite', rangeKm: 230),
+  _template(brand: 'MG', model: 'Comet EV', variant: 'Exclusive', rangeKm: 230),
+  _template(brand: 'MG', model: 'ZS EV', variant: 'Executive', rangeKm: 461),
+  _template(brand: 'MG', model: 'ZS EV', variant: 'Exclusive', rangeKm: 461),
+  _template(brand: 'MG', model: 'Cyberster', variant: 'RWD', rangeKm: 500),
   _template(
     brand: 'MG',
     model: 'Cyberster',
     variant: 'AWD Performance',
     rangeKm: 580,
   ),
-  _template(
-    brand: 'Mahindra',
-    model: 'XUV400',
-    variant: 'EC',
-    rangeKm: 375,
-  ),
-  _template(
-    brand: 'Mahindra',
-    model: 'XUV400',
-    variant: 'EL',
-    rangeKm: 456,
-  ),
+  _template(brand: 'Mahindra', model: 'XUV400', variant: 'EC', rangeKm: 375),
+  _template(brand: 'Mahindra', model: 'XUV400', variant: 'EL', rangeKm: 456),
   _template(
     brand: 'Mahindra',
     model: 'BE 6',
@@ -676,54 +659,19 @@ final List<VehicleTemplate> _fallbackTemplates = [
     variant: 'Premium',
     rangeKm: 452,
   ),
-  _template(
-    brand: 'Hyundai',
-    model: 'Creta EV',
-    variant: 'Base',
-    rangeKm: 450,
-  ),
-  _template(
-    brand: 'BYD',
-    model: 'Atto 3',
-    variant: 'Dynamic',
-    rangeKm: 521,
-  ),
-  _template(
-    brand: 'BYD',
-    model: 'Atto 3',
-    variant: 'Superior',
-    rangeKm: 521,
-  ),
-  _template(
-    brand: 'BYD',
-    model: 'Sealion 7',
-    variant: 'Premium',
-    rangeKm: 567,
-  ),
+  _template(brand: 'Hyundai', model: 'Creta EV', variant: 'Base', rangeKm: 450),
+  _template(brand: 'BYD', model: 'Atto 3', variant: 'Dynamic', rangeKm: 521),
+  _template(brand: 'BYD', model: 'Atto 3', variant: 'Superior', rangeKm: 521),
+  _template(brand: 'BYD', model: 'Sealion 7', variant: 'Premium', rangeKm: 567),
   _template(
     brand: 'BYD',
     model: 'Sealion 7',
     variant: 'Performance AWD',
     rangeKm: 542,
   ),
-  _template(
-    brand: 'Citroen',
-    model: 'eC3',
-    variant: 'Feel',
-    rangeKm: 320,
-  ),
-  _template(
-    brand: 'BMW',
-    model: 'i4',
-    variant: 'eDrive35',
-    rangeKm: 483,
-  ),
-  _template(
-    brand: 'BMW',
-    model: 'iX',
-    variant: 'xDrive50',
-    rangeKm: 635,
-  ),
+  _template(brand: 'Citroen', model: 'eC3', variant: 'Feel', rangeKm: 320),
+  _template(brand: 'BMW', model: 'i4', variant: 'eDrive35', rangeKm: 483),
+  _template(brand: 'BMW', model: 'iX', variant: 'xDrive50', rangeKm: 635),
   _template(
     brand: 'Mercedes-Benz',
     model: 'EQA',
@@ -736,12 +684,7 @@ final List<VehicleTemplate> _fallbackTemplates = [
     variant: '300 4MATIC',
     rangeKm: 423,
   ),
-  _template(
-    brand: 'Mercedes-Benz',
-    model: 'EQS',
-    variant: '580',
-    rangeKm: 857,
-  ),
+  _template(brand: 'Mercedes-Benz', model: 'EQS', variant: '580', rangeKm: 857),
   _template(
     brand: 'Audi',
     model: 'Q8 e-tron',
@@ -754,12 +697,7 @@ final List<VehicleTemplate> _fallbackTemplates = [
     variant: 'Quattro',
     rangeKm: 500,
   ),
-  _template(
-    brand: 'Audi',
-    model: 'e-tron GT',
-    variant: 'RS',
-    rangeKm: 488,
-  ),
+  _template(brand: 'Audi', model: 'e-tron GT', variant: 'RS', rangeKm: 488),
   _template(
     brand: 'Volvo',
     model: 'XC40 Recharge',
@@ -772,78 +710,18 @@ final List<VehicleTemplate> _fallbackTemplates = [
     variant: 'Ultimate AWD',
     rangeKm: 530,
   ),
-  _template(
-    brand: 'Kia',
-    model: 'EV6',
-    variant: 'GT Line AWD',
-    rangeKm: 708,
-  ),
-  _template(
-    brand: 'Kia',
-    model: 'EV9',
-    variant: 'GT Line AWD',
-    rangeKm: 541,
-  ),
-  _template(
-    brand: 'VinFast',
-    model: 'VF 6',
-    variant: 'Eco',
-    rangeKm: 399,
-  ),
-  _template(
-    brand: 'VinFast',
-    model: 'VF 7',
-    variant: 'Plus AWD',
-    rangeKm: 431,
-  ),
-  _template(
-    brand: 'VinFast',
-    model: 'VF 8',
-    variant: 'Eco',
-    rangeKm: 471,
-  ),
-  _template(
-    brand: 'VinFast',
-    model: 'VF 8',
-    variant: 'Plus AWD',
-    rangeKm: 457,
-  ),
-  _template(
-    brand: 'VinFast',
-    model: 'VF 9',
-    variant: 'Plus AWD',
-    rangeKm: 531,
-  ),
-  _template(
-    brand: 'VinFast',
-    model: 'VF MPV 7',
-    variant: 'Eco',
-    rangeKm: 400,
-  ),
-  _template(
-    brand: 'VinFast',
-    model: 'VF MPV 7',
-    variant: 'Plus',
-    rangeKm: 450,
-  ),
-  _template(
-    brand: 'VinFast',
-    model: 'VF3',
-    variant: 'Base',
-    rangeKm: 200,
-  ),
-  _template(
-    brand: 'Mini',
-    model: 'Cooper SE',
-    variant: '3-Door',
-    rangeKm: 270,
-  ),
-  _template(
-    brand: 'Porsche',
-    model: 'Taycan',
-    variant: 'RWD',
-    rangeKm: 484,
-  ),
+  _template(brand: 'Kia', model: 'EV6', variant: 'GT Line AWD', rangeKm: 708),
+  _template(brand: 'Kia', model: 'EV9', variant: 'GT Line AWD', rangeKm: 541),
+  _template(brand: 'VinFast', model: 'VF 6', variant: 'Eco', rangeKm: 399),
+  _template(brand: 'VinFast', model: 'VF 7', variant: 'Plus AWD', rangeKm: 431),
+  _template(brand: 'VinFast', model: 'VF 8', variant: 'Eco', rangeKm: 471),
+  _template(brand: 'VinFast', model: 'VF 8', variant: 'Plus AWD', rangeKm: 457),
+  _template(brand: 'VinFast', model: 'VF 9', variant: 'Plus AWD', rangeKm: 531),
+  _template(brand: 'VinFast', model: 'VF MPV 7', variant: 'Eco', rangeKm: 400),
+  _template(brand: 'VinFast', model: 'VF MPV 7', variant: 'Plus', rangeKm: 450),
+  _template(brand: 'VinFast', model: 'VF3', variant: 'Base', rangeKm: 200),
+  _template(brand: 'Mini', model: 'Cooper SE', variant: '3-Door', rangeKm: 270),
+  _template(brand: 'Porsche', model: 'Taycan', variant: 'RWD', rangeKm: 484),
   _template(
     brand: 'Porsche',
     model: 'Taycan',
@@ -856,18 +734,8 @@ final List<VehicleTemplate> _fallbackTemplates = [
     variant: 'Coupe',
     rangeKm: 530,
   ),
-  _template(
-    brand: 'Lexus',
-    model: 'UX300e',
-    variant: 'Luxury',
-    rangeKm: 315,
-  ),
-  _template(
-    brand: 'Tesla',
-    model: 'Model 3',
-    variant: 'RWD',
-    rangeKm: 513,
-  ),
+  _template(brand: 'Lexus', model: 'UX300e', variant: 'Luxury', rangeKm: 315),
+  _template(brand: 'Tesla', model: 'Model 3', variant: 'RWD', rangeKm: 513),
   _template(
     brand: 'Tesla',
     model: 'Model 3',
@@ -880,18 +748,8 @@ final List<VehicleTemplate> _fallbackTemplates = [
     variant: 'Long Range AWD',
     rangeKm: 661,
   ),
-  _template(
-    brand: 'Nissan',
-    model: 'Leaf',
-    variant: 'e+',
-    rangeKm: 385,
-  ),
-  _template(
-    brand: 'Jaguar',
-    model: 'I-Pace',
-    variant: 'HSE',
-    rangeKm: 470,
-  ),
+  _template(brand: 'Nissan', model: 'Leaf', variant: 'e+', rangeKm: 385),
+  _template(brand: 'Jaguar', model: 'I-Pace', variant: 'HSE', rangeKm: 470),
   _template(
     brand: 'Maruti Suzuki',
     model: 'e Vitara',
