@@ -357,16 +357,39 @@ class _SosScreenState extends ConsumerState<SosScreen>
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Success: ${result['message']} to ${result['users_notified']} users!',
+        if (result.wasSent) {
+          final data = result.alertData ?? {};
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Alert sent to ${data['users_notified'] ?? 'nearby'} users!',
+              ),
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              duration: const Duration(seconds: 4),
             ),
-            backgroundColor: Theme.of(context).colorScheme.primary,
-            duration: const Duration(seconds: 4),
-          ),
-        );
-        Navigator.pop(context);
+          );
+          Navigator.pop(context);
+        } else {
+          // Queued — user is offline
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      "You're offline — SOS queued and will send when you're back online.",
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.orange.shade700,
+              duration: const Duration(seconds: 5),
+            ),
+          );
+          Navigator.pop(context);
+        }
       }
     } catch (e) {
       if (mounted) {

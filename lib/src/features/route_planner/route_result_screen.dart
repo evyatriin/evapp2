@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gap/gap.dart';
 import 'package:latlong2/latlong.dart' as ll;
 import 'package:map_launcher/map_launcher.dart';
 
+import '../../core/offline_banner.dart';
 import '../authentication/auth_service.dart';
 import 'charger_along_route_model.dart';
 import 'charger_route_service.dart';
@@ -14,16 +16,16 @@ import 'saved_route_model.dart';
 import 'widgets/charger_details_sheet.dart';
 import 'widgets/charger_map_marker.dart';
 
-class RouteResultScreen extends StatefulWidget {
+class RouteResultScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> extra;
 
   const RouteResultScreen({super.key, required this.extra});
 
   @override
-  State<RouteResultScreen> createState() => _RouteResultScreenState();
+  ConsumerState<RouteResultScreen> createState() => _RouteResultScreenState();
 }
 
-class _RouteResultScreenState extends State<RouteResultScreen> {
+class _RouteResultScreenState extends ConsumerState<RouteResultScreen> {
   late List<RouteModel> _routes;
   RouteModel? _selectedRoute;
   String? _vehicleId;
@@ -41,6 +43,10 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
   List<ChargerAlongRoute> _chargersAlongRoute = [];
   bool _loadingChargers = false;
   bool _showChargersOnMap = true;
+
+  // Cache / offline state
+  bool _chargersFromCache = false;
+  String? _chargersCacheLabel;
 
   @override
   void initState() {
@@ -63,43 +69,39 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
 
     setState(() => _loadingChargers = true);
 
-    try {
-      // Get origin and destination from the first and last stop
-      final origin = route.stops.isNotEmpty ? route.stops.first.location : null;
-      final destination =
-          route.stops.isNotEmpty ? route.stops.last.location : null;
+    final origin = route.stops.isNotEmpty ? route.stops.first.location : null;
+    final destination =
+        route.stops.isNotEmpty ? route.stops.last.location : null;
 
-      if (origin == null || destination == null) {
-        setState(() => _loadingChargers = false);
-        return;
-      }
+    if (origin == null || destination == null) {
+      if (mounted) setState(() => _loadingChargers = false);
+      return;
+    }
 
-      // Convert polyline to LatLng list
-      final polyline =
-          route.polyline
-              .map((p) => ll.LatLng(p.latitude, p.longitude))
-              .toList();
+    final polyline =
+        route.polyline.map((p) => ll.LatLng(p.latitude, p.longitude)).toList();
 
-      final chargers = await _chargerRouteService.getChargersAlongRoute(
-        origin: origin,
-        destination: destination,
-        polyline: polyline,
-        radiusKm: 25.0, // Search within 25km of route
+    // getChargersAlongRoute now handles offline gracefully:
+    // — if online: fetches live data and caches it
+    // — if offline: returns cached data with freshness label
+    final result = await _chargerRouteService.getChargersAlongRoute(
+      origin: origin,
+      destination: destination,
+      polyline: polyline,
+      radiusKm: 25.0,
+    );
+
+    if (mounted) {
+      setState(() {
+        _chargersAlongRoute = result.chargers;
+        _chargersFromCache = result.fromCache;
+        _chargersCacheLabel = result.cacheLabel;
+        _loadingChargers = false;
+      });
+      debugPrint(
+        'Loaded ${result.chargers.length} chargers '
+        '(${result.fromCache ? "cache: ${result.cacheLabel}" : "live"})',
       );
-
-      if (mounted) {
-        setState(() {
-          _chargersAlongRoute = chargers;
-          _loadingChargers = false;
-        });
-
-        debugPrint('Loaded ${chargers.length} chargers along route');
-      }
-    } catch (e) {
-      debugPrint('Error fetching chargers: $e');
-      if (mounted) {
-        setState(() => _loadingChargers = false);
-      }
     }
   }
 
@@ -370,10 +372,19 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
               ),
             ),
 
+          // Offline banner (shows when device has no network)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 52,
+            left: 0,
+            right: 0,
+            child: OfflineBanner(cacheLabel: _chargersCacheLabel),
+          ),
+
           // Chargers Loaded Badge
           if (!_loadingChargers && _chargersAlongRoute.isNotEmpty)
             Positioned(
-              top: MediaQuery.of(context).padding.top + 60,
+              top: MediaQuery.of(context).padding.top + 60 +
+                  (_chargersFromCache ? 28 : 0), // shift down when offline banner is visible
               left: 16,
               right: 16,
               child: Container(
@@ -382,19 +393,30 @@ class _RouteResultScreenState extends State<RouteResultScreen> {
                   vertical: 8,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.1),
-                  border: Border.all(color: Colors.green, width: 1),
+                  color: _chargersFromCache
+                      ? Colors.orange.withValues(alpha: 0.1)
+                      : Colors.green.withValues(alpha: 0.1),
+                  border: Border.all(
+                    color: _chargersFromCache ? Colors.orange : Colors.green,
+                    width: 1,
+                  ),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.ev_station, size: 14, color: Colors.green),
+                    Icon(
+                      _chargersFromCache ? Icons.history_rounded : Icons.ev_station,
+                      size: 14,
+                      color: _chargersFromCache ? Colors.orange : Colors.green,
+                    ),
                     const Gap(6),
                     Text(
-                      '${_chargersAlongRoute.length} chargers found',
+                      _chargersFromCache
+                          ? '${_chargersAlongRoute.length} chargers · ${_chargersCacheLabel ?? "cached"}'
+                          : '${_chargersAlongRoute.length} chargers found',
                       style: theme.textTheme.labelSmall?.copyWith(
-                        color: Colors.green,
+                        color: _chargersFromCache ? Colors.orange : Colors.green,
                       ),
                     ),
                   ],

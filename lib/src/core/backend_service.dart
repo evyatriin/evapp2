@@ -1,10 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app_config.dart';
+import 'connectivity_service.dart';
+import 'result.dart';
 
 class BackendException implements Exception {
   const BackendException({
@@ -195,5 +198,72 @@ class BackendService {
       code: code,
       fieldErrors: fieldErrors,
     );
+  }
+
+  // ── Safe variants returning Result<T> ─────────────────────────────────────
+  //
+  // Use these when you want to handle offline / error states without try/catch
+  // at the call site, e.g. in services that back cached screens.
+  //
+  // The old throwing `get/post/put/delete` are kept for backward compatibility.
+
+  /// GET that returns `Result<dynamic>` instead of throwing.
+  /// Checks connectivity first; returns `Failure(AppError.offline())` immediately
+  /// when the device has no network, so callers can fall back to cache.
+  static Future<Result<dynamic>> safeGet(
+    String endpoint, {
+    Map<String, String>? queryParams,
+    Map<String, String>? headers,
+    bool authenticated = true,
+  }) async {
+    final online = await checkConnectivityNow();
+    if (!online) return Failure(AppError.offline());
+
+    try {
+      final data = await get(
+        endpoint,
+        queryParams: queryParams,
+        headers: headers,
+        authenticated: authenticated,
+      );
+      return Success(data);
+    } on BackendException catch (e) {
+      if (e.statusCode == 408) return Failure(AppError.timeout());
+      if (e.statusCode == 0) return Failure(AppError.offline());
+      return Failure(AppError.server(e.statusCode, e.message));
+    } on SocketException {
+      return Failure(AppError.offline());
+    } catch (e) {
+      return Failure(AppError.unknown(e));
+    }
+  }
+
+  /// POST that returns `Result<dynamic>` instead of throwing.
+  static Future<Result<dynamic>> safePost(
+    String endpoint, {
+    required Map<String, dynamic> body,
+    Map<String, String>? headers,
+    bool authenticated = true,
+  }) async {
+    final online = await checkConnectivityNow();
+    if (!online) return Failure(AppError.offline());
+
+    try {
+      final data = await post(
+        endpoint,
+        body: body,
+        headers: headers,
+        authenticated: authenticated,
+      );
+      return Success(data);
+    } on BackendException catch (e) {
+      if (e.statusCode == 408) return Failure(AppError.timeout());
+      if (e.statusCode == 0) return Failure(AppError.offline());
+      return Failure(AppError.server(e.statusCode, e.message));
+    } on SocketException {
+      return Failure(AppError.offline());
+    } catch (e) {
+      return Failure(AppError.unknown(e));
+    }
   }
 }
