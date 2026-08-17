@@ -27,6 +27,7 @@ build_args=(
   --dart-define=BACKEND_URL="${BACKEND_URL}"
   --dart-define=SUPABASE_URL="${SUPABASE_URL}"
   --dart-define=SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY}"
+  --dart-define=SOS_ENABLED="${SOS_ENABLED:-false}"
 )
 
 # Android startup is stable with the standard release build, but the obfuscated

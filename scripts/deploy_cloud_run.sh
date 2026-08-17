@@ -53,6 +53,7 @@ done
 env_vars=(
   "APP_ENV=production"
   "ALLOWED_ORIGINS=$(clean_env "${ALLOWED_ORIGINS}")"
+  "FEATURE_SOS_ENABLED=$(clean_env "${FEATURE_SOS_ENABLED:-true}")"
   "SUPABASE_URL=$(clean_env "${SUPABASE_URL}")"
   "SUPABASE_KEY=$(clean_env "${SUPABASE_KEY}")"
   "GOOGLE_MAPS_API_KEY=$(clean_env "${GOOGLE_MAPS_API_KEY}")"

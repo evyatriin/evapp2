@@ -63,7 +63,7 @@ jobs:
             --min-instances 1 \
             --max-instances 5 \
             --concurrency 10 \
-            --set-env-vars "^@^APP_ENV=production@ALLOWED_ORIGINS=https://evraahein.app,https://www.evraahein.app@FEATURE_SOS_ENABLED=false@ELEVATION_ENABLED=true@ELEVATION_API_TIMEOUT_SECONDS=30@PASSWORD_RESET_REDIRECT_URL=https://evraahein-backend-187759131948.asia-south1.run.app/reset-password" \
+            --set-env-vars "^@^APP_ENV=production@ALLOWED_ORIGINS=https://evraahein.app,https://www.evraahein.app@FEATURE_SOS_ENABLED=true@ELEVATION_ENABLED=true@ELEVATION_API_TIMEOUT_SECONDS=30@PASSWORD_RESET_REDIRECT_URL=https://evraahein-backend-187759131948.asia-south1.run.app/reset-password" \
             --set-secrets "SUPABASE_URL=supabase-url:latest,SUPABASE_KEY=supabase-anon-key:latest,SUPABASE_SERVICE_ROLE_KEY=supabase-service-role-key:latest,GOOGLE_MAPS_API_KEY=google-maps-api-key:latest,HERE_API_KEY=here-api-key:latest"
 
       - name: Verify deployment health
