@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, timezone
 import os
 
@@ -66,18 +67,22 @@ async def signup(request: Request, signup_req: SignUpRequest):
         raise HTTPException(status_code=503, detail="Authentication service not configured")
     
     try:
-        # Sign up user with Supabase Auth
-        response = public_supabase.auth.sign_up({
-            "email": signup_req.email,
-            "password": signup_req.password,
-            "options": {
-                "data": {
-                    "name": signup_req.name,
-                    "terms_accepted_at": datetime.now(timezone.utc).isoformat(),
-                    "terms_version": "2026-06-12",
-                }
-            }
-        })
+        # Sign up user with Supabase Auth. The supabase-py client is synchronous,
+        # so run it in a worker thread to avoid blocking the event loop.
+        response = await asyncio.to_thread(
+            public_supabase.auth.sign_up,
+            {
+                "email": signup_req.email,
+                "password": signup_req.password,
+                "options": {
+                    "data": {
+                        "name": signup_req.name,
+                        "terms_accepted_at": datetime.now(timezone.utc).isoformat(),
+                        "terms_version": "2026-06-12",
+                    }
+                },
+            },
+        )
 
         if response.user:
             track_user_event("signup")
@@ -115,11 +120,14 @@ async def login(request: Request, signin_req: SignInRequest):
         raise HTTPException(status_code=503, detail="Authentication service not configured")
 
     try:
-        # Sign in user with Supabase Auth
-        response = public_supabase.auth.sign_in_with_password({
-            "email": signin_req.email,
-            "password": signin_req.password
-        })
+        # Sign in user with Supabase Auth (sync client -> worker thread).
+        response = await asyncio.to_thread(
+            public_supabase.auth.sign_in_with_password,
+            {
+                "email": signin_req.email,
+                "password": signin_req.password,
+            },
+        )
         
         if response.user and response.session:
             track_user_event("login")
@@ -218,7 +226,8 @@ async def change_password(
     if not service_supabase:
         raise HTTPException(status_code=503, detail="Service role not configured")
     try:
-        service_supabase.auth.admin.update_user_by_id(
+        await asyncio.to_thread(
+            service_supabase.auth.admin.update_user_by_id,
             auth_user["user_id"],
             {"password": body.new_password},
         )
@@ -233,9 +242,11 @@ async def change_password(
 async def reset_password(request: Request, body: ResetPasswordRequest):
     """Send a password-reset email via Supabase. Always returns 200 to prevent enumeration."""
     try:
-        public_supabase.auth.reset_password_for_email(
-            body.email,
-            options={"redirect_to": settings.PASSWORD_RESET_REDIRECT_URL},
+        await asyncio.to_thread(
+            lambda: public_supabase.auth.reset_password_for_email(
+                body.email,
+                options={"redirect_to": settings.PASSWORD_RESET_REDIRECT_URL},
+            )
         )
     except Exception as e:
         logger.warning("reset_password email error for %s: %s", body.email, e)

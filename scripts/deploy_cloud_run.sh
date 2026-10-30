@@ -5,12 +5,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BACKEND_DIR="${ROOT_DIR}/backend"
 ENV_FILE="${BACKEND_ENV_FILE:-${BACKEND_DIR}/.env}"
-SERVICE_NAME="${SERVICE_NAME:-ev-ranger-backend}"
-REGION="${REGION:-asia-south1}"
+# Live production service (us-central1). Override via env if deploying elsewhere.
+PROJECT="${PROJECT:-sensous-prod-1778268660}"
+SERVICE_NAME="${SERVICE_NAME:-ev-router-backend}"
+REGION="${REGION:-us-central1}"
 MEMORY="${MEMORY:-512Mi}"
 CPU="${CPU:-1}"
-MIN_INSTANCES="${MIN_INSTANCES:-0}"
-MAX_INSTANCES="${MAX_INSTANCES:-3}"
+# min-instances=1 keeps one warm instance so first requests skip the cold start.
+MIN_INSTANCES="${MIN_INSTANCES:-1}"
+MAX_INSTANCES="${MAX_INSTANCES:-5}"
 ALLOWED_ORIGINS="${ALLOWED_ORIGINS:-*}"
 
 clean_env() {
@@ -67,6 +70,7 @@ fi
 cd "${ROOT_DIR}"
 
 gcloud run deploy "${SERVICE_NAME}" \
+  --project "${PROJECT}" \
   --source backend \
   --region "${REGION}" \
   --platform managed \
@@ -74,6 +78,7 @@ gcloud run deploy "${SERVICE_NAME}" \
   --port 8080 \
   --memory "${MEMORY}" \
   --cpu "${CPU}" \
+  --cpu-boost \
   --min-instances "${MIN_INSTANCES}" \
   --max-instances "${MAX_INSTANCES}" \
-  --set-env-vars "$(IFS=,; echo "${env_vars[*]}")"
+  --update-env-vars "$(IFS=,; echo "${env_vars[*]}")"
