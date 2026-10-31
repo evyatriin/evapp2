@@ -194,12 +194,44 @@ class NormalizedCharger:
 
 _CACHE_SUFFICIENT_COUNT = 5  # min chargers to serve from cache without hitting external APIs
 
+# Cap the number of chargers returned to the client. A map view only needs the
+# nearest few hundred; returning thousands bloats the payload and the device render.
+MAX_RESULTS = 300
+
+# Short-lived in-process response cache so repeated pans/zooms over the same area
+# are served without re-hitting the database. Best-effort and per-instance only.
+_RESPONSE_CACHE_TTL = timedelta(seconds=60)
+_response_cache: dict[tuple[float, float, float], tuple[datetime, list[NormalizedCharger]]] = {}
+_RESPONSE_CACHE_MAX_KEYS = 512
+
+
+def _response_cache_key(latitude: float, longitude: float, radius_km: float) -> tuple[float, float, float]:
+    # ~110m granularity, enough to coalesce nearby requests.
+    return (round(latitude, 3), round(longitude, 3), round(radius_km, 1))
+
+
+def _sort_and_cap(chargers: list[NormalizedCharger]) -> list[NormalizedCharger]:
+    chargers.sort(key=lambda c: (c.distance_m is None, c.distance_m or math.inf, c.name.lower()))
+    return chargers[:MAX_RESULTS]
+
+
+def _store_response_cache(key: tuple[float, float, float], chargers: list[NormalizedCharger]) -> None:
+    if len(_response_cache) > _RESPONSE_CACHE_MAX_KEYS:
+        _response_cache.clear()
+    _response_cache[key] = (datetime.now(timezone.utc), chargers)
+
 
 async def aggregate_chargers_nearby(
     latitude: float,
     longitude: float,
     radius_km: float,
 ) -> list[NormalizedCharger]:
+    # Response cache: serve repeat requests over the same area instantly.
+    key = _response_cache_key(latitude, longitude, radius_km)
+    cached = _response_cache.get(key)
+    if cached and datetime.now(timezone.utc) - cached[0] < _RESPONSE_CACHE_TTL:
+        return list(cached[1])
+
     # Fast path: canonical DB first (~1s).  Return immediately if cache is warm.
     try:
         canonical = await asyncio.wait_for(
@@ -213,15 +245,17 @@ async def aggregate_chargers_nearby(
         asyncio.create_task(
             _refresh_from_external_sources(latitude, longitude, radius_km)
         )
-        canonical.sort(key=lambda c: (c.distance_m is None, c.distance_m or math.inf, c.name.lower()))
-        return canonical
+        result = _sort_and_cap(canonical)
+        _store_response_cache(key, result)
+        return list(result)
 
     # Cold path: first fetch for this area — wait for all sources.
     sources = await _fetch_all_sources(latitude, longitude, radius_km)
     merged = _merge_deduped_chargers(sources)
     asyncio.get_event_loop().run_in_executor(None, _persist_canonical_results_sync, list(merged))
-    merged.sort(key=lambda charger: (charger.distance_m is None, charger.distance_m or math.inf, charger.name.lower()))
-    return merged
+    result = _sort_and_cap(merged)
+    _store_response_cache(key, result)
+    return list(result)
 
 
 async def _refresh_from_external_sources(
@@ -246,9 +280,9 @@ async def _fetch_all_sources(
     results = await _gather_optional(
         asyncio.wait_for(_fetch_canonical_db_nearby(latitude, longitude, radius_km), timeout=8.0),
         asyncio.wait_for(_fetch_legacy_db_stations(latitude, longitude, radius_km), timeout=8.0),
-        asyncio.wait_for(_fetch_here_ev_nearby(latitude, longitude, radius_km), timeout=22.0),
-        asyncio.wait_for(_fetch_google_places_nearby(latitude, longitude, radius_km), timeout=22.0),
-        asyncio.wait_for(_fetch_open_charge_map_nearby(latitude, longitude, radius_km), timeout=22.0),
+        asyncio.wait_for(_fetch_here_ev_nearby(latitude, longitude, radius_km), timeout=10.0),
+        asyncio.wait_for(_fetch_google_places_nearby(latitude, longitude, radius_km), timeout=10.0),
+        asyncio.wait_for(_fetch_open_charge_map_nearby(latitude, longitude, radius_km), timeout=10.0),
     )
     chargers: list[NormalizedCharger] = []
     for batch in results:

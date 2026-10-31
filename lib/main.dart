@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -31,6 +34,10 @@ Future<void> _boot() async {
     return;
   }
 
+  // Warm the Cloud Run backend (defeats cold start) while the user reads the
+  // login screen. Fire-and-forget — failures are harmless.
+  unawaited(_warmBackend());
+
   try {
     await Supabase.initialize(
       url: AppConfig.supabaseUrl,
@@ -46,6 +53,16 @@ Future<void> _boot() async {
         details: kDebugMode ? error.toString() : null,
       ),
     );
+  }
+}
+
+Future<void> _warmBackend() async {
+  try {
+    await http
+        .get(Uri.parse('${AppConfig.backendBaseUrl}/health'))
+        .timeout(const Duration(seconds: 6));
+  } catch (_) {
+    // Best-effort warm-up only.
   }
 }
 
